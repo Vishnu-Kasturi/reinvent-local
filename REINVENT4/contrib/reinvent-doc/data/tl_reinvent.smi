@@ -1,0 +1,6 @@
+# Transfer learning input for Reinvent — one SMILES per line
+# Example: known kinase inhibitors
+
+Cc1ccc(-c2cc(C(F)(F)F)nn2-c2ccc(S(N)(=O)=O)cc2)cc1
+O=C(Nc1ccc(Oc2nccc(-c3cccnc3)n2)cc1)c1ccc(Cl)cc1
+Cc1nc2ccc(F)cc2c(=O)n1-c1ccc(N2CCOCC2)cc1

@@ -1,0 +1,6 @@
+# LibInvent scaffold input — one scaffold per line
+# Attachment points marked with [*:0] and [*:1]
+
+[*:0]Cc2ccc1cncc(C[*:1])c1c2
+[*:0]Cc2cnc1cncc(C[*:1])c1c2
+[*:0]c1cnc2cc(C[*:1])ccc2c1

@@ -1,0 +1,6 @@
+# Mol2Mol input — one reference molecule per line
+# Optional name in the second column
+
+O=S(=O)(c1cccc2cnccc12)N1CCCNCC1	CHEMBL38380
+COc1ccc(CN(CC(=O)NO)S(=O)(=O)c2ccc(OC)cc2)cc1	CHEMBL82783
+Cc1ccc(-c2cc(C(F)(F)F)nn2-c2ccc(S(N)(=O)=O)cc2)cc1	Celecoxib

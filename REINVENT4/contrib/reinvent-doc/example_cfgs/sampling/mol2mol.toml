@@ -1,0 +1,12 @@
+run_type = "sampling"
+device = "cuda:0"  # or "cpu"
+
+[parameters]
+model_file = "prior/mol2mol_medium_similarity.prior"
+smiles_file = "data/mol2mol.smi"
+sample_strategy = "multinomial"  # or "beamsearch" for deterministic output
+temperature = 1.0
+output_file = "output/sampling_mol2mol.csv"
+num_smiles = 100
+unique_molecules = true
+randomize_smiles = true

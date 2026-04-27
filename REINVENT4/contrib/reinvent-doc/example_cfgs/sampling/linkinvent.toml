@@ -1,0 +1,10 @@
+run_type = "sampling"
+device = "cuda:0"  # or "cpu"
+
+[parameters]
+model_file = "prior/linkinvent.prior"
+smiles_file = "data/warheads.smi"
+output_file = "output/sampling_linkinvent.csv"
+num_smiles = 100
+unique_molecules = true
+randomize_smiles = true

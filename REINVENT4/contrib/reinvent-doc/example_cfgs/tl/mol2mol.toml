@@ -1,0 +1,18 @@
+run_type = "transfer_learning"
+device = "cuda:0"  # or "cpu"
+tb_logdir = "tb_TL_mol2mol"
+
+[parameters]
+input_model_file = "prior/mol2mol_medium_similarity.prior"
+smiles_file = "data/tl_reinvent.smi"
+output_model_file = "output/tl_mol2mol.model"
+
+num_epochs = 50
+save_every_n_epochs = 10
+batch_size = 50
+
+pairs.type = "tanimoto"
+pairs.lower_threshold = 0.7   # only pair molecules with Tanimoto >= 0.7
+pairs.upper_threshold = 1.0   # set < 1.0 to exclude identical molecules from pairing
+pairs.min_cardinality = 1     # discard sources with fewer than N valid targets
+pairs.max_cardinality = 199   # discard sources with more than N valid targets

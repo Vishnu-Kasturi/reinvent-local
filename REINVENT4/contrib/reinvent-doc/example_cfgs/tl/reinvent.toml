@@ -1,0 +1,12 @@
+run_type = "transfer_learning"
+device = "cuda:0"  # or "cpu"
+tb_logdir = "tb_TL_reinvent"
+
+[parameters]
+input_model_file = "prior/reinvent.prior"
+smiles_file = "data/tl_reinvent.smi"
+output_model_file = "output/tl_reinvent.model"
+
+num_epochs = 50
+save_every_n_epochs = 10
+batch_size = 50
