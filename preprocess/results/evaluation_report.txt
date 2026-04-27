@@ -1,28 +1,35 @@
-ChEMBL pIC50 Neural Network – Evaluation Report
+ChEMBL pIC50 Ensemble Model – Evaluation Report
 =======================================================
 Active/Inactive threshold for classification : pIC50 = 6.0
 
-Global Test Metrics:
-  R²      : 0.5453
-  RMSE    : 0.7855
-  MAE     : 0.5868
-  F1      : 0.9380
-  AUC-ROC : 0.7366
-
-Per-Zone Metrics
+Global Test Metrics
 -------------------------------------------------------
-  Zone            N      R²    RMSE     MAE
-  low            23 -30.5728  1.6126  1.3732
-  bulk         1193  0.4285  0.7115  0.5465
-  high           94 -5.0834  1.2400  0.9056
-  all          1310  0.5453  0.7855  0.5868
+  Model                       R²    RMSE     MAE      F1   AUC-ROC
+  RF_balanced             0.5092  0.8162  0.6355  0.9293    0.5564
+  RF_extreme              0.4561  0.8591  0.6695  0.9325    0.5757
+  XGB_conservative        0.5875  0.7482  0.5636  0.9396    0.6621
+  XGB_aggressive          0.6174  0.7206  0.5338  0.9430    0.6957
+  Ensemble (Ridge)        0.6177  0.7203  0.5375  0.9434    0.6984
+
+Per-Zone Metrics (Ensemble)
+-------------------------------------------------------
+  Zone            N      R²    RMSE     MAE      F1   AUC-ROC
+  low            23 -31.0511  1.6248  1.4369  0.0000       nan
+  bulk         1193  0.5588  0.6252  0.4865  0.9442    0.6960
+  high           94 -5.4259  1.2744  0.9653  1.0000       nan
+  all          1310  0.6177  0.7203  0.5375  0.9434    0.6984
 
 Classification report (threshold = 6.0)
               precision    recall  f1-score   support
 
-    Inactive       0.65      0.51      0.57       185
-      Active       0.92      0.95      0.94      1125
+    Inactive       0.76      0.42      0.54       185
+      Active       0.91      0.98      0.94      1125
 
-    accuracy                           0.89      1310
-   macro avg       0.79      0.73      0.75      1310
-weighted avg       0.88      0.89      0.89      1310
+    accuracy                           0.90      1310
+   macro avg       0.84      0.70      0.74      1310
+weighted avg       0.89      0.90      0.89      1310
+
+
+5-Fold CV (XGB_conservative proxy on train+val)
+  R²   : 0.7275 ± 0.0129
+  RMSE : 0.6274 ± 0.0112

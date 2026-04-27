@@ -5,8 +5,9 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors, rdMolDescriptors
 from rdkit.Chem import rdMorganFingerprint
 
-# Load the single Neural Network model
-nn_model = joblib.load("models/NN_model.joblib")
+models = {n: joblib.load(f"models/{n}.joblib")
+          for n in ["RF_balanced","RF_extreme","XGB_conservative","XGB_aggressive"]}
+meta   = joblib.load("models/meta_ridge.joblib")
 
 with open("data_splits/physchem_scaler.pkl","rb") as f:
     scaler = pickle.load(f)
@@ -35,6 +36,5 @@ def predict_pic50(smiles_list):
                 "rings","arom_rings","heavy_atoms","frac_csp3","stereo"]
     df[PHYSCHEM] = scaler.transform(df[PHYSCHEM])
     X = df[FEATURE_COLS].values.astype("float32")
-    
-    # Return the NN prediction
-    return nn_model.predict(X)
+    preds_stack = np.column_stack([m.predict(X) for m in models.values()])
+    return meta.predict(preds_stack)
