@@ -5,31 +5,31 @@ Active/Inactive threshold for classification : pIC50 = 6.0
 Global Test Metrics
 -------------------------------------------------------
   Model                       R²    RMSE     MAE      F1   AUC-ROC
-  RF_balanced             0.5092  0.8162  0.6355  0.9293    0.5564
-  RF_extreme              0.4561  0.8591  0.6695  0.9325    0.5757
-  XGB_conservative        0.5875  0.7482  0.5636  0.9396    0.6621
-  XGB_aggressive          0.6174  0.7206  0.5338  0.9430    0.6957
-  Ensemble (Ridge)        0.6177  0.7203  0.5375  0.9434    0.6984
+  RF_balanced             0.5941  0.7678  0.5873  0.9221    0.5743
+  RF_extreme              0.5210  0.8341  0.6330  0.9221    0.5766
+  XGB_conservative        0.6847  0.6767  0.5122  0.9347    0.6773
+  XGB_aggressive          0.7205  0.6371  0.4738  0.9314    0.6948
+  Ensemble (Ridge)        0.7221  0.6353  0.4696  0.9292    0.7109
 
 Per-Zone Metrics (Ensemble)
 -------------------------------------------------------
   Zone            N      R²    RMSE     MAE      F1   AUC-ROC
-  low            23 -31.0511  1.6248  1.4369  0.0000       nan
-  bulk         1193  0.5588  0.6252  0.4865  0.9442    0.6960
-  high           94 -5.4259  1.2744  0.9653  1.0000       nan
-  all          1310  0.6177  0.7203  0.5375  0.9434    0.6984
+  low            28 -17.9263  1.2369  0.8709  0.0000       nan
+  bulk          987  0.6089  0.6030  0.4547  0.9255    0.6734
+  high           78 -2.1486  0.7103  0.5139  1.0000       nan
+  all          1093  0.7221  0.6353  0.4696  0.9292    0.7109
 
 Classification report (threshold = 6.0)
               precision    recall  f1-score   support
 
-    Inactive       0.76      0.42      0.54       185
-      Active       0.91      0.98      0.94      1125
+    Inactive       0.69      0.45      0.54       178
+      Active       0.90      0.96      0.93       915
 
-    accuracy                           0.90      1310
-   macro avg       0.84      0.70      0.74      1310
-weighted avg       0.89      0.90      0.89      1310
+    accuracy                           0.88      1093
+   macro avg       0.79      0.71      0.74      1093
+weighted avg       0.87      0.88      0.87      1093
 
 
 5-Fold CV (XGB_conservative proxy on train+val)
-  R²   : 0.7275 ± 0.0129
-  RMSE : 0.6274 ± 0.0112
+  R²   : 0.7098 ± 0.0165
+  RMSE : 0.6449 ± 0.0271

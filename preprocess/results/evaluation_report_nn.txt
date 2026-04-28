@@ -3,26 +3,26 @@ ChEMBL pIC50 Neural Network – Evaluation Report
 Active/Inactive threshold for classification : pIC50 = 6.0
 
 Global Test Metrics:
-  R²      : 0.5453
-  RMSE    : 0.7855
-  MAE     : 0.5868
-  F1      : 0.9380
-  AUC-ROC : 0.7366
+  R²      : 0.6192
+  RMSE    : 0.7437
+  MAE     : 0.5571
+  F1      : 0.9244
+  AUC-ROC : 0.7111
 
 Per-Zone Metrics
 -------------------------------------------------------
   Zone            N      R²    RMSE     MAE
-  low            23 -30.5728  1.6126  1.3732
-  bulk         1193  0.4285  0.7115  0.5465
-  high           94 -5.0834  1.2400  0.9056
-  all          1310  0.5453  0.7855  0.5868
+  low            28 -27.3961  1.5151  1.2498
+  bulk          987  0.4924  0.6870  0.5246
+  high           78 -4.9540  0.9767  0.7191
+  all          1093  0.6192  0.7437  0.5571
 
 Classification report (threshold = 6.0)
               precision    recall  f1-score   support
 
-    Inactive       0.65      0.51      0.57       185
-      Active       0.92      0.95      0.94      1125
+    Inactive       0.64      0.47      0.54       178
+      Active       0.90      0.95      0.92       915
 
-    accuracy                           0.89      1310
-   macro avg       0.79      0.73      0.75      1310
-weighted avg       0.88      0.89      0.89      1310
+    accuracy                           0.87      1093
+   macro avg       0.77      0.71      0.73      1093
+weighted avg       0.86      0.87      0.86      1093
