@@ -1,0 +1,16 @@
+{
+  "chemberta_model": "DeepChem/ChemBERTa-77M-MTR",
+  "d_model": 128,
+  "n_heads": 4,
+  "n_layers": 2,
+  "d_ff": 256,
+  "total_params": 3752305,
+  "trainable_params": 324865,
+  "best_val_rmse": 0.6633543839141656,
+  "test_rmse": 0.6689851623694462,
+  "test_mae": 0.4783993065357208,
+  "test_r2": 0.6841191053390503,
+  "epochs": 100,
+  "batch_size": 32,
+  "lr": 0.0003
+}

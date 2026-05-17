@@ -1,0 +1,29 @@
+{
+    "run_type": "sampling",
+    "device": "cpu",
+    "use_cuda": true,
+    "tb_logdir": null,
+    "json_out_config": "json_jak2_mol2mol.json",
+    "seed": null,
+    "parameters": {
+        "model_file": "priors/mol2mol_high_similarity.prior",
+        "num_smiles": 50,
+        "smiles_file": "custom_data/top_hits.smi",
+        "target_smiles_path": "",
+        "sample_strategy": "beamsearch",
+        "output_file": "../results/jak2_mol2mol_candidates.csv",
+        "target_nll_file": "target_nll.csv",
+        "unique_molecules": true,
+        "randomize_smiles": true,
+        "temperature": 0.8
+    },
+    "scoring": null,
+    "scheduler": null,
+    "responder": null,
+    "filter": null,
+    "stage": null,
+    "learning_strategy": null,
+    "diversity_filter": null,
+    "intrinsic_penalty": null,
+    "inception": null
+}

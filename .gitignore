@@ -1,3 +1,14 @@
 __pycache__/
 .DS_Store
 *.log
+*.model
+*.chkpt
+*.prior
+tb_jak2_rl_0/
+tb_jak2_tl/
+tb_jak2_rl/
+*.pt
+*.pth
+*.pkl
+*.joblib
+*.ubj
