@@ -46,8 +46,8 @@ PHYSCHEM_COLS = [
 
 # XGB — tighter regularisation
 XGB_PARAMS = dict(
-    n_estimators          = 3000,
-    learning_rate         = 0.02,        # slower lr → better generalisation
+    n_estimators          = 15000,
+    learning_rate         = 0.005,        # slower lr → better generalisation
     max_depth             = 5,           # shallower trees
     subsample             = 0.7,
     colsample_bytree      = 0.6,         # see fewer features per tree
@@ -262,10 +262,10 @@ def main(args):
         print(f"  {name:<30s}  {score:.5f}")
 
     # ── Save artefacts ─────────────────────────────────────────
-    model.save_model(os.path.join(args.output_dir, "xgb_model.ubj"))
+    model.save_model(os.path.join(args.output_dir, "xgb_model_v21.ubj"))
 
     import pickle
-    with open(os.path.join(args.output_dir, "desc_scaler.pkl"), "wb") as f:
+    with open(os.path.join(args.output_dir, "desc_scaler_v21.pkl"), "wb") as f:
         pickle.dump(desc_scaler, f)
 
     summary = {

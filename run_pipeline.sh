@@ -1,8 +1,15 @@
 #!/bin/bash
 set -e
 
+# Support optional target argument (e.g. ./run_pipeline.sh EGFR)
+TARGET_NAME=$1
+
 echo "========================================"
-echo "    JAK2 pIC50 REINVENT4 PIPELINE       "
+if [ -n "$TARGET_NAME" ]; then
+    echo "    $TARGET_NAME pIC50 REINVENT4 PIPELINE"
+else
+    echo "    JAK2 pIC50 REINVENT4 PIPELINE       "
+fi
 echo "========================================"
 
 # Create required directories
@@ -17,16 +24,31 @@ conda activate reinvent-qsar || conda activate reinvent4
 # Export PYTHONPATH so the REINVENT scoring plugins can find reinvent_plugins/components
 export PYTHONPATH="$(pwd)/REINVENT4:$PYTHONPATH"
 
+# Dynamic Target Fetching
+if [ -n "$TARGET_NAME" ]; then
+    echo "[*] Target name specified: $TARGET_NAME"
+    echo "[*] Step 0: Fetching desalted & standardized bioactivity data from ChEMBL..."
+    
+    # Run fetcher (default minimum pIC50 threshold = 6.0)
+    python preprocess/fetch_chembl_target.py "$TARGET_NAME" --min_pic50 6.0
+    
+    echo "[*] Step 0.5: Copying desalted data to REINVENT4/custom_data/ (no TOML edits needed)..."
+    mkdir -p REINVENT4/custom_data
+    cp "datasets/$TARGET_NAME/train.smi" REINVENT4/custom_data/custom_train.smi
+    cp "datasets/$TARGET_NAME/val.smi"   REINVENT4/custom_data/custom_val.smi
+    echo "    Successfully imported $TARGET_NAME dataset into the pipeline!"
+fi
+
 # 1. Transfer Learning
 echo "[*] Phase 1: Transfer Learning..."
 cd REINVENT4
 reinvent -l ../logs/jak2_tl.log configs/jak2_tl.toml
 cd ..
 
-# 2. Reinforcement Learning
+# 2. Reinforcement Learning (v2 config with fixed NumRotBond and diversity filter)
 echo "[*] Phase 2: Reinforcement Learning..."
 cd REINVENT4
-reinvent -l ../logs/jak2_rl.log configs/jak2_rl.toml
+reinvent -l ../logs/jak2_rl.log configs/jak2_rl_v2.toml
 cd ..
 
 # 3. Locate and copy the latest RL checkpoint
@@ -52,33 +74,41 @@ cd REINVENT4
 reinvent -l ../logs/jak2_rl_sampling.log configs/jak2_sampling_rl.toml
 cd ..
 
-# 5. Extract top 50 molecules
-echo "[*] Phase 5: Extracting top 50 SMILES from sampling results..."
+# 5. Extract top 10 unique molecules (FIXED: deduplicate + require Score > 0)
+echo "[*] Phase 5: Extracting top 10 unique hits from RL results..."
 python -c "
 import pandas as pd
+import os
 
-try:
-    df = pd.read_csv('results/jak2_rl_candidates.csv')
-    
-    # Check if 'SMILES' is a column, if not, find the likely column (first col usually)
-    smiles_col = 'SMILES' if 'SMILES' in df.columns else df.columns[0]
-    
-    # Sort by 'Score' if available, otherwise just take the first 50
-    if 'Score' in df.columns:
-        top50 = df.nlargest(50, 'Score')
-    else:
-        top50 = df.head(50)
-        
-    top50_smiles = top50[smiles_col].dropna().unique()[:50]
-    
-    with open('results/jak2_rl_top50_seeds.smi', 'w') as f:
-        for smi in top50_smiles:
-            f.write(f'{smi}\\n')
-            
-    print(f'Successfully extracted {len(top50_smiles)} top SMILES.')
-except Exception as e:
-    print(f'Error extracting top 50 SMILES: {e}')
+# Find the latest focused_rl CSV
+import glob
+csvs = sorted(glob.glob('results/focused_rl*.csv'))
+if not csvs:
+    print('No RL results CSV found! Pipeline failed.')
     exit(1)
+csv_path = csvs[-1]
+print(f'Reading: {csv_path}')
+
+df = pd.read_csv(csv_path)
+
+smiles_col = 'SMILES' if 'SMILES' in df.columns else df.columns[0]
+pic50_col  = 'JAK2pIC50 (raw)' if 'JAK2pIC50 (raw)' in df.columns else 'Score'
+
+# FIXED: only accepted molecules, one row per unique SMILES, ranked by pIC50
+top10 = (
+    df[df['Score'] > 0]                          # exclude diversity-filter rejections
+    .drop_duplicates(subset=[smiles_col])         # one row per unique SMILES
+    .sort_values(by=pic50_col, ascending=False)   # rank by predicted pIC50
+    .head(10)
+)
+
+print(f'Extracted {len(top10)} unique top hits')
+top10.to_csv('results/top_10_hits.csv', index=False)
+
+# Write seed SMILES for Mol2Mol
+os.makedirs('REINVENT4/custom_data', exist_ok=True)
+top10[smiles_col].to_csv('REINVENT4/custom_data/top_hits.smi', index=False, header=False)
+print('Saved top_10_hits.csv and top_hits.smi')
 "
 
 # 6. Mol2Mol Sampling
@@ -88,5 +118,9 @@ reinvent -l ../logs/jak2_mol2mol.log configs/jak2_mol2mol.toml
 cd ..
 
 echo "========================================"
-echo "          PIPELINE COMPLETED            "
+if [ -n "$TARGET_NAME" ]; then
+    echo "    $TARGET_NAME PIPELINE COMPLETED      "
+else
+    echo "    JAK2 PIPELINE COMPLETED             "
+fi
 echo "========================================"

@@ -12,3 +12,6 @@ tb_jak2_rl/
 *.pkl
 *.joblib
 *.ubj
+datasets/
+models/
+results/focused_rl*.csv

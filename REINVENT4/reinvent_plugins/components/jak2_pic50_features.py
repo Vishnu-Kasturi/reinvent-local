@@ -19,6 +19,10 @@ RDKIT_DESC_FUNCS = [
     if name not in _EXCLUDE
 ]
 
+# Precomputed expected total feature dimensionality:
+# 11 physchem + 167 MACCS + 2048 ECFP4 + 2048 ECFP6 + len(RDKIT_DESC_FUNCS) RDKit 2D
+EXPECTED_FEATURE_DIM = 11 + 167 + 2048 + 2048 + len(RDKIT_DESC_FUNCS)
+
 def rdkit_descriptors(mol):
     vals = []
     for _, func in RDKIT_DESC_FUNCS:

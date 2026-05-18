@@ -1,6 +1,6 @@
 run_type = "transfer_learning"
 device = "cpu"  # or "mps"/"cpu" depending on environment
-tb_logdir = "../tb_jak2_tl"
+tb_logdir = "/Users/vishnukasturi/Intern/reinvent-local/tb_jak2_tl"
 json_out_config = "json_jak2_tl.json"
 
 [parameters]

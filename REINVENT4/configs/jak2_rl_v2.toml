@@ -1,0 +1,220 @@
+##############################################################################
+# jak2_rl_v2.toml  —  Corrected Production RL Config for JAK2 pIC50
+#
+# KEY FIXES vs v1:
+#   - NumRotBond: low=2, high=10 (was low=high=8 → degenerate midpoint)
+#   - Stage 2 sigma removed (learning_strategy is global-only in REINVENT4)
+#   - bucket_size=8 (was 25 → forces faster scaffold diversification)
+#   - Inception memory_size=200 (was 100 → richer replay)
+#   - TPSA coef_div corrected to 150 (was 140 → matches high endpoint)
+#   - Added min-plateau to MolecularWeight via wider low/high margin
+#
+# To activate debugging for JAK2 component, set: export JAK2_DEBUG=1
+##############################################################################
+
+run_type    = "staged_learning"
+device      = "cpu"         # change to "cuda:0" if GPU available
+tb_logdir   = "/Users/vishnukasturi/Intern/reinvent-local/tb_jak2_rl"
+json_out_config = "json_jak2_rl_v2.json"
+
+[parameters]
+use_checkpoint = false
+summary_csv_prefix = "../results/focused_rl_v2"
+
+prior_file = "priors/reinvent.prior"
+agent_file = "../models/jak2_focused.model"
+
+batch_size = 64
+unique_sequences = true
+randomize_smiles  = true
+tb_isim = false
+
+[learning_strategy]
+# DAP: Target = Prior_NLL + sigma × score
+# sigma=128 → strong 128-unit gradient per unit of reward
+# This is kept in Stage 1 for fast early learning
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+##############################################################################
+# DIVERSITY FILTER
+# IdenticalMurckoScaffold: once bucket_size molecules with the same
+# Murcko scaffold are accepted, all future molecules of that scaffold → score=0
+#
+# FIX: Reduced bucket_size from 25 → 8
+#   - With 25, the dominant kinase scaffold can accumulate 25 hits before
+#     being blocked → massive scaffold exploitation in early steps.
+#   - With 8, the filter kicks in after only 8 hits per scaffold, forcing
+#     the agent to explore new scaffolds much sooner.
+##############################################################################
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 8      # was 25 → now forces diversity after 8 hits per scaffold
+minscore    = 0.35   # slightly lower to not be too restrictive initially
+
+##############################################################################
+# INCEPTION MEMORY
+# Seeds the experience replay buffer with your known active ligands.
+# Larger memory + sample_size = more diverse replay, better gradient signal.
+##############################################################################
+[inception]
+smiles_file = "custom_data/custom_train.smi"
+memory_size = 200   # was 100 → doubled for more diverse experience replay
+sample_size = 20    # was 10 → more seeds mixed in per gradient step
+
+##############################################################################
+# STAGE 1: Broad JAK2 pIC50 Optimization (300 steps)
+# Goal: Get agent to reliably generate JAK2-active molecules.
+# Components: QED + MW + JAK2pIC50 only (simple, 3 signals)
+# sigma=128 for aggressive potency learning
+##############################################################################
+[[stage]]
+chkpt_file  = '../models/jak2_rl_stage1_v2.chkpt'
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50      # must run at least 50 steps before checking max_score
+max_steps   = 300
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── QED: Drug-likeness (no transform needed, already [0,1]) ──────────────
+[[stage.scoring.component]]
+[stage.scoring.component.QED]
+[[stage.scoring.component.QED.endpoint]]
+name   = "QED"
+weight = 1.0
+
+# ── MolecularWeight: Lipinski-compliant range ────────────────────────────
+# double_sigmoid creates a smooth "hill" between low and high.
+# coef_div should equal the midpoint approximately → (300+550)/2=425 but
+# we use 500 to slightly bias toward larger molecules (kinase inhibitor space).
+# coef_si and coef_se control the steepness of rise/fall (20 = moderate slope).
+# At MW=300: score ≈ 0.04 (low plateau, not exactly 0 → no geometric collapse)
+# At MW=425: score ≈ 0.99 (peak)
+# At MW=550: score ≈ 0.04 (high plateau)
+[[stage.scoring.component]]
+[stage.scoring.component.MolecularWeight]
+[[stage.scoring.component.MolecularWeight.endpoint]]
+name             = "MolecularWeight"
+weight           = 1.0
+transform.type    = "double_sigmoid"
+transform.low     = 300.0
+transform.high    = 550.0
+transform.coef_div = 500.0
+transform.coef_si = 20.0
+transform.coef_se = 20.0
+
+# ── JAK2 pIC50: Custom XGBoost QSAR Model ────────────────────────────────
+# IMPORTANT: No transform applied here!
+# The component already applies linear normalization internally:
+#   norm = (pred_pIC50 - 3.8) / (10.8 - 3.8)  → [0, 1]
+# Adding a TOML transform would double-transform the score.
+# Weight=2.0 → gives 2× gradient signal toward potency vs other components.
+[[stage.scoring.component]]
+[stage.scoring.component.JAK2pIC50]
+[[stage.scoring.component.JAK2pIC50.endpoint]]
+name               = "JAK2pIC50"
+weight             = 2.0
+params.model_path  = "../preprocess/run_xgb_v2/xgb_model.ubj"
+params.scaler_path = "../preprocess/run_xgb_v2/desc_scaler.pkl"
+
+##############################################################################
+# STAGE 2: ADMET-Constrained Refinement (500 steps)
+# Goal: Tighten drug-likeness constraints while maintaining potency.
+# Components: QED + MW + JAK2pIC50 + NumRotBond + TPSA (5 signals)
+# sigma=64 for more conservative, stable learning
+#
+# CRITICAL FIX: NumRotBond transform corrected from low=high=8 to low=2, high=10
+##############################################################################
+[[stage]]
+chkpt_file  = '../models/jak2_rl_stage2_v2.chkpt'
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50
+max_steps   = 500
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── QED ──────────────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.QED]
+[[stage.scoring.component.QED.endpoint]]
+name   = "QED"
+weight = 1.0
+
+# ── MolecularWeight (same as Stage 1) ─────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.MolecularWeight]
+[[stage.scoring.component.MolecularWeight.endpoint]]
+name             = "MolecularWeight"
+weight           = 1.0
+transform.type    = "double_sigmoid"
+transform.low     = 300.0
+transform.high    = 550.0
+transform.coef_div = 500.0
+transform.coef_si = 20.0
+transform.coef_se = 20.0
+
+# ── JAK2 pIC50 (same as Stage 1) ─────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.JAK2pIC50]
+[[stage.scoring.component.JAK2pIC50.endpoint]]
+name               = "JAK2pIC50"
+weight             = 2.0
+params.model_path  = "../preprocess/run_xgb_v2/xgb_model.ubj"
+params.scaler_path = "../preprocess/run_xgb_v2/desc_scaler.pkl"
+
+# ── NumRotatableBonds: CORRECTED TRANSFORM ─────────────────────────────────
+#
+# PREVIOUS (BROKEN):
+#   low = 8.0, high = 8.0  ← low == high → degenerate midpoint at 8
+#   k = 0.5                ← very shallow sigmoid
+#
+# NEW (FIXED):
+#   reverse_sigmoid: f(x) = 1 / (1 + exp(k × (x − high)))
+#   low  = 2  → molecules with NRB < 2 also get penalized (too rigid)
+#   high = 10 → optimal upper cutoff: above 10 bonds = too flexible
+#   k    = 20 → moderate steepness (not a hard cliff, not a gradient desert)
+#
+# Score by NumRotBond (x):
+#   x=4  → 0.98  (very rigid: acceptable for fragment-like)
+#   x=6  → 0.98  (ideal drug-like)
+#   x=8  → 0.95  (still good)
+#   x=10 → 0.50  (exactly at cutoff)
+#   x=12 → 0.12  (penalized)
+#   x=15 → 0.01  (strongly penalized)
+#
+# This gives smooth gradient without hard zero at any biologically common NRB.
+[[stage.scoring.component]]
+[stage.scoring.component.NumRotBond]
+[[stage.scoring.component.NumRotBond.endpoint]]
+name             = "NumRotBond"
+weight           = 1.0
+transform.type   = "reverse_sigmoid"
+transform.high   = 10.0   # was 8 → raised to 10 to be more permissive
+transform.low    = 2.0    # was 8 → lowered to 2 to avoid penalizing rigid mols
+transform.k      = 20.0   # was 0.5 → sharpened for clearer boundary at 10
+
+# ── TPSA: Topological Polar Surface Area ─────────────────────────────────
+# Target range: 50–130 Å² for good oral bioavailability (below BBB limit)
+# coef_div MUST be ≥ high to avoid negative transform values at the boundary.
+# FIX: changed coef_div from 140 → 150 (5% buffer above high=130)
+#
+# Score at TPSA=50 ≈ 0.04 (too low: poor cell permeability)
+# Score at TPSA=90 ≈ 0.99 (ideal)
+# Score at TPSA=130 ≈ 0.04 (too high: poor oral absorption)
+[[stage.scoring.component]]
+[stage.scoring.component.TPSA]
+[[stage.scoring.component.TPSA.endpoint]]
+name             = "TPSA"
+weight           = 1.0
+transform.type    = "double_sigmoid"
+transform.low     = 50.0
+transform.high    = 130.0
+transform.coef_div = 150.0   # was 140 → must be > high to avoid boundary artifact
+transform.coef_si = 20.0
+transform.coef_se = 20.0
+
