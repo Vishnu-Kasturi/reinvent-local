@@ -123,6 +123,25 @@ weight             = 0.0
 params.model_path  = "../data/xgb_model.ubj"
 params.scaler_path = "../data/desc_scaler.pkl"
 
+# ── Tanimoto Novelty Penalty ──────────────────────────────────────────────────
+# Penalizes molecules that are too similar to the training set (max Tanimoto >= 0.50).
+# MaxTanimoto endpoint (weight=0) logs the actual max Tanimoto value in the CSV.
+[[stage.scoring.component]]
+[stage.scoring.component.TanimotoPenalty]
+[[stage.scoring.component.TanimotoPenalty.endpoint]]
+name               = "TanimotoPenalty"
+weight             = 1.0
+params.smiles_file = "../data/custom_train.smi"
+params.threshold   = 0.50
+params.radius      = 2
+[[stage.scoring.component.TanimotoPenalty.endpoint]]
+name               = "MaxTanimoto"
+weight             = 0.0
+params.smiles_file = "../data/custom_train.smi"
+params.threshold   = 0.50
+params.radius      = 2
+
+
 ##############################################################################
 # STAGE 2: ADMET-Constrained Refinement (500 steps)
 # Components: QED + MW + JAK2pIC50 + NumRotBond + TPSA
@@ -170,6 +189,25 @@ name               = "JAK2pIC50_raw"
 weight             = 0.0
 params.model_path  = "../data/xgb_model.ubj"
 params.scaler_path = "../data/desc_scaler.pkl"
+
+# ── Tanimoto Novelty Penalty ──────────────────────────────────────────────────
+# Penalizes molecules that are too similar to the training set (max Tanimoto >= 0.50).
+# MaxTanimoto endpoint (weight=0) logs the actual max Tanimoto value in the CSV.
+[[stage.scoring.component]]
+[stage.scoring.component.TanimotoPenalty]
+[[stage.scoring.component.TanimotoPenalty.endpoint]]
+name               = "TanimotoPenalty"
+weight             = 1.0
+params.smiles_file = "../data/custom_train.smi"
+params.threshold   = 0.50
+params.radius      = 2
+[[stage.scoring.component.TanimotoPenalty.endpoint]]
+name               = "MaxTanimoto"
+weight             = 0.0
+params.smiles_file = "../data/custom_train.smi"
+params.threshold   = 0.50
+params.radius      = 2
+
 
 # ── NumRotatableBonds: reverse_sigmoid [2, 10] ────────────────────────────────
 # Score: x<=6 → ~0.98 (ideal), x=10 → 0.50, x>=12 → penalized
