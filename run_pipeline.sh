@@ -63,9 +63,12 @@ fi
 # Writes: models/jak2_focused.model
 echo ""
 echo "[*] Phase 1: Transfer Learning..."
-reinvent \
-    -l "$REPO_ROOT/logs/jak2_tl.log" \
-    "$REPO_ROOT/REINVENT4/configs/jak2_tl.toml"
+(
+    cd "$REPO_ROOT/REINVENT4"
+    reinvent \
+        -l "$REPO_ROOT/logs/jak2_tl.log" \
+        "configs/jak2_tl.toml"
+)
 
 # ── Step 2: Reinforcement Learning ────────────────────────────────────────────
 # Reads:  models/jak2_focused.model + data/xgb_model.ubj + data/desc_scaler.pkl
@@ -73,9 +76,12 @@ reinvent \
 #         results/focused_rl_v2_*.csv  (with JAK2pIC50 [0-1] AND JAK2pIC50_raw [4-11])
 echo ""
 echo "[*] Phase 2: Reinforcement Learning..."
-reinvent \
-    -l "$REPO_ROOT/logs/jak2_rl.log" \
-    "$REPO_ROOT/REINVENT4/configs/jak2_rl_v2.toml"
+(
+    cd "$REPO_ROOT/REINVENT4"
+    reinvent \
+        -l "$REPO_ROOT/logs/jak2_rl.log" \
+        "configs/jak2_rl_v2.toml"
+)
 
 # ── Step 3: Copy latest RL checkpoint as final model ──────────────────────────
 echo ""
@@ -95,11 +101,16 @@ print(f"  Copied: {os.path.basename(latest)} → models/jak2_rl_final.model")
 PYEOF
 
 # ── Step 4: Sampling from RL model ────────────────────────────────────────────
+# Reads:  models/jak2_rl_final.model
+# Writes: results/jak2_rl_candidates.csv
 echo ""
 echo "[*] Phase 4: Sampling from RL model..."
-reinvent \
-    -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
-    "$REPO_ROOT/REINVENT4/configs/jak2_sampling_rl.toml"
+(
+    cd "$REPO_ROOT/REINVENT4"
+    reinvent \
+        -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
+        "configs/jak2_sampling_rl.toml"
+)
 
 # ── Step 5: Extract top 10 unique hits ────────────────────────────────────────
 echo ""
@@ -147,9 +158,12 @@ PYEOF
 # ── Step 6: Mol2Mol sampling from top seeds ───────────────────────────────────
 echo ""
 echo "[*] Phase 6: Mol2Mol sampling from top seeds..."
-reinvent \
-    -l "$REPO_ROOT/logs/jak2_mol2mol.log" \
-    "$REPO_ROOT/REINVENT4/configs/jak2_mol2mol.toml"
+(
+    cd "$REPO_ROOT/REINVENT4"
+    reinvent \
+        -l "$REPO_ROOT/logs/jak2_mol2mol.log" \
+        "configs/jak2_mol2mol.toml"
+)
 
 # ── Step 7: Tanimoto validation of RL output ──────────────────────────────────
 echo ""
