@@ -4,7 +4,7 @@ json_out_config = "json_jak2_mol2mol.json"
 
 [parameters]
 model_file = "priors/mol2mol_high_similarity.prior"
-smiles_file = "custom_data/top_hits.smi"
+smiles_file = "../data/top_hits.smi"
 
 num_smiles = 50
 output_file = "../results/jak2_mol2mol_candidates.csv"

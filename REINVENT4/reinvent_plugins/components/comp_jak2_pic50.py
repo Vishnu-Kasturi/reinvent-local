@@ -49,11 +49,19 @@ class Parameters:
 class JAK2pIC50:
     """
     REINVENT4 scoring component: XGBoost-based JAK2 pIC50 predictor.
-    
-    Returns normalized [0, 1] reward where:
-        0.0  → pIC50 ≤ 3.8 (inactive)
-        0.5  → pIC50 ≈ 7.3 (moderately active, IC50 ~ 50 nM)
-        1.0  → pIC50 ≥ 10.8 (sub-picomolar)
+
+    Returns TWO endpoints (configure both in the TOML):
+
+    Endpoint 1: JAK2pIC50  (set weight=2.0 in TOML)
+        Normalized [0, 1] reward used for the RL training signal.
+        0.0 → pIC50 ≤ 3.8  (inactive)
+        0.5 → pIC50 ≈ 7.3  (IC50 ~50 nM)
+        1.0 → pIC50 ≥ 10.8 (sub-picomolar)
+
+    Endpoint 2: JAK2pIC50_raw  (set weight=0.0 in TOML — logging only)
+        Raw predicted pIC50 in the natural [~4, ~11] scale.
+        This is written to the RL output CSV as a human-readable column
+        so you can directly inspect predicted potency without back-converting.
     """
 
     def __init__(self, params: Parameters):
@@ -146,11 +154,13 @@ class JAK2pIC50:
                     [np.full(n, np.nan, dtype=np.float32)]
                 )
 
-            # ─── 6. Normalize and mask ────────────────────────────────────────
-            scores = np.empty(n, dtype=np.float32)
-            scores[:] = np.nan  # default: invalid
+            # ─── 6. Normalize → [0,1] score AND keep raw pIC50 ──────────────
+            scores_norm = np.empty(n, dtype=np.float32)
+            scores_raw  = np.empty(n, dtype=np.float32)
+            scores_norm[:] = np.nan  # default: invalid
+            scores_raw[:] = np.nan
 
-            n_valid = 0
+            n_valid   = 0
             n_invalid = 0
 
             for i in range(n):
@@ -165,7 +175,6 @@ class JAK2pIC50:
 
                 raw = float(raw_preds[i])
 
-                # Check raw prediction is sane
                 if not np.isfinite(raw):
                     logger.warning(
                         f"[JAK2pIC50] Non-finite pIC50 prediction for SMILES[{i}]: {raw}"
@@ -173,10 +182,13 @@ class JAK2pIC50:
                     n_invalid += 1
                     continue
 
-                # Linear normalization to [0, 1]
+                # Endpoint 1: normalized [0, 1] reward for RL training signal
                 norm = (raw - PIC50_MIN) / PIC50_RANGE
                 norm = float(np.clip(norm, 0.0, 1.0))
-                scores[i] = norm
+                scores_norm[i] = norm
+
+                # Endpoint 2: raw pIC50 in [~4, ~11] for human-readable CSV logging
+                scores_raw[i] = float(raw)
                 n_valid += 1
 
                 if _DEBUG:
@@ -187,14 +199,15 @@ class JAK2pIC50:
                     )
 
             # ─── 7. Step-level summary logging ───────────────────────────────
-            valid_scores = scores[np.isfinite(scores)]
+            valid_scores = scores_norm[np.isfinite(scores_norm)]
+            valid_raw    = scores_raw[np.isfinite(scores_raw)]
             if len(valid_scores) > 0:
                 logger.info(
                     f"[JAK2pIC50] Batch: {n} molecules | "
                     f"valid={n_valid} | invalid={n_invalid} | "
-                    f"mean_score={valid_scores.mean():.4f} | "
-                    f"max_score={valid_scores.max():.4f} | "
-                    f"min_score={valid_scores.min():.4f}"
+                    f"mean_norm={valid_scores.mean():.4f} | "
+                    f"mean_pIC50={valid_raw.mean():.3f} | "
+                    f"max_pIC50={valid_raw.max():.3f}"
                 )
             else:
                 logger.warning(
@@ -202,7 +215,10 @@ class JAK2pIC50:
                     f"Returning all NaN scores."
                 )
 
-            return ComponentResults([scores])
+            # Return two endpoints:
+            #   [0] scores_norm → logged as 'JAK2pIC50'      (weight=2.0 in TOML)
+            #   [1] scores_raw  → logged as 'JAK2pIC50_raw'  (weight=0.0 in TOML)
+            return ComponentResults([scores_norm, scores_raw])
 
         except Exception as exc:
             logger.error(

@@ -1,17 +1,18 @@
 run_type = "transfer_learning"
-device = "cpu"  # or "mps"/"cpu" depending on environment
-tb_logdir = "/Users/vishnukasturi/Intern/reinvent-local/tb_jak2_tl"
+device   = "cpu"   # change to "cuda:0" or "mps" if GPU/Apple Silicon available
+tb_logdir       = "../tb_jak2_tl"
 json_out_config = "json_jak2_tl.json"
 
 [parameters]
-num_epochs = 100
-batch_size = 128
+num_epochs       = 100
+batch_size       = 128
 save_every_n_epochs = 10
 
-input_model_file = "priors/reinvent.prior"
-smiles_file = "custom_data/custom_train.smi"
-validation_smiles_file = "custom_data/custom_val.smi"
-output_model_file = "../models/jak2_focused.model"
+# Paths are relative to the REINVENT4/ directory (where `reinvent` is called from)
+input_model_file          = "priors/reinvent.prior"
+smiles_file               = "../data/custom_train.smi"
+validation_smiles_file    = "../data/custom_val.smi"
+output_model_file         = "../models/jak2_focused.model"
 
 standardize_smiles = true
-randomize_smiles = true
+randomize_smiles   = true

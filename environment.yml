@@ -1,0 +1,53 @@
+name: reinvent-qsar
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+
+  # Core scientific stack (conda for binary compatibility)
+  - numpy=1.26.4
+  - scipy=1.15.3
+  - pandas=2.3.3
+  - scikit-learn=1.7.2
+  - matplotlib=3.10.9
+  - seaborn=0.13.2
+
+  # RDKit — must come from conda-forge for correct binary linking
+  - rdkit=2026.3.2
+
+  # PyTorch (CPU-only; change to pytorch-cuda=12.x if GPU available)
+  - pytorch=2.9.1
+  - torchvision=0.24.1
+  - cpuonly
+
+  - pip:
+    # REINVENT4 (installed as editable local package)
+    - -e ./REINVENT4-vishnu
+
+    # XGBoost + LightGBM (QSAR model training)
+    - xgboost==3.2.0
+    - lightgbm==4.6.0
+
+    # Cheminformatics extras
+    - molvs==0.1.1
+
+    # ChEMBL API (used in 1_prepare_data.py)
+    - requests==2.34.2
+
+    # ML utilities
+    - joblib==1.5.3
+    - tqdm==4.67.3
+
+    # REINVENT4 runtime dependencies
+    - pydantic==2.13.4
+    - tomli==2.4.1
+    - tensorboard==2.20.0
+    - tensorboardX==2.6.5
+    - typed-argument-parser==1.12.0
+    - pumas==1.3.0
+
+    # Validation script (optional but recommended)
+    - matplotlib==3.10.9

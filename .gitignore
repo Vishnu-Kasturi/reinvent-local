@@ -9,24 +9,25 @@ tb_jak2_tl/
 tb_jak2_rl/
 *.pt
 *.pth
-*.pkl
 *.joblib
-*.ubj
-datasets/
-models/
 results/focused_rl*.csv
 
-# Un-ignore specific essential pipeline files
-!preprocess/run_xgb_v2/xgb_model.ubj
-!preprocess/run_xgb_v2/desc_scaler.pkl
-
-# Un-ignore datasets/JAK2/
+# ── datasets/ — un-ignore JAK2/ subfolder ─────────────────────────────────────
+datasets/
 !datasets/
 datasets/*
 !datasets/JAK2/
 
-# Un-ignore key focused/RL models (excluding heavy intermediate checkpoints)
+# ── models/ — track only the key trained models, not heavy checkpoints ─────────
+*.pkl
+*.ubj
+models/
 !models/
 models/*
 !models/jak2_focused.model
 !models/jak2_rl_stage1_v2.chkpt
+
+# ── data/ — track all files in the central data folder ────────────────────────
+# (xgb_model.ubj, desc_scaler.pkl, custom_train.smi, custom_val.smi)
+!data/
+!data/*

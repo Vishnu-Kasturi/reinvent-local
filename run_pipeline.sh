@@ -1,126 +1,170 @@
 #!/bin/bash
+# run_pipeline.sh — REINVENT4 pIC50 Pipeline
+# ============================================
+# Usage:
+#   ./run_pipeline.sh           → run JAK2 pipeline (data already in data/)
+#   ./run_pipeline.sh EGFR      → fetch EGFR from ChEMBL, then run pipeline
+#
+# Requirements:
+#   conda activate reinvent-qsar
+#   pip install -r requirements.txt   (installs REINVENT4 in editable mode)
+# =============================================================================
 set -e
 
-# Support optional target argument (e.g. ./run_pipeline.sh EGFR)
-TARGET_NAME=$1
+TARGET_NAME=${1:-""}
+
+# ── Resolve repository root (always correct regardless of where you call it from)
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+export REPO_ROOT
 
 echo "========================================"
 if [ -n "$TARGET_NAME" ]; then
-    echo "    $TARGET_NAME pIC50 REINVENT4 PIPELINE"
+    echo "  $TARGET_NAME pIC50 REINVENT4 PIPELINE"
 else
-    echo "    JAK2 pIC50 REINVENT4 PIPELINE       "
+    echo "  JAK2 pIC50 REINVENT4 PIPELINE"
 fi
 echo "========================================"
+echo "  Repo root: $REPO_ROOT"
 
-# Create required directories
-echo "[*] Creating directories..."
-mkdir -p models results logs tb_jak2_tl tb_jak2_rl
+# ── Create output directories ──────────────────────────────────────────────────
+echo ""
+echo "[*] Creating output directories..."
+mkdir -p "$REPO_ROOT/models"
+mkdir -p "$REPO_ROOT/results"
+mkdir -p "$REPO_ROOT/logs"
+mkdir -p "$REPO_ROOT/tb_jak2_tl"
+mkdir -p "$REPO_ROOT/tb_jak2_rl"
+mkdir -p "$REPO_ROOT/data"
 
-# Activate conda environment
-echo "[*] Activating conda environment..."
+# ── Activate conda environment ─────────────────────────────────────────────────
+echo "[*] Activating conda environment: reinvent-qsar"
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate reinvent-qsar || conda activate reinvent4
+conda activate reinvent-qsar
 
-# Export PYTHONPATH so the REINVENT scoring plugins can find reinvent_plugins/components
-export PYTHONPATH="$(pwd)/REINVENT4:$PYTHONPATH"
+# ── Set PYTHONPATH so REINVENT scoring plugins are importable ──────────────────
+# This must point to the REINVENT4 directory so that
+# reinvent_plugins.components.comp_jak2_pic50 is discoverable.
+export PYTHONPATH="$REPO_ROOT/REINVENT4:${PYTHONPATH:-}"
+echo "[*] PYTHONPATH → $REPO_ROOT/REINVENT4"
 
-# Dynamic Target Fetching
+# ── Step 0: Dynamic target fetching (only if TARGET_NAME is provided) ──────────
 if [ -n "$TARGET_NAME" ]; then
-    echo "[*] Target name specified: $TARGET_NAME"
-    echo "[*] Step 0: Fetching desalted & standardized bioactivity data from ChEMBL..."
-    
-    # Run fetcher (default minimum pIC50 threshold = 6.0)
-    python preprocess/fetch_chembl_target.py "$TARGET_NAME" --min_pic50 6.0
-    
-    echo "[*] Step 0.5: Copying desalted data to REINVENT4/custom_data/ (no TOML edits needed)..."
-    mkdir -p REINVENT4/custom_data
-    cp "datasets/$TARGET_NAME/train.smi" REINVENT4/custom_data/custom_train.smi
-    cp "datasets/$TARGET_NAME/val.smi"   REINVENT4/custom_data/custom_val.smi
-    echo "    Successfully imported $TARGET_NAME dataset into the pipeline!"
+    echo ""
+    echo "[*] Step 0: Fetching $TARGET_NAME bioactivity data from ChEMBL..."
+    python "$REPO_ROOT/preprocess/1_prepare_data.py" "$TARGET_NAME" --min_pic50 6.0
+
+    echo "[*] Step 0.5: Training XGBoost pIC50 model for $TARGET_NAME..."
+    python "$REPO_ROOT/preprocess/2_train_xgboost.py" "$TARGET_NAME"
+    # ↑ Outputs xgb_model.ubj + desc_scaler.pkl directly to data/ (no path editing needed)
 fi
 
-# 1. Transfer Learning
+# ── Step 1: Transfer Learning ──────────────────────────────────────────────────
+# Reads:  data/custom_train.smi + data/custom_val.smi
+# Writes: models/jak2_focused.model
+echo ""
 echo "[*] Phase 1: Transfer Learning..."
-cd REINVENT4
-reinvent -l ../logs/jak2_tl.log configs/jak2_tl.toml
-cd ..
+reinvent \
+    -l "$REPO_ROOT/logs/jak2_tl.log" \
+    "$REPO_ROOT/REINVENT4/configs/jak2_tl.toml"
 
-# 2. Reinforcement Learning (v2 config with fixed NumRotBond and diversity filter)
+# ── Step 2: Reinforcement Learning ────────────────────────────────────────────
+# Reads:  models/jak2_focused.model + data/xgb_model.ubj + data/desc_scaler.pkl
+# Writes: models/jak2_rl_stage1_v2.chkpt, models/jak2_rl_stage2_v2.chkpt
+#         results/focused_rl_v2_*.csv  (with JAK2pIC50 [0-1] AND JAK2pIC50_raw [4-11])
+echo ""
 echo "[*] Phase 2: Reinforcement Learning..."
-cd REINVENT4
-reinvent -l ../logs/jak2_rl.log configs/jak2_rl_v2.toml
-cd ..
+reinvent \
+    -l "$REPO_ROOT/logs/jak2_rl.log" \
+    "$REPO_ROOT/REINVENT4/configs/jak2_rl_v2.toml"
 
-# 3. Locate and copy the latest RL checkpoint
+# ── Step 3: Copy latest RL checkpoint as final model ──────────────────────────
+echo ""
 echo "[*] Phase 3: Locating latest RL checkpoint..."
-python -c "
+python - <<'PYEOF'
 import os, glob, shutil
 
-checkpoints = glob.glob('models/*.chkpt')
+checkpoints = glob.glob(os.path.join(os.environ["REPO_ROOT"], "models", "*.chkpt"))
 if not checkpoints:
-    print('No RL checkpoints found! Pipeline failed.')
+    print("[ERROR] No RL checkpoints found! Pipeline failed.")
     exit(1)
 
-latest_checkpoint = max(checkpoints, key=os.path.getmtime)
-print(f'Found latest checkpoint: {latest_checkpoint}')
+latest = max(checkpoints, key=os.path.getmtime)
+dest   = os.path.join(os.environ["REPO_ROOT"], "models", "jak2_rl_final.model")
+shutil.copy(latest, dest)
+print(f"  Copied: {os.path.basename(latest)} → models/jak2_rl_final.model")
+PYEOF
 
-shutil.copy(latest_checkpoint, 'models/jak2_rl_final.model')
-print('Copied to models/jak2_rl_final.model')
-"
-
-# 4. RL Sampling
+# ── Step 4: Sampling from RL model ────────────────────────────────────────────
+echo ""
 echo "[*] Phase 4: Sampling from RL model..."
-cd REINVENT4
-reinvent -l ../logs/jak2_rl_sampling.log configs/jak2_sampling_rl.toml
-cd ..
+reinvent \
+    -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
+    "$REPO_ROOT/REINVENT4/configs/jak2_sampling_rl.toml"
 
-# 5. Extract top 10 unique molecules (FIXED: deduplicate + require Score > 0)
-echo "[*] Phase 5: Extracting top 10 unique hits from RL results..."
-python -c "
-import pandas as pd
-import os
+# ── Step 5: Extract top 10 unique hits ────────────────────────────────────────
+echo ""
+echo "[*] Phase 5: Extracting top 10 unique hits..."
+python - <<'PYEOF'
+import pandas as pd, glob, os
 
-# Find the latest focused_rl CSV
-import glob
-csvs = sorted(glob.glob('results/focused_rl*.csv'))
+repo = os.environ["REPO_ROOT"]
+csvs = sorted(glob.glob(os.path.join(repo, "results", "focused_rl*.csv")))
 if not csvs:
-    print('No RL results CSV found! Pipeline failed.')
+    print("[ERROR] No RL results CSV found!")
     exit(1)
-csv_path = csvs[-1]
-print(f'Reading: {csv_path}')
 
+csv_path = csvs[-1]
+print(f"  Reading: {csv_path}")
 df = pd.read_csv(csv_path)
 
-smiles_col = 'SMILES' if 'SMILES' in df.columns else df.columns[0]
-pic50_col  = 'JAK2pIC50 (raw)' if 'JAK2pIC50 (raw)' in df.columns else 'Score'
+smiles_col = "SMILES" if "SMILES" in df.columns else df.columns[0]
 
-# FIXED: only accepted molecules, one row per unique SMILES, ranked by pIC50
+# Prefer raw pIC50 column for ranking (added by comp_jak2_pic50.py)
+if "JAK2pIC50_raw" in df.columns:
+    rank_col = "JAK2pIC50_raw"
+    print("  Ranking by JAK2pIC50_raw (actual predicted pIC50, 4-11 range)")
+elif "JAK2pIC50 (raw)" in df.columns:
+    rank_col = "JAK2pIC50 (raw)"
+else:
+    rank_col = "Score"
+    print("  [WARNING] JAK2pIC50_raw column not found — ranking by Score")
+
 top10 = (
-    df[df['Score'] > 0]                          # exclude diversity-filter rejections
-    .drop_duplicates(subset=[smiles_col])         # one row per unique SMILES
-    .sort_values(by=pic50_col, ascending=False)   # rank by predicted pIC50
+    df[df["Score"] > 0]
+    .drop_duplicates(subset=[smiles_col])
+    .sort_values(by=rank_col, ascending=False)
     .head(10)
 )
+print(f"  Extracted {len(top10)} unique top hits")
+top10.to_csv(os.path.join(repo, "results", "top_10_hits.csv"), index=False)
 
-print(f'Extracted {len(top10)} unique top hits')
-top10.to_csv('results/top_10_hits.csv', index=False)
+os.makedirs(os.path.join(repo, "data"), exist_ok=True)
+top10[smiles_col].to_csv(
+    os.path.join(repo, "data", "top_hits.smi"), index=False, header=False)
+print("  Saved → results/top_10_hits.csv + data/top_hits.smi")
+PYEOF
 
-# Write seed SMILES for Mol2Mol
-os.makedirs('REINVENT4/custom_data', exist_ok=True)
-top10[smiles_col].to_csv('REINVENT4/custom_data/top_hits.smi', index=False, header=False)
-print('Saved top_10_hits.csv and top_hits.smi')
-"
-
-# 6. Mol2Mol Sampling
+# ── Step 6: Mol2Mol sampling from top seeds ───────────────────────────────────
+echo ""
 echo "[*] Phase 6: Mol2Mol sampling from top seeds..."
-cd REINVENT4
-reinvent -l ../logs/jak2_mol2mol.log configs/jak2_mol2mol.toml
-cd ..
+reinvent \
+    -l "$REPO_ROOT/logs/jak2_mol2mol.log" \
+    "$REPO_ROOT/REINVENT4/configs/jak2_mol2mol.toml"
 
+# ── Step 7: Tanimoto validation of RL output ──────────────────────────────────
+echo ""
+echo "[*] Phase 7: Tanimoto validation of RL output vs training data..."
+python "$REPO_ROOT/validate_rl_output.py"
+
+echo ""
 echo "========================================"
 if [ -n "$TARGET_NAME" ]; then
-    echo "    $TARGET_NAME PIPELINE COMPLETED      "
+    echo "  $TARGET_NAME PIPELINE COMPLETED"
 else
-    echo "    JAK2 PIPELINE COMPLETED             "
+    echo "  JAK2 PIPELINE COMPLETED"
 fi
+echo "========================================"
+echo "  Results:     $REPO_ROOT/results/"
+echo "  Top hits:    $REPO_ROOT/results/top_10_hits.csv"
+echo "  Validation:  $REPO_ROOT/results/rl_validation.csv"
 echo "========================================"

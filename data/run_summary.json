@@ -1,0 +1,35 @@
+{
+  "target": "JAK2",
+  "best_iteration": 10232,
+  "feature_dim": 4482,
+  "physchem_cols": [
+    "mw",
+    "logp",
+    "hbd",
+    "hba",
+    "tpsa",
+    "rot_bonds",
+    "rings",
+    "arom_rings",
+    "heavy_atoms",
+    "frac_csp3",
+    "stereo"
+  ],
+  "results": {
+    "train": {
+      "r2": 0.9675090481034418,
+      "rmse": 0.21857378922141066,
+      "mae": 0.16052216453201615
+    },
+    "val": {
+      "r2": 0.6837670066377086,
+      "rmse": 0.6340588721289245,
+      "mae": 0.4630414439862254
+    },
+    "test": {
+      "r2": 0.7066085432011333,
+      "rmse": 0.6588628076318226,
+      "mae": 0.48397276616261686
+    }
+  }
+}
