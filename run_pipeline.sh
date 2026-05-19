@@ -81,18 +81,25 @@ fi
 # Writes: models/jak2_rl_stage1_v2.chkpt, models/jak2_rl_stage2_v2.chkpt
 #         results/focused_rl_v2_*.csv  (with JAK2pIC50 [0-1] AND JAK2pIC50_raw [4-11])
 echo ""
-echo "[*] Phase 2: Reinforcement Learning..."
-(
-    cd "$REPO_ROOT/REINVENT4"
-    reinvent \
-        -l "$REPO_ROOT/logs/jak2_rl.log" \
-        "configs/jak2_rl_v2.toml"
-)
+if [ -f "$REPO_ROOT/results/focused_rl_v2_1.csv" ] && [ -s "$REPO_ROOT/results/focused_rl_v2_1.csv" ]; then
+    echo "[*] Phase 2: Found existing RL output at results/focused_rl_v2_1.csv — skipping Reinforcement Learning."
+else
+    echo "[*] Phase 2: Reinforcement Learning..."
+    (
+        cd "$REPO_ROOT/REINVENT4"
+        reinvent \
+            -l "$REPO_ROOT/logs/jak2_rl.log" \
+            "configs/jak2_rl_v2.toml"
+    )
+fi
 
 # ── Step 3: Copy latest RL checkpoint as final model ──────────────────────────
 echo ""
-echo "[*] Phase 3: Locating latest RL checkpoint..."
-python - <<'PYEOF'
+if [ -f "$REPO_ROOT/models/jak2_rl_final.model" ]; then
+    echo "[*] Phase 3: Found existing final RL model at models/jak2_rl_final.model — skipping checkpoint copy."
+else
+    echo "[*] Phase 3: Locating latest RL checkpoint..."
+    python - <<'PYEOF'
 import os, glob, shutil
 
 checkpoints = glob.glob(os.path.join(os.environ["REPO_ROOT"], "models", "*.chkpt"))
@@ -105,18 +112,23 @@ dest   = os.path.join(os.environ["REPO_ROOT"], "models", "jak2_rl_final.model")
 shutil.copy(latest, dest)
 print(f"  Copied: {os.path.basename(latest)} → models/jak2_rl_final.model")
 PYEOF
+fi
 
 # ── Step 4: Sampling from RL model ────────────────────────────────────────────
 # Reads:  models/jak2_rl_final.model
 # Writes: results/jak2_rl_candidates.csv
 echo ""
-echo "[*] Phase 4: Sampling from RL model..."
-(
-    cd "$REPO_ROOT/REINVENT4"
-    reinvent \
-        -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
-        "configs/jak2_sampling_rl.toml"
-)
+if [ -f "$REPO_ROOT/results/jak2_rl_candidates.csv" ] && [ -s "$REPO_ROOT/results/jak2_rl_candidates.csv" ]; then
+    echo "[*] Phase 4: Found existing sampling candidates at results/jak2_rl_candidates.csv — skipping Sampling."
+else
+    echo "[*] Phase 4: Sampling from RL model..."
+    (
+        cd "$REPO_ROOT/REINVENT4"
+        reinvent \
+            -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
+            "configs/jak2_sampling_rl.toml"
+    )
+fi
 
 # ── Step 5: Extract top 10 unique hits ────────────────────────────────────────
 echo ""
@@ -163,13 +175,17 @@ PYEOF
 
 # ── Step 6: Mol2Mol sampling from top seeds ───────────────────────────────────
 echo ""
-echo "[*] Phase 6: Mol2Mol sampling from top seeds..."
-(
-    cd "$REPO_ROOT/REINVENT4"
-    reinvent \
-        -l "$REPO_ROOT/logs/jak2_mol2mol.log" \
-        "configs/jak2_mol2mol.toml"
-)
+if [ -f "$REPO_ROOT/results/jak2_mol2mol_candidates.csv" ] && [ -s "$REPO_ROOT/results/jak2_mol2mol_candidates.csv" ]; then
+    echo "[*] Phase 6: Found existing Mol2Mol candidates at results/jak2_mol2mol_candidates.csv — skipping Mol2Mol sampling."
+else
+    echo "[*] Phase 6: Mol2Mol sampling from top seeds..."
+    (
+        cd "$REPO_ROOT/REINVENT4"
+        reinvent \
+            -l "$REPO_ROOT/logs/jak2_mol2mol.log" \
+            "configs/jak2_mol2mol.toml"
+    )
+fi
 
 # ── Step 7: Tanimoto validation of RL output ──────────────────────────────────
 echo ""
