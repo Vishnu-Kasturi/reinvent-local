@@ -1,0 +1,23 @@
+
+ChEMBL Bioactivity Fetch Summary
+==================================
+Target name:      JAK2
+Preferred name:   Tyrosine-protein kinase JAK2
+ChEMBL ID:        CHEMBL2971
+UniProt ID:       O14636
+Organism:         Homo sapiens
+
+Raw records:      17707
+After dedup:      12156
+Clean unique:     5995
+
+pIC50 stats:
+  Min:  5.00
+  Max:  10.52
+  Mean: 7.59
+  Median: 7.55
+
+Train: 4796 SMILES
+Val:   1199 SMILES
+
+Output directory: datasets/JAK2/
