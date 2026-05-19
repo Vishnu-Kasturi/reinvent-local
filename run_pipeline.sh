@@ -48,87 +48,85 @@ export PYTHONPATH="$REPO_ROOT/REINVENT4:${PYTHONPATH:-}"
 echo "[*] PYTHONPATH → $REPO_ROOT/REINVENT4"
 
 # ── Step 0: Dynamic target fetching (only if TARGET_NAME is provided) ──────────
-if [ -n "$TARGET_NAME" ]; then
-    echo ""
-    echo "[*] Step 0: Fetching $TARGET_NAME bioactivity data from ChEMBL..."
-    python "$REPO_ROOT/preprocess/1_prepare_data.py" "$TARGET_NAME" --min_pic50 6.0
-
-    echo "[*] Step 0.5: Training XGBoost pIC50 model for $TARGET_NAME..."
-    python "$REPO_ROOT/preprocess/2_train_xgboost.py" "$TARGET_NAME"
-    # ↑ Outputs xgb_model.ubj + desc_scaler.pkl directly to data/ (no path editing needed)
-fi
+# if [ -n "$TARGET_NAME" ]; then
+#     echo ""
+#     echo "[*] Step 0: Fetching $TARGET_NAME bioactivity data from ChEMBL..."
+#     python "$REPO_ROOT/preprocess/1_prepare_data.py" "$TARGET_NAME" --min_pic50 6.0
+# 
+#     echo "[*] Step 0.5: Training XGBoost pIC50 model for $TARGET_NAME..."
+#     python "$REPO_ROOT/preprocess/2_train_xgboost.py" "$TARGET_NAME"
+#     # ↑ Outputs xgb_model.ubj + desc_scaler.pkl directly to data/ (no path editing needed)
+# fi
 
 # ── Step 1: Transfer Learning ──────────────────────────────────────────────────
 # Reads:  data/custom_train.smi + data/custom_val.smi
 # Writes: models/jak2_focused.model
-echo ""
-if [ -f "$REPO_ROOT/models/jak2_focused.model" ]; then
-    echo "[*] Phase 1: Pre-trained TL model found at models/jak2_focused.model — skipping Transfer Learning."
-else
-    echo "[*] Phase 1: Pre-trained model not found. Running Transfer Learning..."
-    (
-        cd "$REPO_ROOT/REINVENT4"
-        reinvent \
-            -l "$REPO_ROOT/logs/jak2_tl.log" \
-            "configs/jak2_tl.toml"
-    )
-fi
-
-
+# echo ""
+# if [ -f "$REPO_ROOT/models/jak2_focused.model" ]; then
+#     echo "[*] Phase 1: Pre-trained TL model found at models/jak2_focused.model — skipping Transfer Learning."
+# else
+#     echo "[*] Phase 1: Pre-trained model not found. Running Transfer Learning..."
+#     (
+#         cd "$REPO_ROOT/REINVENT4"
+#         reinvent \
+#             -l "$REPO_ROOT/logs/jak2_tl.log" \
+#             "configs/jak2_tl.toml"
+#     )
+# fi
 
 # ── Step 2: Reinforcement Learning ────────────────────────────────────────────
 # Reads:  models/jak2_focused.model + data/xgb_model.ubj + data/desc_scaler.pkl
 # Writes: models/jak2_rl_stage1_v2.chkpt, models/jak2_rl_stage2_v2.chkpt
 #         results/focused_rl_v2_*.csv  (with JAK2pIC50 [0-1] AND JAK2pIC50_raw [4-11])
-echo ""
-if [ -f "$REPO_ROOT/results/focused_rl_v2_1.csv" ] && [ -s "$REPO_ROOT/results/focused_rl_v2_1.csv" ]; then
-    echo "[*] Phase 2: Found existing RL output at results/focused_rl_v2_1.csv — skipping Reinforcement Learning."
-else
-    echo "[*] Phase 2: Reinforcement Learning..."
-    (
-        cd "$REPO_ROOT/REINVENT4"
-        reinvent \
-            -l "$REPO_ROOT/logs/jak2_rl.log" \
-            "configs/jak2_rl_v2.toml"
-    )
-fi
+# echo ""
+# if [ -f "$REPO_ROOT/results/focused_rl_v2_1.csv" ] && [ -s "$REPO_ROOT/results/focused_rl_v2_1.csv" ]; then
+#     echo "[*] Phase 2: Found existing RL output at results/focused_rl_v2_1.csv — skipping Reinforcement Learning."
+# else
+#     echo "[*] Phase 2: Reinforcement Learning..."
+#     (
+#         cd "$REPO_ROOT/REINVENT4"
+#         reinvent \
+#             -l "$REPO_ROOT/logs/jak2_rl.log" \
+#             "configs/jak2_rl_v2.toml"
+#     )
+# fi
 
 # ── Step 3: Copy latest RL checkpoint as final model ──────────────────────────
-echo ""
-if [ -f "$REPO_ROOT/models/jak2_rl_final.model" ]; then
-    echo "[*] Phase 3: Found existing final RL model at models/jak2_rl_final.model — skipping checkpoint copy."
-else
-    echo "[*] Phase 3: Locating latest RL checkpoint..."
-    python - <<'PYEOF'
-import os, glob, shutil
-
-checkpoints = glob.glob(os.path.join(os.environ["REPO_ROOT"], "models", "*.chkpt"))
-if not checkpoints:
-    print("[ERROR] No RL checkpoints found! Pipeline failed.")
-    exit(1)
-
-latest = max(checkpoints, key=os.path.getmtime)
-dest   = os.path.join(os.environ["REPO_ROOT"], "models", "jak2_rl_final.model")
-shutil.copy(latest, dest)
-print(f"  Copied: {os.path.basename(latest)} → models/jak2_rl_final.model")
-PYEOF
-fi
+# echo ""
+# if [ -f "$REPO_ROOT/models/jak2_rl_final.model" ]; then
+#     echo "[*] Phase 3: Found existing final RL model at models/jak2_rl_final.model — skipping checkpoint copy."
+# else
+#     echo "[*] Phase 3: Locating latest RL checkpoint..."
+#     python - <<'PYEOF'
+# import os, glob, shutil
+# 
+# checkpoints = glob.glob(os.path.join(os.environ["REPO_ROOT"], "models", "*.chkpt"))
+# if not checkpoints:
+#     print("[ERROR] No RL checkpoints found! Pipeline failed.")
+#     exit(1)
+# 
+# latest = max(checkpoints, key=os.path.getmtime)
+# dest   = os.path.join(os.environ["REPO_ROOT"], "models", "jak2_rl_final.model")
+# shutil.copy(latest, dest)
+# print(f"  Copied: {os.path.basename(latest)} → models/jak2_rl_final.model")
+# PYEOF
+# fi
 
 # ── Step 4: Sampling from RL model ────────────────────────────────────────────
 # Reads:  models/jak2_rl_final.model
 # Writes: results/jak2_rl_candidates.csv
-echo ""
-if [ -f "$REPO_ROOT/results/jak2_rl_candidates.csv" ] && [ -s "$REPO_ROOT/results/jak2_rl_candidates.csv" ]; then
-    echo "[*] Phase 4: Found existing sampling candidates at results/jak2_rl_candidates.csv — skipping Sampling."
-else
-    echo "[*] Phase 4: Sampling from RL model..."
-    (
-        cd "$REPO_ROOT/REINVENT4"
-        reinvent \
-            -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
-            "configs/jak2_sampling_rl.toml"
-    )
-fi
+# echo ""
+# if [ -f "$REPO_ROOT/results/jak2_rl_candidates.csv" ] && [ -s "$REPO_ROOT/results/jak2_rl_candidates.csv" ]; then
+#     echo "[*] Phase 4: Found existing sampling candidates at results/jak2_rl_candidates.csv — skipping Sampling."
+# else
+#     echo "[*] Phase 4: Sampling from RL model..."
+#     (
+#         cd "$REPO_ROOT/REINVENT4"
+#         reinvent \
+#             -l "$REPO_ROOT/logs/jak2_rl_sampling.log" \
+#             "configs/jak2_sampling_rl.toml"
+#     )
+# fi
 
 # ── Step 5: Extract top 10 unique hits ────────────────────────────────────────
 echo ""
