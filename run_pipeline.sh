@@ -61,14 +61,19 @@ fi
 # ── Step 1: Transfer Learning ──────────────────────────────────────────────────
 # Reads:  data/custom_train.smi + data/custom_val.smi
 # Writes: models/jak2_focused.model
-# echo ""
-# echo "[*] Phase 1: Transfer Learning..."
-# (
-#     cd "$REPO_ROOT/REINVENT4"
-#     reinvent \
-#         -l "$REPO_ROOT/logs/jak2_tl.log" \
-#         "configs/jak2_tl.toml"
-# )
+echo ""
+if [ -f "$REPO_ROOT/models/jak2_focused.model" ]; then
+    echo "[*] Phase 1: Pre-trained TL model found at models/jak2_focused.model — skipping Transfer Learning."
+else
+    echo "[*] Phase 1: Pre-trained model not found. Running Transfer Learning..."
+    (
+        cd "$REPO_ROOT/REINVENT4"
+        reinvent \
+            -l "$REPO_ROOT/logs/jak2_tl.log" \
+            "configs/jak2_tl.toml"
+    )
+fi
+
 
 
 # ── Step 2: Reinforcement Learning ────────────────────────────────────────────
