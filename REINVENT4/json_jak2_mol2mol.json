@@ -8,7 +8,7 @@
     "parameters": {
         "model_file": "priors/mol2mol_high_similarity.prior",
         "num_smiles": 50,
-        "smiles_file": "custom_data/top_hits.smi",
+        "smiles_file": "../data/top_hits.smi",
         "target_smiles_path": "",
         "sample_strategy": "beamsearch",
         "output_file": "../results/jak2_mol2mol_candidates.csv",

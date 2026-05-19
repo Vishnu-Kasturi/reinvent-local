@@ -2,7 +2,7 @@
     "run_type": "staged_learning",
     "device": "cpu",
     "use_cuda": true,
-    "tb_logdir": "/Users/vishnukasturi/Intern/reinvent-local/tb_jak2_rl",
+    "tb_logdir": "../tb_jak2_rl",
     "json_out_config": "json_jak2_rl_v2.json",
     "seed": null,
     "parameters": {
@@ -69,8 +69,40 @@
                                     "name": "JAK2pIC50",
                                     "weight": 2.0,
                                     "params": {
-                                        "model_path": "../preprocess/run_xgb_v2/xgb_model.ubj",
-                                        "scaler_path": "../preprocess/run_xgb_v2/desc_scaler.pkl"
+                                        "model_path": "../data/xgb_model.ubj",
+                                        "scaler_path": "../data/desc_scaler.pkl"
+                                    }
+                                },
+                                {
+                                    "name": "JAK2pIC50_raw",
+                                    "weight": 0.0,
+                                    "params": {
+                                        "model_path": "../data/xgb_model.ubj",
+                                        "scaler_path": "../data/desc_scaler.pkl"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "TanimotoPenalty": {
+                            "endpoint": [
+                                {
+                                    "name": "TanimotoPenalty",
+                                    "weight": 1.0,
+                                    "params": {
+                                        "smiles_file": "../data/custom_train.smi",
+                                        "threshold": 0.5,
+                                        "radius": 2
+                                    }
+                                },
+                                {
+                                    "name": "MaxTanimoto",
+                                    "weight": 0.0,
+                                    "params": {
+                                        "smiles_file": "../data/custom_train.smi",
+                                        "threshold": 0.5,
+                                        "radius": 2
                                     }
                                 }
                             ]
@@ -125,8 +157,40 @@
                                     "name": "JAK2pIC50",
                                     "weight": 2.0,
                                     "params": {
-                                        "model_path": "../preprocess/run_xgb_v2/xgb_model.ubj",
-                                        "scaler_path": "../preprocess/run_xgb_v2/desc_scaler.pkl"
+                                        "model_path": "../data/xgb_model.ubj",
+                                        "scaler_path": "../data/desc_scaler.pkl"
+                                    }
+                                },
+                                {
+                                    "name": "JAK2pIC50_raw",
+                                    "weight": 0.0,
+                                    "params": {
+                                        "model_path": "../data/xgb_model.ubj",
+                                        "scaler_path": "../data/desc_scaler.pkl"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "TanimotoPenalty": {
+                            "endpoint": [
+                                {
+                                    "name": "TanimotoPenalty",
+                                    "weight": 1.0,
+                                    "params": {
+                                        "smiles_file": "../data/custom_train.smi",
+                                        "threshold": 0.5,
+                                        "radius": 2
+                                    }
+                                },
+                                {
+                                    "name": "MaxTanimoto",
+                                    "weight": 0.0,
+                                    "params": {
+                                        "smiles_file": "../data/custom_train.smi",
+                                        "threshold": 0.5,
+                                        "radius": 2
                                     }
                                 }
                             ]
@@ -186,7 +250,7 @@
     },
     "intrinsic_penalty": null,
     "inception": {
-        "smiles_file": "custom_data/custom_train.smi",
+        "smiles_file": "../data/custom_train.smi",
         "memory_size": 200,
         "sample_size": 20,
         "deduplicate": true
