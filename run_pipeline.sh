@@ -61,14 +61,15 @@ fi
 # ── Step 1: Transfer Learning ──────────────────────────────────────────────────
 # Reads:  data/custom_train.smi + data/custom_val.smi
 # Writes: models/jak2_focused.model
-echo ""
-echo "[*] Phase 1: Transfer Learning..."
-(
-    cd "$REPO_ROOT/REINVENT4"
-    reinvent \
-        -l "$REPO_ROOT/logs/jak2_tl.log" \
-        "configs/jak2_tl.toml"
-)
+# echo ""
+# echo "[*] Phase 1: Transfer Learning..."
+# (
+#     cd "$REPO_ROOT/REINVENT4"
+#     reinvent \
+#         -l "$REPO_ROOT/logs/jak2_tl.log" \
+#         "configs/jak2_tl.toml"
+# )
+
 
 # ── Step 2: Reinforcement Learning ────────────────────────────────────────────
 # Reads:  models/jak2_focused.model + data/xgb_model.ubj + data/desc_scaler.pkl
