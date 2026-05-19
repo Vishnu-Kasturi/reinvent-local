@@ -56,10 +56,9 @@ PAGE_SIZE    = 1000
 TRAIN_RATIO  = 0.80
 RANDOM_SEED  = 42
 
-# REINVENT prior tokenizer — only these characters are valid
-TOKEN_RE = re.compile(
-    r"(\%\d{2}|Br|Cl|@@|->|c|n|o|s|p|S|F|C|N|O|P|B|I|[se]|\[|\]|"
-    r"\(|\)|=|#|\+|-|\\|/|\.|[0-9])"
+# REINVENT prior tokenizer regex pattern
+SMILES_TOKENS_REGEX = re.compile(
+    r"(\[[^]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|-|=|#|\$|:|\\|/|\(|\)|%\d{2}|\d|\.|\*)"
 )
 
 # Conflict threshold: flag SMILES where max-min pIC50 > this
@@ -97,9 +96,13 @@ def standardize(smi: str):
         return None
 
 
-def token_ok(smi: str) -> bool:
-    """Check all characters in SMILES are supported by REINVENT prior."""
-    return "".join(TOKEN_RE.findall(smi)) == smi
+def token_ok(smi: str, allowed_tokens: set) -> bool:
+    """Validate all SMILES tokens against the allowed prior vocabulary."""
+    tokens = set(SMILES_TOKENS_REGEX.findall(smi))
+    tokens = {s for s in tokens if "*" not in s}
+    invalid = tokens - allowed_tokens
+    return len(invalid) == 0
+
 
 
 def drug_like(smi: str, min_mw=150, max_mw=800, max_logp=7,
@@ -327,6 +330,20 @@ def main():
 
     # ── Step 4: Drug-likeness + token filter ──────────────────────────────────
     print(f"\n[4/5] Applying drug-likeness and REINVENT token filters...")
+    
+    # Load allowed tokens from the REINVENT4 prior
+    import torch
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    prior_path = os.path.join(repo_root, "REINVENT4", "priors", "reinvent.prior")
+    print(f"  Loading permitted tokens from prior: {prior_path}...")
+    try:
+        ckpt = torch.load(prior_path, map_location="cpu", weights_only=False)
+        allowed_tokens = set(ckpt["vocabulary"].tokens())
+        print(f"  Loaded {len(allowed_tokens)} valid tokens from prior vocabulary")
+    except Exception as e:
+        print(f"  [WARNING] Could not load prior vocabulary: {e}. Falling back to no token filtering.")
+        allowed_tokens = None
+
     n_drug, n_token = 0, 0
     keep = []
     for _, row in dedup_df.iterrows():
@@ -334,9 +351,10 @@ def main():
         if not drug_like(smi, max_mw=args.max_mw):
             n_drug += 1
             continue
-        if not token_ok(smi):
-            n_token += 1
-            continue
+        if allowed_tokens is not None:
+            if not token_ok(smi, allowed_tokens):
+                n_token += 1
+                continue
         keep.append(row)
 
     clean_df = pd.DataFrame(keep).reset_index(drop=True)
