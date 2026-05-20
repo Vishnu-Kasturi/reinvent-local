@@ -318,8 +318,8 @@ def main():
     }
 
     # 6. Save final model + scaler + summary
-    model_path  = os.path.join(args.out_dir, "xgb_model.ubj")
-    scaler_path = os.path.join(args.out_dir, "desc_scaler.pkl")
+    model_path  = os.path.join(args.out_dir, "xgb_model_optuna.ubj")
+    scaler_path = os.path.join(args.out_dir, "desc_scaler_optuna.pkl")
 
     final_model.save_model(model_path)
     with open(scaler_path, "wb") as f:
@@ -333,12 +333,12 @@ def main():
         "best_params":     study.best_params,
         "results":         res,
     }
-    with open(os.path.join(args.out_dir, "run_summary.json"), "w") as f:
+    with open(os.path.join(args.out_dir, "run_summary_optuna.json"), "w") as f:
         json.dump(summary, f, indent=2)
 
     print(f"\n✅ Optimized Model saved directly to: {model_path}")
     print(f"✅ Scaler saved directly to: {scaler_path}")
-    print(f"✅ Run summary saved directly to: {args.out_dir}/run_summary.json")
+    print(f"✅ Run summary saved directly to: {args.out_dir}/run_summary_optuna.json")
 
 
 if __name__ == "__main__":
