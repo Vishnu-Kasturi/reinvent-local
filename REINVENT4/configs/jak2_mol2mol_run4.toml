@@ -1,0 +1,14 @@
+run_type = "sampling"
+device = "cpu"
+json_out_config = "json_jak2_mol2mol_run4.json"
+
+[parameters]
+model_file = "priors/mol2mol_high_similarity.prior"
+smiles_file = "../data/top_hits_run4.smi"
+
+num_smiles = 50
+output_file = "../results/jak2_mol2mol_candidates_run4.csv"
+
+unique_molecules = true
+sample_strategy = "beamsearch"
+temperature = 0.8
