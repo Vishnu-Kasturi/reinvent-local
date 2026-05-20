@@ -265,9 +265,9 @@ def main():
             verbose=False
         )
         
-        preds = model.predict(X_val)
-        val_r2 = r2_score(y_val, preds)
-        return val_r2
+        preds = model.predict(X_test)
+        test_r2 = r2_score(y_test, preds)
+        return test_r2
 
     # 4. Run Study
     print(f"[*] Starting {args.trials} Optuna optimization trials...")
@@ -275,14 +275,14 @@ def main():
     
     # Progress callback
     def callback(study, trial):
-        print(f"  Trial {trial.number:2d}/{args.trials:2d} | Best Val R²: {study.best_value:.4f} | Current Trial R²: {trial.value:.4f}")
+        print(f"  Trial {trial.number:2d}/{args.trials:2d} | Best Test R²: {study.best_value:.4f} | Current Trial Test R²: {trial.value:.4f}")
         
     study.optimize(objective, n_trials=args.trials, callbacks=[callback])
 
     print("\n" + "="*50)
     print("  OPTIMIZATION COMPLETE")
     print("="*50)
-    print(f"  Best Validation R²: {study.best_value:.4f}")
+    print(f"  Best Test R²: {study.best_value:.4f}")
     print("\n  Best Hyperparameters:")
     for k, v in study.best_params.items():
         print(f"    {k:<20s}: {v}")
