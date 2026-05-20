@@ -250,6 +250,7 @@ def main():
             "reg_lambda": trial.suggest_float("reg_lambda", 1.0, 10.0, log=True),
             "objective": "reg:squarederror",
             "eval_metric": "rmse",
+            "early_stopping_rounds": 80,
             "tree_method": "hist",
             "device": "cpu",
             "random_state": RANDOM_SEED,
@@ -261,7 +262,6 @@ def main():
             X_train, y_train,
             sample_weight=w_train,
             eval_set=[(X_val, y_val)],
-            early_stopping_rounds=80,
             verbose=False
         )
         
@@ -295,6 +295,7 @@ def main():
         "n_estimators": 15000, # Large estimators with early stopping
         "objective": "reg:squarederror",
         "eval_metric": "rmse",
+        "early_stopping_rounds": 100,
         "tree_method": "hist",
         "device": "cpu",
         "random_state": RANDOM_SEED,
@@ -306,7 +307,6 @@ def main():
         X_train, y_train,
         sample_weight=w_train,
         eval_set=[(X_val, y_val)],
-        early_stopping_rounds=100,
         verbose=500
     )
 
