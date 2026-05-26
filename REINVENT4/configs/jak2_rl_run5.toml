@@ -1,0 +1,167 @@
+##############################################################################
+# jak2_rl_run5.toml  —  RL Config for JAK2 pIC50 (Run 5 - No Tanimoto Penalty)
+##############################################################################
+#
+# Generates JAK2 inhibitors targeting potency (XGBoost pIC50), MW, and QED (Stage 1),
+# followed by ADMET refinement (NumRotBond, TPSA, Potency, MW, QED in Stage 2).
+#
+# Crucially, the Tanimoto similarity penalty has been REMOVED from the scoring 
+# function in both Stage 1 and Stage 2 as requested.
+#
+# Starting prior: models/jak2_focused.model.80.chkpt (our verified sweet spot!)
+#
+##############################################################################
+
+run_type        = "staged_learning"
+device          = "cpu"
+tb_logdir       = "../tb_jak2_rl_run5"
+json_out_config = "json_jak2_rl_run5.json"
+
+[parameters]
+use_checkpoint     = false
+summary_csv_prefix = "../results/focused_rl_run5"
+
+# Paths relative to REINVENT4/ directory
+prior_file = "priors/reinvent.prior"
+agent_file = "../models/jak2_focused.model.80.chkpt"
+
+batch_size        = 64
+unique_sequences  = true
+randomize_smiles  = true
+tb_isim           = false
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 8
+minscore    = 0.35
+
+[inception]
+smiles_file = "../data/custom_train.smi"
+memory_size = 200
+sample_size = 20
+
+##############################################################################
+# STAGE 1: Broad JAK2 pIC50 Optimization (300 steps)
+# Components: QED + MolecularWeight + JAK2pIC50 (TanimotoPenalty Removed!)
+##############################################################################
+[[stage]]
+chkpt_file  = "../models/jak2_rl_stage1_run5.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50
+max_steps   = 300
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── QED: Drug-likeness (already [0,1]) ────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.QED]
+[[stage.scoring.component.QED.endpoint]]
+name   = "QED"
+weight = 1.0
+
+# ── MolecularWeight: Lipinski-compliant range [300, 550] ──────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.MolecularWeight]
+[[stage.scoring.component.MolecularWeight.endpoint]]
+name              = "MolecularWeight"
+weight            = 1.0
+transform.type    = "double_sigmoid"
+transform.low     = 300.0
+transform.high    = 550.0
+transform.coef_div = 500.0
+transform.coef_si = 20.0
+transform.coef_se = 20.0
+
+# ── JAK2 pIC50: final_acc scaffold-stratified model (R²=0.7006, 3451 features) ────
+[[stage.scoring.component]]
+[stage.scoring.component.JAK2pIC50]
+[[stage.scoring.component.JAK2pIC50.endpoint]]
+name               = "JAK2pIC50"
+weight             = 2.0
+params.model_path  = ["../Preprocess/final_acc/jak2_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/jak2_pic50_final_acc_scaler.pkl"]
+[[stage.scoring.component.JAK2pIC50.endpoint]]
+name               = "JAK2pIC50_raw"
+weight             = 0.0
+params.model_path  = ["../Preprocess/final_acc/jak2_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/jak2_pic50_final_acc_scaler.pkl"]
+
+
+##############################################################################
+# STAGE 2: ADMET-Constrained Refinement (500 steps)
+# Components: QED + MW + JAK2pIC50 + NumRotBond + TPSA (TanimotoPenalty Removed!)
+##############################################################################
+[[stage]]
+chkpt_file  = "../models/jak2_rl_stage2_run5.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50
+max_steps   = 500
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── QED ───────────────────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.QED]
+[[stage.scoring.component.QED.endpoint]]
+name   = "QED"
+weight = 1.0
+
+# ── MolecularWeight ───────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.MolecularWeight]
+[[stage.scoring.component.MolecularWeight.endpoint]]
+name              = "MolecularWeight"
+weight            = 1.0
+transform.type    = "double_sigmoid"
+transform.low     = 300.0
+transform.high    = 550.0
+transform.coef_div = 500.0
+transform.coef_si = 20.0
+transform.coef_se = 20.0
+
+# ── JAK2 pIC50: final_acc scaffold-stratified model (R²=0.7006, 3451 features) ────
+[[stage.scoring.component]]
+[stage.scoring.component.JAK2pIC50]
+[[stage.scoring.component.JAK2pIC50.endpoint]]
+name               = "JAK2pIC50"
+weight             = 2.0
+params.model_path  = ["../Preprocess/final_acc/jak2_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/jak2_pic50_final_acc_scaler.pkl"]
+[[stage.scoring.component.JAK2pIC50.endpoint]]
+name               = "JAK2pIC50_raw"
+weight             = 0.0
+params.model_path  = ["../Preprocess/final_acc/jak2_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/jak2_pic50_final_acc_scaler.pkl"]
+
+# ── NumRotatableBonds: reverse_sigmoid [2, 10] ────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.NumRotBond]
+[[stage.scoring.component.NumRotBond.endpoint]]
+name             = "NumRotBond"
+weight           = 1.0
+transform.type   = "reverse_sigmoid"
+transform.high   = 10.0
+transform.low    = 2.0
+transform.k      = 20.0
+
+# ── TPSA: Target range 50–130 Å² ──────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.TPSA]
+[[stage.scoring.component.TPSA.endpoint]]
+name              = "TPSA"
+weight            = 1.0
+transform.type    = "double_sigmoid"
+transform.low     = 50.0
+transform.high    = 130.0
+transform.coef_div = 150.0
+transform.coef_si = 20.0
+transform.coef_se = 20.0

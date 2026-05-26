@@ -1,0 +1,11 @@
+Epoch,Valid,Unique,Mean_Tanimoto,Median_Tanimoto,Exact_Copies,Copy_Rate,Path
+10,477,477,0.3916882360636585,0.345679012345679,2,0.0041928721174004195,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.10.chkpt
+20,475,475,0.4687287582905918,0.42857142857142855,12,0.02526315789473684,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.20.chkpt
+30,479,479,0.5005515123181715,0.46511627906976744,13,0.027139874739039668,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.30.chkpt
+40,466,466,0.5541412188280086,0.5314477848101266,20,0.04291845493562232,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.40.chkpt
+50,471,471,0.6011952694349243,0.6024096385542169,42,0.08917197452229299,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.50.chkpt
+60,475,475,0.6211277362438807,0.631578947368421,52,0.10947368421052632,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.60.chkpt
+70,465,465,0.6337581881159693,0.6338028169014085,57,0.12258064516129032,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.70.chkpt
+80,473,473,0.6660239627100651,0.6867469879518072,73,0.1543340380549683,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.80.chkpt
+90,461,461,0.7072304868380411,0.7222222222222222,95,0.20607375271149675,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.90.chkpt
+100,468,468,0.6870520446197814,0.7196491228070175,113,0.24145299145299146,/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.100.chkpt

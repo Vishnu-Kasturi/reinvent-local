@@ -1,9 +1,0 @@
-ChEMBL pIC50 Scaffold Split Report
-=============================================
-Total molecules     : 10,022
-Unique scaffolds    : 3,709
-
-Split sizes:
-  Train : 7,463
-  Val   : 1,466
-  Test  : 1,093

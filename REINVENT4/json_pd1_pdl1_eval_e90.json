@@ -1,0 +1,29 @@
+{
+    "run_type": "sampling",
+    "device": "cpu",
+    "use_cuda": true,
+    "tb_logdir": "tb_pd1_pdl1_eval_e90",
+    "json_out_config": "json_pd1_pdl1_eval_e90.json",
+    "seed": null,
+    "parameters": {
+        "model_file": "/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.90.chkpt",
+        "num_smiles": 500,
+        "smiles_file": null,
+        "target_smiles_path": "",
+        "sample_strategy": "multinomial",
+        "output_file": "/Users/vishnukasturi/Intern/reinvent-local/results/pd1_pdl1_tl_sample_e90.csv",
+        "target_nll_file": "target_nll.csv",
+        "unique_molecules": true,
+        "randomize_smiles": true,
+        "temperature": 1.0
+    },
+    "scoring": null,
+    "scheduler": null,
+    "responder": null,
+    "filter": null,
+    "stage": null,
+    "learning_strategy": null,
+    "diversity_filter": null,
+    "intrinsic_penalty": null,
+    "inception": null
+}

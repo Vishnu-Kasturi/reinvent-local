@@ -1,7 +1,7 @@
 run_type = "transfer_learning"
 device   = "cpu"
-tb_logdir       = "../tb_jak2_TL"
-json_out_config = "json_jak2_TL.json"
+tb_logdir       = "../tb_pd1_pdl1_TL"
+json_out_config = "json_pd1_pdl1_TL.json"
 
 [parameters]
 num_epochs          = 100
@@ -10,9 +10,9 @@ save_every_n_epochs = 10
 
 # Paths relative to REINVENT4/ directory
 input_model_file          = "priors/reinvent.prior"
-smiles_file               = "../data/jak2_TL_train.smi"
-validation_smiles_file    = "../data/jak2_TL_val.smi"
-output_model_file         = "../models/jak2_TL.model"
+smiles_file               = "../data/pd1_pdl1_TL_train.smi"
+validation_smiles_file    = "../data/pd1_pdl1_TL_val.smi"
+output_model_file         = "../models/pd1_pdl1_TL.model"
 
 standardize_smiles = true
 randomize_smiles   = true

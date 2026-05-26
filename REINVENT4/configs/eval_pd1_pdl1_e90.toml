@@ -1,0 +1,11 @@
+
+run_type = "sampling"
+device = "cpu"
+tb_logdir = "tb_pd1_pdl1_eval_e90"
+json_out_config = "json_pd1_pdl1_eval_e90.json"
+[parameters]
+model_file = "/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.90.chkpt"
+output_file = "/Users/vishnukasturi/Intern/reinvent-local/results/pd1_pdl1_tl_sample_e90.csv"
+num_smiles = 500
+unique_molecules = true
+randomize_smiles = true

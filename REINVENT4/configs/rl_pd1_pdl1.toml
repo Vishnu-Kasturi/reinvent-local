@@ -1,0 +1,98 @@
+##############################################################################
+# rl_pd1_pdl1.toml  —  RL Config for PD1-PDL1 Multi-Objective Optimization
+##############################################################################
+#
+# Scoring components (geometric mean):
+#   1. PD1PDL1pIC50   — XGBoost pIC50 predictor       (weight=2, squared)
+#   2. PD1PDL1Sol     — XGBoost solubility predictor   (weight=2, squared)
+#   3. SAScore        — RDKit Synthetic Accessibility   (weight=1)
+#
+# The geometric mean with weight=2 effectively squares the pIC50 and
+# solubility contributions, giving them heavier influence on the reward.
+#
+##############################################################################
+
+run_type        = "staged_learning"
+device          = "cpu"
+tb_logdir       = "../tb_pd1_pdl1_rl"
+json_out_config = "json_pd1_pdl1_rl.json"
+
+[parameters]
+use_checkpoint     = false
+summary_csv_prefix = "../results/pd1_pdl1_rl"
+
+# Starting agent: TL-focused PD1-PDL1 model (set dynamically by pipeline)
+prior_file = "priors/reinvent.prior"
+agent_file = "../models/pd1_pdl1_focused.model.80.chkpt"
+
+batch_size        = 64
+unique_sequences  = true
+randomize_smiles  = true
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 8
+minscore    = 0.35
+
+[inception]
+smiles_file = "../data/custom_train.smi"
+memory_size = 200
+sample_size = 20
+
+##############################################################################
+# STAGE 1: Multi-Objective PD1-PDL1 Optimization (500 steps)
+##############################################################################
+[[stage]]
+chkpt_file  = "../models/pd1_pdl1_rl_stage1.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50
+max_steps   = 300
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── PD1-PDL1 pIC50: final_acc scaffold-stratified model (R²=0.8592, 2415 features) ──
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1pIC50]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50"
+weight             = 2.0
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50_raw"
+weight             = 0.0
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
+
+# ── PD1-PDL1 Solubility: final_acc scaffold-stratified model (R²=0.7771, 2427 features) ──
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1Sol]
+[[stage.scoring.component.PD1PDL1Sol.endpoint]]
+name               = "PD1PDL1Sol"
+weight             = 2.0
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"]
+[[stage.scoring.component.PD1PDL1Sol.endpoint]]
+name               = "PD1PDL1Sol_raw"
+weight             = 0.0
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"]
+
+# ── SA Score: Synthetic Accessibility (RDKit, lower=easier) ──────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.SAScore]
+[[stage.scoring.component.SAScore.endpoint]]
+name              = "SAScore"
+weight            = 1.0
+transform.type    = "reverse_sigmoid"
+transform.high    = 6.0
+transform.low     = 2.0
+transform.k       = 0.5
+

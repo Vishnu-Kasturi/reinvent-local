@@ -1,0 +1,12 @@
+run_type = "sampling"
+device = "cpu"
+json_out_config = "json_pd1_pdl1_sampling.json"
+
+[parameters]
+model_file = "../models/pd1_pdl1_rl_final.model"
+num_smiles = 5000
+output_file = "../results/pd1_pdl1_rl_candidates.csv"
+
+unique_molecules = true
+sample_strategy = "multinomial"
+temperature = 1.0

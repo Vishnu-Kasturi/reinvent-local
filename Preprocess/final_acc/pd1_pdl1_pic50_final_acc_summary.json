@@ -1,0 +1,29 @@
+{
+  "train_csv": "/Users/vishnukasturi/Intern/reinvent-local/Preprocess/Data_pd1_pdl1/data_csvs/pd1_pdl1_preprocess_train.csv",
+  "test_csv": "/Users/vishnukasturi/Intern/reinvent-local/Preprocess/Data_pd1_pdl1/data_csvs/pd1_pdl1_preprocess_test.csv",
+  "n_train": 2302,
+  "n_test": 487,
+  "n_features": 2415,
+  "feature_groups": {
+    "rdkit_200": 200,
+    "ecfp4_2048": 2048,
+    "maccs_167": 167
+  },
+  "best_iteration": 2327,
+  "metrics": {
+    "train": {
+      "r2": 0.9893777370452881,
+      "rmse": 0.17210720913702154,
+      "mae": 0.12269888073205948,
+      "f1": 0.9820877084620135,
+      "auc": 0.9976306253430846
+    },
+    "test": {
+      "r2": 0.8592396974563599,
+      "rmse": 0.6311072225849182,
+      "mae": 0.41637951135635376,
+      "f1": 0.9063444108761329,
+      "auc": 0.9429960229783473
+    }
+  }
+}

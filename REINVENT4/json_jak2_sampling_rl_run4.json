@@ -1,0 +1,29 @@
+{
+    "run_type": "sampling",
+    "device": "cpu",
+    "use_cuda": true,
+    "tb_logdir": null,
+    "json_out_config": "json_jak2_sampling_rl_run4.json",
+    "seed": null,
+    "parameters": {
+        "model_file": "../models/jak2_rl_final_run4.model",
+        "num_smiles": 5000,
+        "smiles_file": null,
+        "target_smiles_path": "",
+        "sample_strategy": "multinomial",
+        "output_file": "../results/jak2_rl_candidates_run4.csv",
+        "target_nll_file": "target_nll.csv",
+        "unique_molecules": true,
+        "randomize_smiles": true,
+        "temperature": 1.0
+    },
+    "scoring": null,
+    "scheduler": null,
+    "responder": null,
+    "filter": null,
+    "stage": null,
+    "learning_strategy": null,
+    "diversity_filter": null,
+    "intrinsic_penalty": null,
+    "inception": null
+}
