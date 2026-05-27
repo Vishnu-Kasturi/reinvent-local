@@ -1,0 +1,106 @@
+{
+    "run_type": "staged_learning",
+    "device": "cpu",
+    "use_cuda": true,
+    "tb_logdir": "../tb_pd1_pdl1_pic50_only_rl",
+    "json_out_config": "json_pd1_pdl1_pic50_only_rl.json",
+    "seed": null,
+    "parameters": {
+        "prior_file": "priors/reinvent.prior",
+        "agent_file": "/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.50.chkpt",
+        "summary_csv_prefix": "../results/pd1_pdl1_pic50_only_rl",
+        "use_checkpoint": false,
+        "purge_memories": true,
+        "smiles_file": null,
+        "sample_strategy": "multinomial",
+        "distance_threshold": 99999,
+        "batch_size": 64,
+        "randomize_smiles": true,
+        "unique_sequences": true,
+        "temperature": 1.0,
+        "tb_isim": false
+    },
+    "scoring": null,
+    "scheduler": null,
+    "responder": null,
+    "filter": null,
+    "stage": [
+        {
+            "max_steps": 200,
+            "max_score": 1.0,
+            "chkpt_file": "../models/pd1_pdl1_pic50_only_rl.chkpt",
+            "termination": "simple",
+            "min_steps": 100,
+            "scoring": {
+                "type": "geometric_mean",
+                "component": [
+                    {
+                        "PD1PDL1pIC50": {
+                            "endpoint": [
+                                {
+                                    "name": "PD1PDL1pIC50",
+                                    "weight": 0.0,
+                                    "params": {
+                                        "model_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj",
+                                        "scaler_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+                                    }
+                                },
+                                {
+                                    "name": "PD1PDL1pIC50_raw",
+                                    "weight": 3.0,
+                                    "transform": {
+                                        "type": "sigmoid",
+                                        "low": 7.5,
+                                        "high": 10.5,
+                                        "k": 0.5
+                                    },
+                                    "params": {
+                                        "model_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj",
+                                        "scaler_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "SAScore": {
+                            "endpoint": [
+                                {
+                                    "name": "SAScore",
+                                    "weight": 1.0,
+                                    "transform": {
+                                        "type": "reverse_sigmoid",
+                                        "high": 5.0,
+                                        "low": 2.0,
+                                        "k": 0.5
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "filename": null
+            },
+            "diversity_filter": null
+        }
+    ],
+    "learning_strategy": {
+        "type": "dap",
+        "sigma": 120,
+        "rate": 0.0001
+    },
+    "diversity_filter": {
+        "type": "IdenticalMurckoScaffold",
+        "bucket_size": 50,
+        "minscore": 0.1,
+        "minsimilarity": 0.4,
+        "penalty_multiplier": 0.5
+    },
+    "intrinsic_penalty": null,
+    "inception": {
+        "smiles_file": "../data/pd1_pdl1_TL_train.smi",
+        "memory_size": 200,
+        "sample_size": 20,
+        "deduplicate": true
+    }
+}

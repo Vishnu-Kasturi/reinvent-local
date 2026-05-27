@@ -7,9 +7,8 @@ json_out_config = "json_pd1_pdl1_rl_toml.json"
 use_checkpoint     = false
 summary_csv_prefix = "../results/pd1_pdl1_rl_toml"
 
-# Agent set dynamically by pipeline script
 prior_file = "priors/reinvent.prior"
-agent_file = "/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.10.chkpt"
+agent_file = "/Users/vishnukasturi/Intern/reinvent-local/models/pd1_pdl1_TL.model.50.chkpt"
 
 batch_size        = 64
 unique_sequences  = true
@@ -17,13 +16,13 @@ randomize_smiles  = true
 
 [learning_strategy]
 type  = "dap"
-sigma = 128
+sigma = 120
 rate  = 0.0001
 
 [diversity_filter]
 type        = "IdenticalMurckoScaffold"
-bucket_size = 8
-minscore    = 0.35
+bucket_size = 50
+minscore    = 0.10
 
 [inception]
 smiles_file = "../data/pd1_pdl1_TL_train.smi"
@@ -31,30 +30,20 @@ memory_size = 200
 sample_size = 20
 
 ##############################################################################
-# STAGE 1: Broad Optimization (300 steps)
+# SINGLE STAGE — pIC50, Solubility, and SA Score ALL ACTIVE
+# Weights balanced to prevent solubility hijacking: pIC50 (3.0), Sol (2.0), SA (1.0)
 ##############################################################################
 [[stage]]
 chkpt_file  = "../models/pd1_pdl1_rl_toml_stage1.chkpt"
 termination = "simple"
-max_score   = 0.0
-min_steps   = 120
-max_steps   = 130
+max_score   = 1.0
+min_steps   = 100
+max_steps   = 200
 
 [stage.scoring]
 type = "geometric_mean"
 
-# ── SA Score ──────────────────────────────────────────────────────────────────
-[[stage.scoring.component]]
-[stage.scoring.component.SAScore]
-[[stage.scoring.component.SAScore.endpoint]]
-name              = "SAScore"
-weight            = 1.0
-transform.type    = "reverse_sigmoid"
-transform.high    = 6.0
-transform.low     = 2.0
-transform.k       = 0.5
-
-# ── PD1-PDL1 pIC50: Raw -> Normalized (Sigmoid) ──────────────────────────────
+# 1. pIC50 — High Potency (Weight 3)
 [[stage.scoring.component]]
 [stage.scoring.component.PD1PDL1pIC50]
 [[stage.scoring.component.PD1PDL1pIC50.endpoint]]
@@ -66,13 +55,13 @@ params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pk
 name               = "PD1PDL1pIC50_raw"
 weight             = 3.0
 transform.type     = "sigmoid"
+transform.low      = 7.5
 transform.high     = 10.5
-transform.low      = 7.0
 transform.k        = 0.5
 params.model_path  = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
 params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
 
-# ── PD1-PDL1 Solubility: Raw -> Normalized (Sigmoid) ──────────────────────────
+# 2. Solubility — High Solubility logS > -3 (Weight 2)
 [[stage.scoring.component]]
 [stage.scoring.component.PD1PDL1Sol]
 [[stage.scoring.component.PD1PDL1Sol.endpoint]]
@@ -84,65 +73,19 @@ params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
 name               = "PD1PDL1Sol_raw"
 weight             = 2.0
 transform.type     = "sigmoid"
-transform.high     = 0.0
 transform.low      = -6.0
+transform.high     = -1.0
 transform.k        = 0.5
 params.model_path  = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
 params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
 
-##############################################################################
-# STAGE 2: Refinement (300 steps)
-##############################################################################
-[[stage]]
-chkpt_file  = "../models/pd1_pdl1_rl_toml_stage2.chkpt"
-termination = "simple"
-max_score   = 1.0
-min_steps   = 50
-max_steps   = 200
-
-[stage.scoring]
-type = "geometric_mean"
-
+# 3. SA Score — Low Synthesizability difficulty (Weight 1)
 [[stage.scoring.component]]
 [stage.scoring.component.SAScore]
 [[stage.scoring.component.SAScore.endpoint]]
 name              = "SAScore"
 weight            = 1.0
 transform.type    = "reverse_sigmoid"
-transform.high    = 6.0
+transform.high    = 5.0
 transform.low     = 2.0
 transform.k       = 0.5
-
-[[stage.scoring.component]]
-[stage.scoring.component.PD1PDL1pIC50]
-[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
-name               = "PD1PDL1pIC50"
-weight             = 0.0
-params.model_path  = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
-params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
-[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
-name               = "PD1PDL1pIC50_raw"
-weight             = 4.0
-transform.type     = "sigmoid"
-transform.high     = 11.5
-transform.low      = 8.5
-transform.k        = 0.5
-params.model_path  = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
-params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
-
-[[stage.scoring.component]]
-[stage.scoring.component.PD1PDL1Sol]
-[[stage.scoring.component.PD1PDL1Sol.endpoint]]
-name               = "PD1PDL1Sol"
-weight             = 0.0
-params.model_path  = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
-params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
-[[stage.scoring.component.PD1PDL1Sol.endpoint]]
-name               = "PD1PDL1Sol_raw"
-weight             = 2.0
-transform.type     = "sigmoid"
-transform.high     = 0.0
-transform.low      = -6.0
-transform.k        = 0.5
-params.model_path  = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
-params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"

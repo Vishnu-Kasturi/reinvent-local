@@ -51,12 +51,23 @@ def main():
     
     # 1. Load baseline
     print(f"[*] Loading baseline {args.raw_pic50}")
-    df_base = pd.read_csv(args.raw_pic50)
+    try:
+        df_base = pd.read_csv(args.raw_pic50, sep="\t")
+        if df_base.shape[1] <= 1:
+            df_base = pd.read_csv(args.raw_pic50, sep=",")
+    except Exception:
+        df_base = pd.read_csv(args.raw_pic50)
     
-    # standardize col names
-    if "pic50" not in df_base.columns and "pIC50" in df_base.columns:
-        df_base.rename(columns={"pIC50": "pic50"}, inplace=True)
-        
+    # Normalize all column names to lowercase and strip whitespace
+    df_base.columns = [c.strip().lower() for c in df_base.columns]
+    
+    # Handle possible variant field names
+    if "pic50" not in df_base.columns:
+        if "pic50_raw" in df_base.columns:
+            df_base.rename(columns={"pic50_raw": "pic50"}, inplace=True)
+        elif "y" in df_base.columns:
+            df_base.rename(columns={"y": "pic50"}, inplace=True)
+            
     df_base = df_base.dropna(subset=["smiles", "pic50"])
     
     mw, qed, sa = compute_properties(df_base["smiles"])

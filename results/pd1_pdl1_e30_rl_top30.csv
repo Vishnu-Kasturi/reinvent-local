@@ -1,0 +1,23 @@
+SMILES,pic50,logS,SAScore (raw)
+COc1nc(-c2cccc(-c3cccc4c3CCC4)c2Cl)ccc1CNCCC(=O)O,9.4266,-5.5526,2.5579
+COc1nc(-c2cccc(-c3cnc(CNCCCO)c(OC)n3)c2Cl)ccc1CNC(C)C(=O)O,9.3841,-3.5109,3.4207
+COc1nc(-c2cccc(-c3cnc(CNCCO)c(OC)n3)c2Cl)ccc1CNCc1ccn(C)n1,9.3672,-3.5921,3.109
+COc1nc(-c2cccc(-c3cnc(CNCCO)c(OC)n3)c2Cl)ccc1CN1CCNC(C)C1,9.346,-2.8271,3.5271
+COc1nc(-c2cccc(-c3cnc(CNCCC(=O)O)c(OC)n3)c2Cl)cnc1CNCCO,9.3174,-2.9969,3.1059
+COc1nc(-c2cccc(-c3ccc(CNCC4CCCCO4)c(OC)n3)c2Cl)ccc1CNCCO,9.1879,-3.5472,3.3086
+COc1nc(-c2cccc(-c3ccc(CNCCO)c(OC)n3)c2Cl)ccc1CNCCO,9.155,-3.0764,2.7795
+COc1nc(-c2cccc(-c3cnc(CNCCO)c(OC)n3)c2Cl)ccc1CNCCO,9.1547,-2.9231,2.944
+COc1nc(-c2cccc(-c3cnc(CNCCF)c(OC)n3)c2Cl)ccc1CNCCO,9.1402,-3.4436,3.0437
+COc1nc(-c2cccc(-c3cnc(CNCCO)c(OC)n3)c2Cl)cnc1CN,9.136,-2.7171,3.0394
+COc1nc(-c2cccc(-c3cnc(CNC(CO)(CO)CO)c(OC)n3)c2Cl)ccc1CNCCO,9.1203,-2.7674,3.2478
+COc1nc(-c2cccc(-c3cnc(CNCCO)c(OC)n3)c2Cl)ncc1CNCCO,9.1119,-2.7635,3.0593
+COc1nc(-c2cccc(-c3ccc(CNCCO)cn3)c2Cl)ccc1CNCCO,9.0542,-3.0189,2.6504
+COc1nc(-c2cccc(-c3ncc(CNCCO)c(OC)n3)c2Cl)ccc1CNCCO,9.0055,-2.9297,2.8948
+COc1nc(-c2cccc(-c3ccnn3C)c2Cl)ccc1CNCCO,9.0019,-3.3737,2.6608
+COc1nc(-c2cccc(-c3cnc(C)nc3)c2Cl)ccc1CNCCO,8.9875,-3.838,2.6215
+COc1nc(-c2cncc(-c3cnc(CNCC4CC(O)C4)c(OC)n3)c2Cl)ccc1CNCCO,8.9706,-3.1378,3.2415
+COc1nc(-c2cccc(-c3cnc(CN)c(OC)n3)c2Cl)ccc1CNCCO,8.8952,-2.8847,2.8575
+COc1nc(-c2cccc(-c3ccc(CNCCO)cn3)c2Cl)cnc1CNCCO,8.8378,-2.9301,2.8241
+COc1nc(-c2cccc(-c3ccnn3C)c2Cl)cnc1CNC(CO)CO,8.8362,-2.6916,2.9982
+CNCCNCc1nnc(-c2cccc(-c3ccc(CNCCO)c(OC)n3)c2Cl)o1,8.7799,-2.8669,2.8283
+COc1nc(-c2cccc(-c3ccc(CNCCO)nn3)c2Cl)ccc1CNCCO,8.6812,-2.9606,2.7681

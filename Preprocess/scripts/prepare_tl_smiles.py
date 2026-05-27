@@ -80,12 +80,22 @@ def main():
     args = parser.parse_args()
     
     print(f"[*] Loading {args.input_csv}...")
-    df = pd.read_csv(args.input_csv)
+    try:
+        df = pd.read_csv(args.input_csv, sep="\t")
+        if df.shape[1] <= 1:
+            df = pd.read_csv(args.input_csv, sep=",")
+    except Exception:
+        df = pd.read_csv(args.input_csv)
     
-    if "pic50" not in df.columns and "pIC50" in df.columns:
-        df.rename(columns={"pIC50": "pic50"}, inplace=True)
-    elif "pic50" not in df.columns and "Y" in df.columns:
-         df.rename(columns={"Y": "pic50"}, inplace=True)
+    # Normalize all column names to lowercase and strip whitespace
+    df.columns = [c.strip().lower() for c in df.columns]
+    
+    # Handle possible pic50 field names
+    if "pic50" not in df.columns:
+        if "pic50_raw" in df.columns:
+            df.rename(columns={"pic50_raw": "pic50"}, inplace=True)
+        elif "y" in df.columns:
+            df.rename(columns={"y": "pic50"}, inplace=True)
         
     df = df.dropna(subset=["smiles", "pic50"])
     

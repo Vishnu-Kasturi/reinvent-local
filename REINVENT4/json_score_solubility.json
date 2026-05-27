@@ -1,0 +1,43 @@
+{
+    "run_type": "scoring",
+    "device": "cpu",
+    "use_cuda": true,
+    "tb_logdir": null,
+    "json_out_config": "json_score_solubility.json",
+    "seed": null,
+    "parameters": {
+        "smiles_file": "../results/to_score.smi",
+        "output_csv": "../results/scored_solubility.csv",
+        "smiles_column": "SMILES",
+        "standardize_smiles": true
+    },
+    "scoring": {
+        "type": "geometric_mean",
+        "parallel": 1,
+        "component": [
+            {
+                "PD1PDL1Sol": {
+                    "endpoint": [
+                        {
+                            "name": "PD1PDL1Sol_raw",
+                            "weight": 1.0,
+                            "params": {
+                                "model_path": "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj",
+                                "scaler_path": "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "filename": null
+    },
+    "scheduler": null,
+    "responder": null,
+    "filter": null,
+    "stage": null,
+    "learning_strategy": null,
+    "diversity_filter": null,
+    "intrinsic_penalty": null,
+    "inception": null
+}

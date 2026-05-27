@@ -45,7 +45,7 @@ if [[ "$TARGET" == "jak2" ]]; then
     RL_TOML="jak2_rl_toml.toml"
 else
     RAW_CSV="Preprocess/Data_pd1_pdl1/pd1_pdl1_pic50_raw.csv"
-    PREPROCESS_CSV="Preprocess/Data_pd1_pdl1/data_csvs/pd1_pdl1_preprocess_all.csv"
+    PREPROCESS_CSV="Preprocess/Data_pd1_pdl1/pd1_pdl1_pic50_raw.csv"
     SOL_CSV="Preprocess/Data_pd1_pdl1/pd1_pdl1_sol.csv"
     TL_TOML="pd1_pdl1_TL.toml"
     RL_TOML="pd1_pdl1_rl_toml.toml"

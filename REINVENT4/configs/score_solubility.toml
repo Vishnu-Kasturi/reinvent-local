@@ -1,0 +1,18 @@
+run_type = "scoring"
+json_out_config = "json_score_solubility.json"
+
+[parameters]
+smiles_file = "../results/to_score.smi"
+output_csv = "../results/scored_solubility.csv"
+
+[scoring]
+type = "geometric_mean"
+parallel = 1
+
+[[scoring.component]]
+[scoring.component.PD1PDL1Sol]
+[[scoring.component.PD1PDL1Sol.endpoint]]
+name               = "PD1PDL1Sol_raw"
+weight             = 1.0
+params.model_path  = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
+params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
