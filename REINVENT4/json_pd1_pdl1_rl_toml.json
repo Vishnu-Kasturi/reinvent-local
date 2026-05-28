@@ -47,16 +47,90 @@
                                 },
                                 {
                                     "name": "PD1PDL1pIC50_raw",
-                                    "weight": 3.0,
+                                    "weight": 5.0,
                                     "transform": {
                                         "type": "sigmoid",
-                                        "low": 7.5,
+                                        "low": 7.0,
                                         "high": 10.5,
                                         "k": 0.5
                                     },
                                     "params": {
                                         "model_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj",
                                         "scaler_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "SAScore": {
+                            "endpoint": [
+                                {
+                                    "name": "SAScore",
+                                    "weight": 1.0,
+                                    "transform": {
+                                        "type": "reverse_sigmoid",
+                                        "high": 6.0,
+                                        "low": 2.0,
+                                        "k": 0.5
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "filename": null
+            },
+            "diversity_filter": null
+        },
+        {
+            "max_steps": 200,
+            "max_score": 1.0,
+            "chkpt_file": "../models/pd1_pdl1_rl_toml_stage2.chkpt",
+            "termination": "simple",
+            "min_steps": 50,
+            "scoring": {
+                "type": "geometric_mean",
+                "component": [
+                    {
+                        "PD1PDL1pIC50": {
+                            "endpoint": [
+                                {
+                                    "name": "PD1PDL1pIC50",
+                                    "weight": 0.0,
+                                    "params": {
+                                        "model_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj",
+                                        "scaler_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+                                    }
+                                },
+                                {
+                                    "name": "PD1PDL1pIC50_raw",
+                                    "weight": 4.0,
+                                    "transform": {
+                                        "type": "sigmoid",
+                                        "low": 8.5,
+                                        "high": 11.0,
+                                        "k": 0.5
+                                    },
+                                    "params": {
+                                        "model_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj",
+                                        "scaler_path": "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "SAScore": {
+                            "endpoint": [
+                                {
+                                    "name": "SAScore",
+                                    "weight": 1.0,
+                                    "transform": {
+                                        "type": "reverse_sigmoid",
+                                        "high": 6.0,
+                                        "low": 2.0,
+                                        "k": 0.5
                                     }
                                 }
                             ]
@@ -75,7 +149,7 @@
                                 },
                                 {
                                     "name": "PD1PDL1Sol_raw",
-                                    "weight": 2.0,
+                                    "weight": 1.0,
                                     "transform": {
                                         "type": "sigmoid",
                                         "low": -6.0,
@@ -89,22 +163,6 @@
                                 }
                             ]
                         }
-                    },
-                    {
-                        "SAScore": {
-                            "endpoint": [
-                                {
-                                    "name": "SAScore",
-                                    "weight": 1.0,
-                                    "transform": {
-                                        "type": "reverse_sigmoid",
-                                        "high": 5.0,
-                                        "low": 2.0,
-                                        "k": 0.5
-                                    }
-                                }
-                            ]
-                        }
                     }
                 ],
                 "filename": null
@@ -114,7 +172,7 @@
     ],
     "learning_strategy": {
         "type": "dap",
-        "sigma": 120,
+        "sigma": 128,
         "rate": 0.0001
     },
     "diversity_filter": {

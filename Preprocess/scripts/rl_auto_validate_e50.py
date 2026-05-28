@@ -48,8 +48,7 @@ df_raw.columns=[c.strip().lower() for c in df_raw.columns]
 raw_smi=df_raw['smiles'].dropna().tolist(); raw_pic50=df_raw['pic50'].dropna().values
 max_st=df_rl['step'].max(); cutoff=int(max_st*0.8)
 df_opt=df_rl[df_rl['step']>cutoff].copy()
-df_opt['pic50']=df_opt.get(PIC50, np.nan)
-df_opt['logS']=df_opt.get(SOL, np.nan)
+df_opt['pic50']=df_opt[PIC50]; df_opt['logS']=df_opt[SOL]
 print(f'Total rows: {len(df_rl)} | Max step: {max_st} | Optimized: {len(df_opt)}')
 
 # Top hits
