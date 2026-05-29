@@ -52,7 +52,7 @@ files = sorted(glob.glob("results/pd1_pdl1_tl_run2_sample_e*.csv"),
 if not files:
     print("No TL run2 checkpoint sample files found!"); sys.exit(1)
 
-checkpoints = [(int(re.findall(r'e(\d+)', f)[0]), f) for f in files]
+checkpoints = [(int(re.findall(r'e(\d+)', f)[0]), f) for f in files if int(re.findall(r'e(\d+)', f)[0]) <= 100]
 epoch_data = {}
 for epoch, f_path in checkpoints:
     print(f"Predicting properties for Epoch {epoch}...")

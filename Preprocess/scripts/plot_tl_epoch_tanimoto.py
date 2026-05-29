@@ -36,7 +36,7 @@ print(f"Reference: {len(ref_fps)} pIC50 fingerprints\n")
 
 # ── Find checkpoints ─────────────────────────────────────────────────────────
 checkpoints = []
-for epoch in range(10, 160, 10):
+for epoch in range(10, 110, 10):
     p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL_run2.model.{epoch}.chkpt')
     if os.path.exists(p):
         checkpoints.append((epoch, p))

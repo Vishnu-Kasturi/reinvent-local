@@ -30,7 +30,7 @@ print(f"  {len(ref_fps)} pIC50 reference fingerprints\n")
 # ── Load checkpoint samples ──────────────────────────────────────────────────
 files = sorted(glob.glob("results/pd1_pdl1_tl_run2_sample_e*.csv"),
                key=lambda f: int(re.findall(r'e(\d+)', f)[0]))
-checkpoints = [(int(re.findall(r'e(\d+)', f)[0]), f) for f in files]
+checkpoints = [(int(re.findall(r'e(\d+)', f)[0]), f) for f in files if int(re.findall(r'e(\d+)', f)[0]) <= 100]
 print(f"Found {len(checkpoints)} checkpoints\n")
 
 epoch_max_tans = {}
