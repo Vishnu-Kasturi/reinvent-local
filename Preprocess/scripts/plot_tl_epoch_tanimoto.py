@@ -1,34 +1,23 @@
-"""
-Re-sample 500 unique valid molecules from each TL checkpoint,
-then compute Tanimoto similarity vs the processed pIC50 dataset.
-
-Overwrites existing pd1_pdl1_tl_sample_e{epoch}.csv files.
-"""
-import os, sys, subprocess, glob, re
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import seaborn as sns
+import os, sys, glob, re, subprocess, pandas as pd, numpy as np
+import matplotlib.pyplot as plt, matplotlib.cm as cm, seaborn as sns
+from tqdm import tqdm
 from rdkit import Chem, DataStructs, RDLogger
 from rdkit.Chem import AllChem
-from tqdm import tqdm
-
 RDLogger.DisableLog('rdApp.*')
 
-REPO_ROOT   = os.path.abspath('.')
+REPO_ROOT   = os.path.abspath('/Users/vishnukasturi/Intern/reinvent-local')
 MODELS_DIR  = os.path.join(REPO_ROOT, 'models')
 RESULTS_DIR = os.path.join(REPO_ROOT, 'results')
 CONFIGS_DIR = os.path.join(REPO_ROOT, 'REINVENT4', 'configs')
 
-# ── Fingerprints for reference set ──────────────────────────────────────────
 def morgan_fps(smiles_list):
     fps = []
-    for smi in smiles_list:
-        mol = Chem.MolFromSmiles(str(smi))
-        fps.append(AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048) if mol else None)
+    for s in smiles_list:
+        m = Chem.MolFromSmiles(str(s))
+        fps.append(AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048) if m else None)
     return fps
 
+# ── Reference Dataset ────────────────────────────────────────────────────────
 REF_CSV = 'Preprocess/Data_pd1_pdl1/data_csvs/pd1_pdl1_preprocess_all.csv'
 df_ref  = pd.read_csv(REF_CSV)
 ref_fps = [fp for fp in morgan_fps(df_ref['smiles'].dropna().tolist()) if fp is not None]
@@ -37,7 +26,7 @@ print(f"Reference: {len(ref_fps)} pIC50 fingerprints\n")
 # ── Find checkpoints ─────────────────────────────────────────────────────────
 checkpoints = []
 for epoch in range(10, 110, 10):
-    p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL_run2.model.{epoch}.chkpt')
+    p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL_run3.model.{epoch}.chkpt')
     if os.path.exists(p):
         checkpoints.append((epoch, p))
 print(f"Found {len(checkpoints)} checkpoints: {[e for e,_ in checkpoints]}\n")
@@ -47,12 +36,12 @@ epoch_max_tanimotos = {}
 summary_rows = []
 
 for epoch, chkpt_path in checkpoints:
-    out_csv  = os.path.join(RESULTS_DIR, f'pd1_pdl1_tl_run2_sample_e{epoch}.csv')
-    toml_path = os.path.join(CONFIGS_DIR, f'_tl_run2_sample_e{epoch}.toml')
+    out_csv  = os.path.join(RESULTS_DIR, f'pd1_pdl1_tl_run3_sample_e{epoch}.csv')
+    toml_path = os.path.join(CONFIGS_DIR, f'_tl_run3_sample_e{epoch}.toml')
     
     toml_content = f"""run_type = "sampling"
 device   = "cpu"
-json_out_config = "_tl_sample_e{epoch}.json"
+json_out_config = "_tl_run3_sample_e{epoch}.json"
 
 [parameters]
 model_file      = "{chkpt_path}"
@@ -80,7 +69,6 @@ temperature     = 1.0
     df = pd.read_csv(out_csv)
     n_valid = len(df)
     
-    # Trim to exactly 500
     df = df.head(500)
     df.to_csv(out_csv, index=False)
     
@@ -112,7 +100,7 @@ temperature     = 1.0
 
 # ── Save summary ──────────────────────────────────────────────────────────────
 df_summary = pd.DataFrame(summary_rows)
-df_summary.to_csv('results/pd1_pdl1_tl_run2_epoch_tanimoto_summary.csv', index=False)
+df_summary.to_csv('results/pd1_pdl1_tl_run3_epoch_tanimoto_summary.csv', index=False)
 print(f"\n{df_summary.to_string(index=False)}")
 
 # ── Plot ──────────────────────────────────────────────────────────────────────
@@ -120,7 +108,7 @@ sns.set_theme(style="whitegrid")
 colors = cm.plasma(np.linspace(0.1, 0.9, len(epoch_max_tanimotos)))
 
 fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-fig.suptitle('PD1-PDL1 TL Run2 Epoch — Tanimoto Similarity vs pIC50 Dataset (500 samples each)',
+fig.suptitle('PD1-PDL1 TL Run3 Epoch — Tanimoto Similarity vs pIC50 Dataset (500 samples each)',
              fontsize=15, weight='bold')
 
 ax = axes[0]
@@ -160,5 +148,5 @@ ax2.legend(lines1 + lines2, labels1 + labels2, fontsize=9, loc='lower right')
 ax2.spines[['top']].set_visible(False)
 
 plt.tight_layout()
-plt.savefig('results/pd1_pdl1_tl_run2_epoch_tanimoto.png', dpi=150, bbox_inches='tight')
-print("\nPlot saved to: results/pd1_pdl1_tl_run2_epoch_tanimoto.png")
+plt.savefig('results/pd1_pdl1_tl_run3_epoch_tanimoto.png', dpi=150, bbox_inches='tight')
+print("\nPlot saved to: results/pd1_pdl1_tl_run3_epoch_tanimoto.png")
