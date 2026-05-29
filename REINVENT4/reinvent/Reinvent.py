@@ -119,7 +119,7 @@ def main(args: Any):
 
     actual_device = set_torch_device(args.device, device)
 
-    if hasattr(torch, actual_device.type) and actual_device.type != "cpu":  # "cuda" (incl. ROCm) and "xpu"
+    if hasattr(torch, actual_device.type) and actual_device.type not in ("cpu", "mps"):  # "cuda" (incl. ROCm) and "xpu"
         gpu = getattr(torch, actual_device.type)
 
         current_device = gpu.current_device()
@@ -131,6 +131,8 @@ def main(args: Any):
             f"GPU memory: {free_memory // 1024**2} MiB free, "
             f"{total_memory // 1024**2} MiB total"
         )
+    elif actual_device.type == "mps":
+        logger.info("Using Apple Silicon MPS (Metal Performance Shaders) GPU")
     else:
         logger.info(f"Using CPU {platform.processor()}")
 

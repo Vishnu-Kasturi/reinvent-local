@@ -1,0 +1,18 @@
+run_type = "transfer_learning"
+device   = "mps"
+tb_logdir       = "../tb_pd1_pdl1_TL_run2_mps"
+json_out_config = "json_pd1_pdl1_TL_run2_mps.json"
+
+[parameters]
+num_epochs          = 150
+batch_size          = 64
+save_every_n_epochs = 5
+
+# Paths relative to REINVENT4/ directory
+input_model_file          = "priors/reinvent.prior"
+smiles_file               = "../data/pd1_pdl1_TL_run2_train.smi"
+validation_smiles_file    = "../data/pd1_pdl1_TL_run2_val.smi"
+output_model_file         = "../models/pd1_pdl1_TL_run2.model"
+
+standardize_smiles = true
+randomize_smiles   = true
