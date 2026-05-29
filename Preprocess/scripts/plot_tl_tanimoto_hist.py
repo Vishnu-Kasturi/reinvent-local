@@ -28,7 +28,7 @@ ref_fps = [fp for fp in morgan_fps(df_ref['smiles'].dropna().tolist()) if fp is 
 print(f"  {len(ref_fps)} pIC50 reference fingerprints\n")
 
 # ── Load checkpoint samples ──────────────────────────────────────────────────
-files = sorted(glob.glob("results/pd1_pdl1_tl_sample_e*.csv"),
+files = sorted(glob.glob("results/pd1_pdl1_tl_run2_sample_e*.csv"),
                key=lambda f: int(re.findall(r'e(\d+)', f)[0]))
 checkpoints = [(int(re.findall(r'e(\d+)', f)[0]), f) for f in files]
 print(f"Found {len(checkpoints)} checkpoints\n")
@@ -48,8 +48,8 @@ for epoch, fpath in checkpoints:
 n_epochs = len(checkpoints)
 colors   = cm.plasma(np.linspace(0.1, 0.9, n_epochs))
 
-fig, axes = plt.subplots(2, 5, figsize=(22, 9), sharey=False, sharex=True)
-fig.suptitle('PD1-PDL1 TL Checkpoints — Max Tanimoto Similarity vs pIC50 Dataset\n(500 samples per epoch)',
+fig, axes = plt.subplots(int(np.ceil(n_epochs/5)), 5, figsize=(22, 9), sharey=False, sharex=True)
+fig.suptitle('PD1-PDL1 TL Run2 Checkpoints — Max Tanimoto Similarity vs pIC50 Dataset\n(500 samples per epoch)',
              fontsize=16, weight='bold', y=1.02)
 
 bins = np.linspace(0, 1, 35)
@@ -79,6 +79,6 @@ for idx, ((epoch, _), ax) in enumerate(zip(checkpoints, axes.flatten())):
 axes.flatten()[-1].legend(fontsize=8, loc='upper left')
 
 plt.tight_layout()
-outpath = 'results/pd1_pdl1_tl_epoch_tanimoto_hist.png'
+outpath = 'results/pd1_pdl1_tl_run2_epoch_tanimoto_hist.png'
 plt.savefig(outpath, dpi=150, bbox_inches='tight')
 print(f"\nSaved: {outpath}")

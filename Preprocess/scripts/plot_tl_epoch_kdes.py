@@ -47,10 +47,10 @@ def predict_all(smiles_list):
     }
 
 # ── Load TL checkpoint sample files ────────────────────────────────────────────
-files = sorted(glob.glob("results/pd1_pdl1_tl_sample_e*.csv"),
+files = sorted(glob.glob("results/pd1_pdl1_tl_run2_sample_e*.csv"),
                key=lambda f: int(re.findall(r'e(\d+)', f)[0]))
 if not files:
-    print("No TL checkpoint sample files found!"); sys.exit(1)
+    print("No TL run2 checkpoint sample files found!"); sys.exit(1)
 
 checkpoints = [(int(re.findall(r'e(\d+)', f)[0]), f) for f in files]
 epoch_data = {}
@@ -73,7 +73,7 @@ print(f"Baseline: {len(df_base)} pIC50 molecules with predicted logS\n")
 # ── Plot ────────────────────────────────────────────────────────────────────────
 sns.set_theme(style="whitegrid")
 fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-fig.suptitle('PD1-PDL1 TL Epoch Progressions vs pIC50 Processed Baseline\n(logS from solubility model)', 
+fig.suptitle('PD1-PDL1 TL Run2 Epoch Progressions vs pIC50 Processed Baseline\n(logS from solubility model)', 
              fontsize=16, weight='bold', y=1.02)
 
 colors = cm.plasma(np.linspace(0.1, 0.9, len(checkpoints)))
@@ -96,6 +96,6 @@ plot_kde(axes[1,0], raw_sa,    'SA',     'Synthetic Accessibility Evolution',   
 plot_kde(axes[1,1], raw_qed,   'QED',    'Drug-Likeness (QED) Evolution',           'QED', xlim=(0, 1))
 
 plt.tight_layout()
-outpath = 'results/pd1_pdl1_tl_epoch_kde_vs_pic50_baseline.png'
+outpath = 'results/pd1_pdl1_tl_run2_epoch_kde_vs_pic50_baseline.png'
 plt.savefig(outpath, dpi=150, bbox_inches='tight')
 print(f"Saved to: {outpath}")

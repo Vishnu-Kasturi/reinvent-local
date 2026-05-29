@@ -36,8 +36,8 @@ print(f"Reference: {len(ref_fps)} pIC50 fingerprints\n")
 
 # ── Find checkpoints ─────────────────────────────────────────────────────────
 checkpoints = []
-for epoch in range(10, 110, 10):
-    p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL.model.{epoch}.chkpt')
+for epoch in range(10, 160, 10):
+    p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL_run2.model.{epoch}.chkpt')
     if os.path.exists(p):
         checkpoints.append((epoch, p))
 print(f"Found {len(checkpoints)} checkpoints: {[e for e,_ in checkpoints]}\n")
@@ -47,8 +47,8 @@ epoch_max_tanimotos = {}
 summary_rows = []
 
 for epoch, chkpt_path in checkpoints:
-    out_csv  = os.path.join(RESULTS_DIR, f'pd1_pdl1_tl_sample_e{epoch}.csv')
-    toml_path = os.path.join(CONFIGS_DIR, f'_tl_sample_e{epoch}.toml')
+    out_csv  = os.path.join(RESULTS_DIR, f'pd1_pdl1_tl_run2_sample_e{epoch}.csv')
+    toml_path = os.path.join(CONFIGS_DIR, f'_tl_run2_sample_e{epoch}.toml')
     
     toml_content = f"""run_type = "sampling"
 device   = "cpu"
@@ -112,7 +112,7 @@ temperature     = 1.0
 
 # ── Save summary ──────────────────────────────────────────────────────────────
 df_summary = pd.DataFrame(summary_rows)
-df_summary.to_csv('results/pd1_pdl1_tl_epoch_tanimoto_summary.csv', index=False)
+df_summary.to_csv('results/pd1_pdl1_tl_run2_epoch_tanimoto_summary.csv', index=False)
 print(f"\n{df_summary.to_string(index=False)}")
 
 # ── Plot ──────────────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ sns.set_theme(style="whitegrid")
 colors = cm.plasma(np.linspace(0.1, 0.9, len(epoch_max_tanimotos)))
 
 fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-fig.suptitle('PD1-PDL1 TL Epoch — Tanimoto Similarity vs pIC50 Dataset (500 samples each)',
+fig.suptitle('PD1-PDL1 TL Run2 Epoch — Tanimoto Similarity vs pIC50 Dataset (500 samples each)',
              fontsize=15, weight='bold')
 
 ax = axes[0]
@@ -160,5 +160,5 @@ ax2.legend(lines1 + lines2, labels1 + labels2, fontsize=9, loc='lower right')
 ax2.spines[['top']].set_visible(False)
 
 plt.tight_layout()
-plt.savefig('results/pd1_pdl1_tl_epoch_tanimoto.png', dpi=150, bbox_inches='tight')
-print("\nPlot saved to: results/pd1_pdl1_tl_epoch_tanimoto.png")
+plt.savefig('results/pd1_pdl1_tl_run2_epoch_tanimoto.png', dpi=150, bbox_inches='tight')
+print("\nPlot saved to: results/pd1_pdl1_tl_run2_epoch_tanimoto.png")
