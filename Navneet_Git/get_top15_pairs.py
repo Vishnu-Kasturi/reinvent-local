@@ -33,13 +33,17 @@ def main():
             "name": "with_TL",
             "csv_path": f"{repo}/Navneet_Git/top15_balanced_with_TL.csv",
             "out_png": f"{repo}/Navneet_Git/top15_balanced_with_TL_pairs.png",
-            "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_with_TL_pairs.png"
+            "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_with_TL_pairs.png",
+            "out_csv": f"{repo}/Navneet_Git/top15_balanced_with_TL_pairs.csv",
+            "brain_csv": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_with_TL_pairs.csv"
         },
         {
             "name": "without_TL",
             "csv_path": f"{repo}/Navneet_Git/top15_balanced_without_TL.csv",
             "out_png": f"{repo}/Navneet_Git/top15_balanced_without_TL_pairs.png",
-            "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_without_TL_pairs.png"
+            "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_without_TL_pairs.png",
+            "out_csv": f"{repo}/Navneet_Git/top15_balanced_without_TL_pairs.csv",
+            "brain_csv": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_without_TL_pairs.csv"
         }
     ]
 
@@ -49,6 +53,7 @@ def main():
         
         pair_mols = []
         pair_legends = []
+        pair_data = []
         
         for idx, (_, row) in enumerate(df.iterrows()):
             gen_smi = row['canonical_smiles']
@@ -66,6 +71,19 @@ def main():
             base_smi = base_smiles[max_idx]
             base_m = Chem.MolFromSmiles(base_smi)
             base_pic50 = base_pic50s[max_idx]
+            
+            # Record data for CSV
+            pair_data.append({
+                "Rank": idx + 1,
+                "generated_smiles": gen_smi,
+                "predicted_pic50": row['pic50'],
+                "predicted_solubility": row['solubility'],
+                "docking_score": row['docking_score'],
+                "combined_score": row['combined_score'],
+                "tanimoto_similarity": max_tan,
+                "matched_baseline_smiles": base_smi,
+                "matched_baseline_original_pic50": base_pic50
+            })
             
             # Prepare generated molecule coords and legend
             AllChem.Compute2DCoords(gen_m)
@@ -92,6 +110,16 @@ def main():
                 f"Orig pIC50: {base_pic50:.2f}"
             )
             pair_legends.append(base_legend)
+            
+        # Save CSV
+        df_pairs = pd.DataFrame(pair_data)
+        df_pairs.to_csv(d['out_csv'], index=False)
+        print(f"[+] Saved pair CSV to {d['out_csv']}")
+        
+        # Copy CSV to brain dir
+        os.makedirs(os.path.dirname(d['brain_csv']), exist_ok=True)
+        df_pairs.to_csv(d['brain_csv'], index=False)
+        print(f"[+] Saved pair CSV to {d['brain_csv']}")
             
         # Draw grid image (3 pairs per row -> 6 columns, 5 rows)
         img = Draw.MolsToGridImage(
