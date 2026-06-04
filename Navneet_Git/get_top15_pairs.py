@@ -57,12 +57,24 @@ def main():
             "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_without_TL_pairs.png",
             "out_csv": f"{repo}/Navneet_Git/top15_balanced_without_TL_pairs.csv",
             "brain_csv": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_without_TL_pairs.csv"
+        },
+        {
+            "name": "slide_9_10",
+            "csv_path": f"{repo}/Navneet_Git/slide_9_10_molecules.csv",
+            "out_png": f"{repo}/Navneet_Git/Base_Matches/slide_9_10_base_matches.png",
+            "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/slide_9_10_base_matches.png",
+            "out_csv": f"{repo}/Navneet_Git/Base_Matches/slide_9_10_molecules.csv",
+            "brain_csv": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/slide_9_10_molecules.csv"
         }
     ]
 
     for d in datasets:
         print(f"\n[*] Processing top 15 dataset: {d['name']}")
         df = pd.read_csv(d['csv_path'])
+        
+        # Resolve column names dynamically
+        pic50_col = 'pic50' if 'pic50' in df.columns else ('PD1PDL1pIC50_raw (raw)' if 'PD1PDL1pIC50_raw (raw)' in df.columns else None)
+        sol_col = 'solubility' if 'solubility' in df.columns else ('PD1PDL1Sol_raw (raw)' if 'PD1PDL1Sol_raw (raw)' in df.columns else None)
         
         # Determine baseline matches first
         base_matched_smiles = []
@@ -119,10 +131,10 @@ def main():
             pair_data.append({
                 "Rank": idx + 1,
                 "generated_smiles": gen_smi,
-                "predicted_pic50": row['pic50'],
-                "predicted_solubility": row['solubility'],
-                "docking_score": row['docking_score'],
-                "combined_score": row['combined_score'],
+                "predicted_pic50": row[pic50_col] if pic50_col else np.nan,
+                "predicted_solubility": row[sol_col] if sol_col else np.nan,
+                "docking_score": row.get('docking_score', np.nan),
+                "combined_score": row.get('combined_score', np.nan),
                 "tanimoto_similarity": max_tan,
                 "matched_baseline_smiles": base_smi,
                 "matched_baseline_original_pic50": base_pic50,
@@ -135,8 +147,8 @@ def main():
             
             gen_legend = (
                 f"Rank {idx+1} (Gen)\n"
-                f"Pred pIC50: {row['pic50']:.2f}\n"
-                f"Pred logS: {row['solubility']:.2f}\n"
+                f"Pred pIC50: {row[pic50_col]:.2f}\n"
+                f"Pred logS: {row[sol_col]:.2f}\n"
                 f"Tan: {max_tan:.3f}"
             )
             pair_legends.append(gen_legend)
