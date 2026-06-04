@@ -165,15 +165,15 @@ def main():
         df_pairs.to_csv(d['brain_csv'], index=False)
         print(f"[+] Saved pair CSV to {d['brain_csv']}")
             
-        # Configure drawing options (increased legend font size)
+        # Configure drawing options (increased legend font size for high readability)
         dopts = Draw.rdMolDraw2D.MolDrawOptions()
-        dopts.legendFontSize = 22
+        dopts.legendFontSize = 36
         
         # Draw grid image (3 pairs per row -> 6 columns, 5 rows)
         img = Draw.MolsToGridImage(
             pair_mols,
             molsPerRow=6,
-            subImgSize=(350, 350),
+            subImgSize=(500, 500),
             legends=pair_legends,
             useSVG=False,
             drawOptions=dopts
