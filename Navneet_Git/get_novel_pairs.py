@@ -1,16 +1,29 @@
 import os
+import sys
 import pandas as pd
 import numpy as np
+import xgboost as xgb
 from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, Draw
+
+# Load REINVENT features plugin
+sys.path.append('REINVENT4')
+from reinvent_plugins.components.pd1_pdl1_features import compute_features
 
 def main():
     repo = "/Users/vishnukasturi/Intern/reinvent-local"
     baseline_path = f"{repo}/Preprocess/Data_pd1_pdl1/pd1_pdl1_pic50_raw.csv"
+    sol_model_path = f"{repo}/Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
+    sol_scaler_path = f"{repo}/Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
     
     print("[*] Loading baseline dataset...")
     df_base = pd.read_csv(baseline_path, sep='\t')
     df_base = df_base.dropna(subset=['SMILES'])
+    
+    # Load solubility predictor model
+    print("[*] Loading solubility model...")
+    bst_sol = xgb.Booster()
+    bst_sol.load_model(sol_model_path)
     
     base_mols = []
     base_fps = []
@@ -73,6 +86,35 @@ def main():
             
         df = pd.read_csv(d['csv_path'])
         
+        # Determine baseline matches first
+        base_matched_smiles = []
+        for idx, (_, row) in enumerate(df.iterrows()):
+            gen_smi = row['SMILES']
+            gen_m = Chem.MolFromSmiles(gen_smi)
+            if gen_m:
+                gen_fp = AllChem.GetMorganFingerprintAsBitVect(gen_m, 2, 2048)
+                sims = DataStructs.BulkTanimotoSimilarity(gen_fp, base_fps)
+                max_idx = np.argmax(sims)
+                base_matched_smiles.append(base_smiles[max_idx])
+            else:
+                base_matched_smiles.append("")
+                
+        # Predict solubility for matched baseline SMILES
+        valid_base_smiles = [s for s in base_matched_smiles if s != ""]
+        base_sols = {}
+        if valid_base_smiles:
+            X_s, m_s = compute_features(valid_base_smiles, sol_scaler_path)
+            preds_s = bst_sol.predict(xgb.DMatrix(X_s))
+            pred_idx = 0
+            for s in base_matched_smiles:
+                if s == "":
+                    continue
+                if m_s[pred_idx]:
+                    base_sols[s] = float(preds_s[pred_idx])
+                else:
+                    base_sols[s] = np.nan
+                pred_idx += 1
+
         pair_mols = []
         pair_legends = []
         pair_data = []
@@ -90,9 +132,10 @@ def main():
             max_idx = np.argmax(sims)
             max_tan = sims[max_idx]
             
-            base_smi = base_smiles[max_idx]
+            base_smi = base_matched_smiles[idx]
             base_m = Chem.MolFromSmiles(base_smi)
             base_pic50 = base_pic50s[max_idx]
+            base_sol = base_sols.get(base_smi, np.nan)
             
             # Record data for CSV
             pair_data.append({
@@ -104,7 +147,8 @@ def main():
                 "docking_score": row['DockingScore'],
                 "tanimoto_similarity": max_tan,
                 "matched_baseline_smiles": base_smi,
-                "matched_baseline_original_pic50": base_pic50
+                "matched_baseline_original_pic50": base_pic50,
+                "matched_baseline_predicted_solubility": base_sol
             })
             
             # Prepare generated molecule coords and legend
@@ -128,7 +172,8 @@ def main():
                 
             base_legend = (
                 f"Rank {idx+1} (Base Match)\n"
-                f"Orig pIC50: {base_pic50:.2f}"
+                f"Orig pIC50: {base_pic50:.2f}\n"
+                f"Pred logS: {base_sol:.2f}"
             )
             pair_legends.append(base_legend)
             
@@ -141,13 +186,18 @@ def main():
         os.makedirs(os.path.dirname(d['brain_csv']), exist_ok=True)
         df_pairs.to_csv(d['brain_csv'], index=False)
         
+        # Configure drawing options (increased legend font size)
+        dopts = Draw.rdMolDraw2D.MolDrawOptions()
+        dopts.legendFontSize = 22
+        
         # Draw grid image (3 pairs per row -> 6 columns, 5 rows)
         img = Draw.MolsToGridImage(
             pair_mols,
             molsPerRow=6,
-            subImgSize=(300, 300),
+            subImgSize=(350, 350),
             legends=pair_legends,
-            useSVG=False
+            useSVG=False,
+            drawOptions=dopts
         )
         
         img.save(d['out_png'])
