@@ -128,7 +128,7 @@ def main():
             base_sol = base_sols.get(base_smi, np.nan)
             
             # Record data for CSV
-            pair_data.append({
+            pair_row = {
                 "Rank": idx + 1,
                 "generated_smiles": gen_smi,
                 "predicted_pic50": row[pic50_col] if pic50_col else np.nan,
@@ -139,15 +139,23 @@ def main():
                 "matched_baseline_smiles": base_smi,
                 "matched_baseline_original_pic50": base_pic50,
                 "matched_baseline_predicted_solubility": base_sol
-            })
+            }
+            if 'mol_id' in row:
+                pair_row['mol_id'] = row['mol_id']
+            if 'epoch' in row:
+                pair_row['epoch'] = row['epoch']
+                
+            pair_data.append(pair_row)
             
             # Prepare generated molecule coords and legend
             AllChem.Compute2DCoords(gen_m)
             pair_mols.append(gen_m)
             
-            gen_legend = (
-                f"Rank {idx+1} (Gen)\n"
-                f"Pred pIC50: {row[pic50_col]:.2f}\n"
+            gen_legend = f"Rank {idx+1} (Gen)"
+            if 'mol_id' in row and 'epoch' in row:
+                gen_legend += f" | {row['mol_id']} (Ep {int(row['epoch'])})"
+            gen_legend += (
+                f"\nPred pIC50: {row[pic50_col]:.2f}\n"
                 f"Pred logS: {row[sol_col]:.2f}\n"
                 f"Tan: {max_tan:.3f}"
             )
