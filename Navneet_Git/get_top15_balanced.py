@@ -69,7 +69,7 @@ def main():
                 
                 # Create legend
                 legend = (
-                    f"Rank {idx+1}\n"
+                    f"Rank {idx+1} | {row['mol_id']} (Ep {int(row['epoch'])})\n"
                     f"pIC50: {row['pic50']:.2f} | logS: {row['solubility']:.2f}\n"
                     f"Docking: {row['docking_score']:.2f} kcal\n"
                     f"Tanimoto: {max_tan:.3f}"
@@ -86,13 +86,18 @@ def main():
         top15.to_csv(d['out_csv'], index=False)
         print(f"[+] Saved CSV to {d['out_csv']}")
         
+        # Configure drawing options (increased legend font size for high readability)
+        dopts = Draw.rdMolDraw2D.MolDrawOptions()
+        dopts.legendFontSize = 36
+        
         # Draw molecules grid (3 rows of 5 columns)
         img = Draw.MolsToGridImage(
             mols,
             molsPerRow=5,
-            subImgSize=(350, 320),
+            subImgSize=(500, 500),
             legends=legends,
-            useSVG=False
+            useSVG=False,
+            drawOptions=dopts
         )
         
         # Save to Navneet_Git
