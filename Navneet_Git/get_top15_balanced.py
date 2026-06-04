@@ -25,12 +25,14 @@ def main():
             "name": "with_TL",
             "path": f"{repo}/Navneet_Git/RL_filtered_processed.csv",
             "out_png": f"{repo}/Navneet_Git/top15_balanced_with_TL.png",
+            "out_csv": f"{repo}/Navneet_Git/top15_balanced_with_TL.csv",
             "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_with_TL.png"
         },
         {
             "name": "without_TL",
             "path": f"{repo}/Navneet_Git/RL_without_TL_filtered_processed.csv",
             "out_png": f"{repo}/Navneet_Git/top15_balanced_without_TL.png",
+            "out_csv": f"{repo}/Navneet_Git/top15_balanced_without_TL.csv",
             "brain_png": "/Users/vishnukasturi/.gemini/antigravity/brain/47052de4-b6d7-432f-a23a-37a447b1885e/top15_balanced_without_TL.png"
         }
     ]
@@ -50,6 +52,7 @@ def main():
         
         mols = []
         legends = []
+        tan_similarities = []
         
         for idx, (_, row) in enumerate(top15.iterrows()):
             smi = row['canonical_smiles']
@@ -62,6 +65,7 @@ def main():
                 fp = AllChem.GetMorganFingerprintAsBitVect(m, 2, 2048)
                 sims = DataStructs.BulkTanimotoSimilarity(fp, base_fps)
                 max_tan = max(sims) if sims else 0.0
+                tan_similarities.append(max_tan)
                 
                 # Create legend
                 legend = (
@@ -71,6 +75,16 @@ def main():
                     f"Tanimoto: {max_tan:.3f}"
                 )
                 legends.append(legend)
+            else:
+                tan_similarities.append(0.0)
+                
+        # Add Tanimoto and Rank columns to the DataFrame
+        top15['Rank'] = list(range(1, len(top15) + 1))
+        top15['max_tanimoto'] = tan_similarities
+        
+        # Save CSV
+        top15.to_csv(d['out_csv'], index=False)
+        print(f"[+] Saved CSV to {d['out_csv']}")
         
         # Draw molecules grid (3 rows of 5 columns)
         img = Draw.MolsToGridImage(
