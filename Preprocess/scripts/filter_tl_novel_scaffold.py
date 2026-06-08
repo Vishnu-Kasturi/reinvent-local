@@ -27,23 +27,14 @@ def main():
     total_before = len(df)
     print(f"[+] Loaded {total_before} rows.")
 
-    # 1. Define query and adjust properties
+    # 1. Define query using MolFromSmarts
     query_smi = "Clc1c(*)cccc1c1cccc(c1Cl)*"
-    print(f"[*] Defining query SMILES: {query_smi}")
-    query_mol = Chem.MolFromSmiles(query_smi)
+    print(f"[*] Defining query SMARTS: {query_smi}")
+    query_mol = Chem.MolFromSmarts(query_smi)
     if not query_mol:
-        print("[ERROR] Could not parse query SMILES via MolFromSmiles. Trying MolFromSmarts...")
-        query_mol = Chem.MolFromSmarts(query_smi)
-        if not query_mol:
-            print("[ERROR] Could not parse query at all.")
-            return
-
-    # Apply properties to create a generalized query as requested by user
-    params = AllChem.AdjustQueryParameters()
-    params.makeAtomsGeneric = True  # Allows atom types to match more broadly
-    params.makeBondsGeneric = True  # Allows bond types to match broadly
-    generalized_query = AllChem.AdjustQueryProperties(query_mol, params)
-    print("[+] Generalized query initialized successfully.")
+        print("[ERROR] Could not parse query SMARTS.")
+        return
+    print("[+] Query initialized successfully via MolFromSmarts.")
 
     # 2. Filter rows
     print("[*] Filtering molecules...")
@@ -55,7 +46,7 @@ def main():
         mol = Chem.MolFromSmiles(smi)
         if mol:
             # Check for match
-            has_match = mol.HasSubstructMatch(generalized_query)
+            has_match = mol.HasSubstructMatch(query_mol)
             if has_match:
                 removed_count += 1
             else:
