@@ -1,0 +1,72 @@
+run_type        = "staged_learning"
+device          = "cpu"
+tb_logdir       = "tb_pd1_pdl1_mol2mol_mmp"
+json_out_config = "json_pd1_pdl1_mol2mol_mmp.json"
+
+[parameters]
+prior_file         = "priors/mol2mol_mmp.prior"
+agent_file         = "priors/mol2mol_mmp.prior"
+smiles_file        = "../data/top16_balanced_with_TL.smi"
+sample_strategy    = "multinomial"
+distance_threshold = 100
+summary_csv_prefix = "../results/pd1_pdl1_mol2mol_mmp"
+batch_size         = 32
+unique_sequences   = true
+randomize_smiles   = true
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 8
+minscore    = 0.40
+
+[[stage]]
+chkpt_file  = "../models/pd1_pdl1_mol2mol_mmp.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 30
+max_steps   = 30
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── SA Score ──────────────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.SAScore]
+[[stage.scoring.component.SAScore.endpoint]]
+name              = "SAScore"
+weight            = 1.0
+transform.type    = "reverse_sigmoid"
+transform.high    = 4.5
+transform.low     = 2.0
+transform.k       = 0.5
+
+# ── PD1-PDL1 pIC50 (Tightened to prevent decay) ────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1pIC50]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50"
+weight             = 5.0
+transform.type     = "sigmoid"
+transform.high     = 11.0
+transform.low      = 8.5
+transform.k        = 0.5
+params.model_path  = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
+params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+
+# ── PD1-PDL1 Solubility (Lowered to create smooth learning gradient) ─────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1Sol]
+[[stage.scoring.component.PD1PDL1Sol.endpoint]]
+name               = "PD1PDL1Sol"
+weight             = 10.0
+transform.type     = "sigmoid"
+transform.high     = 2.0
+transform.low      = -5.5
+transform.k        = 0.5
+params.model_path  = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
+params.scaler_path = "../Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
