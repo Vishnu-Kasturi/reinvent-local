@@ -1,0 +1,16 @@
+SMILES
+CS(=O)(=O)N(CCO)C(=O)c1ccc(Nc2cc3c(ncn3-c3cccc(C(=O)NCCO)c3)c(N3CCOCC3)n2)cc1
+Cc1cc(C(=O)N2CCN(C)CC2)ccc1Nc1cc2c(ncn2-c2cccc(C(=O)NCCO)c2)c(N2CCOCC2)n1
+CN1CCN(C(=O)c2ccc(Nc3cc4c(ncn4-c4cccc(C(=O)NCCO)c4)c(N4CCOCC4)n3)cc2)CC1
+CN(C)C1CN(C(=O)c2ccc(Nc3cc4c(ncn4-c4cncc(C(=O)NCCO)c4)c(N4CCOCC4)n3)cc2)C1
+Cc1cc(Nc2cc3c(ncn3-c3cccc(C(=O)NCCO)c3)c(N3CCOCC3)n2)ccc1C(=O)N1CC(N)C1
+Cc1ccc(Nc2cc3c(ncn3-c3cccc(C(=O)NCCO)c3)c(N3CCOCC3)n2)cc1C(=O)N1CC(N)C1
+CN(C)c1cc(Nc2cc3c(ncn3-c3cccc(C(=O)NCCO)c3)c(N3CCOCC3)n2)ccc1C(=O)N1CCOCC1
+CN1CCN(C(=O)c2ccc(Nc3nc(N4CCOCC4)cc4c3ncn4-c3cccc(C(=O)N(C)CCO)c3)cc2)CC1
+C[C@@H](CO)NC(=O)c1cccc(-n2cnc3c(N4CCOCC4)nc(Nc4ccc(C(=O)N5CC(N(C)C)C5)cc4)cc32)c1
+CN(c1ccc(C(=O)N2CC(N)C2)cc1)c1cc2c(ncn2-c2cccc(C(=O)NCCO)c2)c(N2CCOCC2)n1
+CS(=O)(=O)N1CCN(C(=O)c2ccc(Nc3cc4c(ncn4-c4cccc(C(=O)NCCO)c4)c(N4CCOCC4)n3)cc2)CC1
+CN(C)C1CCN(C(=O)c2ccc(Nc3cc4c(ncn4-c4cccc(C(=O)NCCO)c4)c(N4CCOCC4)n3)cc2)C1
+Cc1cc(Nc2cc3c(ncn3-c3cccc(C(=O)NCCO)c3)c(N3CCOCC3)n2)ccc1C(=O)N1CC(O)C1
+Cc1ccc(Nc2cc3c(ncn3-c3cccc(C(=O)NCCO)c3)c(N3CCOCC3)n2)cc1C(=O)N1CC(O)C1
+CS(=O)(=O)N1CCCN(C(=O)c2ccc(Nc3cc4c(ncn4-c4cccc(C(=O)NCCO)c4)c(N4CCOCC4)n3)cc2)CC1
