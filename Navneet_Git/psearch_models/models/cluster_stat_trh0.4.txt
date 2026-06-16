@@ -1,0 +1,47 @@
+#The saved file contains statistical information about the cluster 
+#and the index of the molecule according to its location in the input file 
+
+cluster 0, cluster length 22, share of active 0.364
+63,0,3,5,6,22,24,25,27,29,32,34,35,37,38,40,42,45,47,48,61,64
+
+cluster 1, cluster length 14, share of active 0.643
+39,1,2,4,9,11,12,13,16,18,28,36,44,54
+
+cluster 2, cluster length 9, share of active 0.333
+62,7,14,17,52,55,57,58,60
+
+cluster 3, cluster length 8, share of active 0.5
+50,15,20,21,23,31,33,51
+
+cluster 4, cluster length 2, share of active 0.0
+43,46
+
+cluster 5, cluster length 1, share of active 0.0
+59
+
+cluster 6, cluster length 1, share of active 0.0
+41
+
+cluster 7, cluster length 1, share of active 1.0
+19
+
+cluster 8, cluster length 1, share of active 1.0
+8
+
+cluster 9, cluster length 1, share of active 1.0
+10
+
+cluster 10, cluster length 1, share of active 0.0
+56
+
+cluster 11, cluster length 1, share of active 0.0
+49
+
+cluster 12, cluster length 1, share of active 0.0
+30
+
+cluster 13, cluster length 1, share of active 0.0
+53
+
+cluster 14, cluster length 1, share of active 1.0
+26
