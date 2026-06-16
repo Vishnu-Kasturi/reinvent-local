@@ -71,7 +71,7 @@ class PD1PDL1Sol:
     def __init__(self, params: Parameters):
         self.model_path  = params.model_path[0]
         self.scaler_path = params.scaler_path[0]
-        self.number_of_endpoints = 2
+        self.number_of_endpoints = 1
 
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"[PD1PDL1Sol] Model not found: {self.model_path}")
@@ -101,7 +101,6 @@ class PD1PDL1Sol:
             dmatrix = xgb.DMatrix(X)
             raw_preds = self.model.predict(dmatrix)
 
-            scores_norm = np.full(n, np.nan, dtype=np.float32)
             scores_raw  = np.full(n, np.nan, dtype=np.float32)
             n_valid = 0
 
@@ -111,21 +110,19 @@ class PD1PDL1Sol:
                 raw = float(raw_preds[i])
                 if not np.isfinite(raw):
                     continue
-                scores_norm[i] = float(np.clip((raw - SOL_MIN) / SOL_RANGE, 0.0, 1.0))
                 scores_raw[i]  = raw
                 n_valid += 1
 
-            valid_scores = scores_norm[np.isfinite(scores_norm)]
             valid_raw    = scores_raw[np.isfinite(scores_raw)]
-            if len(valid_scores) > 0:
+            if len(valid_raw) > 0:
                 logger.info(
                     f"[PD1PDL1Sol] Batch: {n} | valid={n_valid} | "
-                    f"mean_norm={valid_scores.mean():.4f} | mean_logS={valid_raw.mean():.3f}"
+                    f"mean_logS={valid_raw.mean():.3f}"
                 )
             else:
                 logger.warning(f"[PD1PDL1Sol] ALL {n} molecules invalid. Returning NaN.")
 
-            return ComponentResults([scores_norm, scores_raw])
+            return ComponentResults([scores_raw])
 
         except Exception as exc:
             logger.error(f"[PD1PDL1Sol] Error: {exc}\n{traceback.format_exc()}")

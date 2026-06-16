@@ -17,31 +17,27 @@ def morgan_fps(smiles_list):
         fps.append(AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048) if m else None)
     return fps
 
-# ── Reference Dataset ────────────────────────────────────────────────────────
 REF_CSV = 'Preprocess/Data_pd1_pdl1/data_csvs/pd1_pdl1_preprocess_all.csv'
 df_ref  = pd.read_csv(REF_CSV)
 ref_fps = [fp for fp in morgan_fps(df_ref['smiles'].dropna().tolist()) if fp is not None]
 print(f"Reference: {len(ref_fps)} pIC50 fingerprints\n")
 
-# ── Find checkpoints ─────────────────────────────────────────────────────────
 checkpoints = []
-for epoch in range(10, 110, 10):
-    p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL_run4.model.{epoch}.chkpt')
+for epoch in range(10, 160, 10):
+    p = os.path.join(MODELS_DIR, f'pd1_pdl1_TL_run5.model.{epoch}.chkpt')
     if os.path.exists(p):
         checkpoints.append((epoch, p))
 print(f"Found {len(checkpoints)} checkpoints: {[e for e,_ in checkpoints]}\n")
 
-# ── Sample + compute Tanimoto ─────────────────────────────────────────────────
 epoch_max_tanimotos = {}
 summary_rows = []
 
 for epoch, chkpt_path in checkpoints:
-    out_csv  = os.path.join(RESULTS_DIR, f'pd1_pdl1_tl_run4_sample_e{epoch}.csv')
-    toml_path = os.path.join(CONFIGS_DIR, f'_tl_run4_sample_e{epoch}.toml')
-    
+    out_csv   = os.path.join(RESULTS_DIR, f'pd1_pdl1_tl_run5_sample_e{epoch}.csv')
+    toml_path = os.path.join(CONFIGS_DIR, f'_tl_run5_sample_e{epoch}.toml')
     toml_content = f"""run_type = "sampling"
 device   = "cpu"
-json_out_config = "_tl_run4_sample_e{epoch}.json"
+json_out_config = "_tl_run5_sample_e{epoch}.json"
 
 [parameters]
 model_file      = "{chkpt_path}"
@@ -53,100 +49,90 @@ temperature     = 1.0
 """
     with open(toml_path, 'w') as f:
         f.write(toml_content)
-    
-    print(f"Epoch {epoch:3d}: Sampling 600 → target 500 valid...")
+
+    print(f"Epoch {epoch:3d}: Sampling...")
     subprocess.run(
         ['conda', 'run', '-n', 'reinvent-qsar', 'reinvent', toml_path],
         cwd=os.path.join(REPO_ROOT, 'REINVENT4'),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
-    
+
     if not os.path.exists(out_csv):
-        print(f"  [!] Output not found for Epoch {epoch}, skipping.")
-        continue
-    
-    df = pd.read_csv(out_csv)
-    n_valid = len(df)
-    
-    df = df.head(500)
+        print(f"  [!] No output for Epoch {epoch}"); continue
+
+    df = pd.read_csv(out_csv).head(500)
     df.to_csv(out_csv, index=False)
-    
-    smiles = df['SMILES'].dropna().tolist()
+    smiles  = df['SMILES'].dropna().tolist()
     gen_fps = [fp for fp in morgan_fps(smiles) if fp is not None]
-    
+
     max_tans = []
-    for fp in tqdm(gen_fps, desc=f"  Tanimoto E{epoch:3d}", leave=False):
+    for fp in tqdm(gen_fps, desc=f"  E{epoch:3d}", leave=False):
         sims = DataStructs.BulkTanimotoSimilarity(fp, ref_fps)
         max_tans.append(max(sims))
-    
+
     epoch_max_tanimotos[epoch] = max_tans
-    mean_t = np.mean(max_tans)
-    med_t  = np.median(max_tans)
+    mean_t = np.mean(max_tans); med_t = np.median(max_tans)
     nov_85 = np.mean(np.array(max_tans) < 0.85) * 100
     nov_70 = np.mean(np.array(max_tans) < 0.70) * 100
-    
-    print(f"          n_sampled={n_valid} → trimmed to {len(gen_fps)} | "
-          f"Mean={mean_t:.3f} | Median={med_t:.3f} | "
-          f"Novel<0.85: {nov_85:.1f}% | Novel<0.70: {nov_70:.1f}%")
-    
-    summary_rows.append({
-        "Epoch": epoch, "N_Generated": len(gen_fps),
-        "Mean_MaxTanimoto": round(mean_t, 4),
-        "Median_MaxTanimoto": round(med_t, 4),
-        "Novelty_T085": round(nov_85, 2),
-        "Novelty_T070": round(nov_70, 2),
-    })
+    print(f"          n={len(gen_fps)} | Mean={mean_t:.3f} | Median={med_t:.3f} | Novel<0.85={nov_85:.1f}% | Novel<0.70={nov_70:.1f}%")
+    summary_rows.append({"Epoch": epoch, "N_Generated": len(gen_fps),
+        "Mean_MaxTanimoto": round(mean_t,4), "Median_MaxTanimoto": round(med_t,4),
+        "Novelty_T085": round(nov_85,2), "Novelty_T070": round(nov_70,2)})
 
-# ── Save summary ──────────────────────────────────────────────────────────────
-df_summary = pd.DataFrame(summary_rows)
-df_summary.to_csv('results/pd1_pdl1_tl_run4_epoch_tanimoto_summary.csv', index=False)
-print(f"\n{df_summary.to_string(index=False)}")
+df_sum = pd.DataFrame(summary_rows)
+df_sum.to_csv('results/pd1_pdl1_tl_run5_epoch_tanimoto_summary.csv', index=False)
+print(f"\n{df_sum.to_string(index=False)}")
 
-# ── Plot ──────────────────────────────────────────────────────────────────────
+# ── 2×8 histogram grid ────────────────────────────────────────────────────────
 sns.set_theme(style="whitegrid")
-colors = cm.plasma(np.linspace(0.1, 0.9, len(epoch_max_tanimotos)))
+n_epochs = len(checkpoints)
+colors   = cm.plasma(np.linspace(0.1, 0.9, n_epochs))
+ncols = 5; nrows = int(np.ceil(n_epochs / ncols))
+fig, axes = plt.subplots(nrows, ncols, figsize=(22, nrows*4), sharey=False, sharex=True)
+fig.suptitle('PD1-PDL1 TL Run5 — Max Tanimoto Histograms (Regularized: LR=3e-5, WD=1e-5, clip=0.5)',
+             fontsize=14, weight='bold', y=1.01)
+bins = np.linspace(0, 1, 35)
+for idx, (epoch, _) in enumerate(checkpoints):
+    ax = axes.flatten()[idx]
+    max_tans = epoch_max_tanimotos[epoch]
+    mean_t = np.mean(max_tans); med_t = np.median(max_tans)
+    nov_85  = np.mean(np.array(max_tans) < 0.85)*100
+    ax.hist(max_tans, bins=bins, color=colors[idx], edgecolor='white', lw=0.5, alpha=0.85)
+    ax.axvline(mean_t, color='white', ls='-', lw=2.0)
+    ax.axvline(0.85, color='gold', ls='--', lw=1.5)
+    ax.axvline(0.70, color='tomato', ls='--', lw=1.2)
+    ax.set_title(f'Epoch {epoch}', fontsize=11, weight='bold')
+    ax.set_xlim(0, 1); ax.set_xlabel('Max Tanimoto', fontsize=8)
+    ax.text(0.03, 0.94, f'Mean:{mean_t:.3f}\nMed:{med_t:.3f}\nNov<0.85:{nov_85:.0f}%',
+            transform=ax.transAxes, fontsize=7, va='top',
+            bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
+    ax.spines[['top','right']].set_visible(False)
+# hide unused axes
+for j in range(len(checkpoints), nrows*ncols):
+    axes.flatten()[j].set_visible(False)
 
-fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-fig.suptitle('PD1-PDL1 TL Run4 Epoch — Tanimoto Similarity vs pIC50 Dataset (500 samples each)',
-             fontsize=15, weight='bold')
+plt.tight_layout()
+plt.savefig('results/pd1_pdl1_tl_run5_epoch_tanimoto_hist.png', dpi=150, bbox_inches='tight')
+print("\nSaved: results/pd1_pdl1_tl_run5_epoch_tanimoto_hist.png")
 
-ax = axes[0]
-for idx, (epoch, max_tans) in enumerate(epoch_max_tanimotos.items()):
-    sns.kdeplot(max_tans, label=f'Epoch {epoch}', color=colors[idx], lw=2.0, ax=ax)
-ax.axvline(0.85, color='gold', ls='--', lw=1.5, label='T=0.85 novelty cutoff')
-ax.axvline(0.70, color='tomato', ls='--', lw=1.5, label='T=0.70 novelty cutoff')
-ax.set_xlabel('Max Tanimoto Similarity to pIC50 Dataset', fontsize=12)
-ax.set_ylabel('Density', fontsize=12)
-ax.set_title('Max Tanimoto Distribution per Epoch (KDE)', fontsize=13, weight='bold')
-ax.set_xlim(0, 1)
-ax.legend(fontsize=9)
-ax.spines[['top','right']].set_visible(False)
-
-ax2 = axes[1]
+# ── Line plot ─────────────────────────────────────────────────────────────────
+fig2, ax2 = plt.subplots(figsize=(14, 6))
 epochs = [r['Epoch'] for r in summary_rows]
 means  = [r['Mean_MaxTanimoto'] for r in summary_rows]
 meds   = [r['Median_MaxTanimoto'] for r in summary_rows]
 nov85  = [r['Novelty_T085'] for r in summary_rows]
-
 ax2.plot(epochs, means, 'o-', color='#e74c3c', lw=2.5, ms=7, label='Mean Max Tanimoto')
 ax2.plot(epochs, meds,  's--', color='#3498db', lw=2.0, ms=6, label='Median Max Tanimoto')
-ax2.set_xlabel('TL Epoch', fontsize=12)
-ax2.set_ylabel('Max Tanimoto to pIC50 Dataset', fontsize=12)
-ax2.set_title('Tanimoto Progression across TL Epochs\n(500 samples per epoch)', fontsize=13, weight='bold')
+ax2.set_xlabel('TL Epoch', fontsize=12); ax2.set_ylabel('Max Tanimoto', fontsize=12)
+ax2.set_title('TL Run5 Tanimoto Progression (Regularized)', fontsize=13, weight='bold')
 ax2.set_ylim(0, 1)
-
 ax3 = ax2.twinx()
 ax3.plot(epochs, nov85, '^:', color='#27ae60', lw=2.0, ms=6, label='% Novel (T<0.85)')
-ax3.set_ylabel('% Structurally Novel Molecules', fontsize=12, color='#27ae60')
-ax3.tick_params(axis='y', labelcolor='#27ae60')
-ax3.set_ylim(0, 100)
-
+ax3.set_ylabel('% Novel', fontsize=12, color='#27ae60')
+ax3.tick_params(axis='y', labelcolor='#27ae60'); ax3.set_ylim(0, 100)
 lines1, labels1 = ax2.get_legend_handles_labels()
 lines2, labels2 = ax3.get_legend_handles_labels()
-ax2.legend(lines1 + lines2, labels1 + labels2, fontsize=9, loc='lower right')
-ax2.spines[['top']].set_visible(False)
-
+ax2.legend(lines1+lines2, labels1+labels2, fontsize=9, loc='lower right')
 plt.tight_layout()
-plt.savefig('results/pd1_pdl1_tl_run4_epoch_tanimoto.png', dpi=150, bbox_inches='tight')
-print("\nPlot saved to: results/pd1_pdl1_tl_run4_epoch_tanimoto.png")
+plt.savefig('results/pd1_pdl1_tl_run5_epoch_tanimoto.png', dpi=150, bbox_inches='tight')
+print("Saved: results/pd1_pdl1_tl_run5_epoch_tanimoto.png")

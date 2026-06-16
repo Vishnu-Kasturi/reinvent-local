@@ -89,6 +89,20 @@ def _physchem(mol) -> np.ndarray:
     return np.array(vals, dtype=np.float32)
 
 
+_SCALERS = {}
+
+def get_scaler(scaler_path: str):
+    if not scaler_path:
+        return None
+    if scaler_path not in _SCALERS:
+        if os.path.exists(scaler_path):
+            with open(scaler_path, "rb") as f:
+                _SCALERS[scaler_path] = pickle.load(f)
+        else:
+            return None
+    return _SCALERS[scaler_path]
+
+
 def compute_features(smiles_list: list[str], scaler_path: str):
     """
     Compute the 2427-dim feature matrix for a list of SMILES.
@@ -131,12 +145,17 @@ def compute_features(smiles_list: list[str], scaler_path: str):
     # Concatenate in the same order as training
     X = np.concatenate([rdkit_arr, ecfp4_arr, maccs_arr, phys_arr], axis=1)  # (n, 2427)
 
-    # Apply scaler to continuous columns (0:200 and 2415:2427)
-    if scaler_path and os.path.exists(scaler_path):
-        with open(scaler_path, "rb") as f:
-            scaler = pickle.load(f)
-        cont_idx = list(range(200)) + list(range(200 + ECFP4_NBITS + MACCS_NBITS, EXPECTED_FEATURE_DIM))
-        X[:, cont_idx] = scaler.transform(X[:, cont_idx]).astype(np.float32)
+    # Apply scaler to continuous columns dynamically based on scaler requirements
+    scaler = get_scaler(scaler_path)
+    if scaler:
+        n_features_scaler = scaler.mean_.shape[0] if hasattr(scaler, "mean_") else 200
+        if n_features_scaler == 200:
+            # Scale only the first 200 features (RDKit descriptors)
+            X[:, :200] = scaler.transform(X[:, :200]).astype(np.float32)
+        else:
+            # Scale RDKit (0:200) and Physchem (2415:2427)
+            cont_idx = list(range(200)) + list(range(200 + ECFP4_NBITS + MACCS_NBITS, EXPECTED_FEATURE_DIM))
+            X[:, cont_idx] = scaler.transform(X[:, cont_idx]).astype(np.float32)
 
     # Zero out invalid rows to prevent NaN propagation
     for i, valid in enumerate(valid_mask):

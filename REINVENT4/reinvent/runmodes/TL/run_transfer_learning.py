@@ -49,6 +49,35 @@ def run_transfer_learning(
 
     logger.info(f"Using generator {model_type}")
 
+    # ── Optional layer freezing ────────────────────────────────────────────────
+    # freeze_n_layers in [scheduler] TOML: 0=none, 1=embed+layer0, 2=+layer1, etc.
+    # This reduces overfitting by only fine-tuning the top LSTM layer + linear head
+    _freeze_n = scheduler_config.pop("freeze_n_layers", 0)
+    if _freeze_n > 0 and model_type == "Reinvent":
+        network = adapter.network
+        frozen_count = 0
+        # Freeze embedding
+        if _freeze_n >= 1:
+            for p in network._embedding.parameters():
+                p.requires_grad = False
+                frozen_count += p.numel()
+        # Freeze LSTM layers 0..(_freeze_n-1)
+        all_lstm_params = list(network._rnn.parameters())
+        # LSTM stores params as {weight_ih_lX, weight_hh_lX, bias_ih_lX, bias_hh_lX}
+        # Split by layer index
+        for name, param in network._rnn.named_parameters():
+            # name looks like weight_ih_l0, bias_hh_l2, etc.
+            import re
+            m = re.search(r'l(\d+)', name)
+            if m and int(m.group(1)) < (_freeze_n - 1):
+                param.requires_grad = False
+                frozen_count += param.numel()
+        trainable = sum(p.numel() for p in network.parameters() if p.requires_grad)
+        total = sum(p.numel() for p in network.parameters())
+        logger.info(f"Froze {frozen_count:,} params | Trainable: {trainable:,}/{total:,} "
+                    f"({100*trainable/total:.1f}%) — freeze_n_layers={_freeze_n}")
+
+
     smiles_filename = os.path.abspath(parameters.smiles_file)
     do_standardize = parameters.standardize_smiles
 
@@ -126,8 +155,13 @@ def run_transfer_learning(
 
         lr_scheduler = topt.lr_scheduler.LambdaLR(optimizer, lr_step)
     else:
+        _weight_decay = scheduler_config.pop("weight_decay", 0.0)
         lr_config = TL.StepLRConfiguration(**scheduler_config)
-        optimizer = topt.Adam(adapter.get_network_parameters(), lr=lr_config.lr)
+        optimizer = topt.Adam(
+            adapter.get_network_parameters(),
+            lr=lr_config.lr,
+            weight_decay=_weight_decay,
+        )
 
         lr_scheduler = topt.lr_scheduler.StepLR(
             optimizer, step_size=lr_config.step, gamma=lr_config.gamma

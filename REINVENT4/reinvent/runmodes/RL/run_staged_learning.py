@@ -186,8 +186,8 @@ def run_staged_learning(
                 intrinsic_penalty=intrinsic_penalty,
             )
 
-            if hasattr(torch, device.type) and device.type != "cpu":
-                gpu = getattr(torch, device.type)
+            if device.type == "cuda" and hasattr(torch, "cuda"):
+                gpu = torch.cuda
                 free_memory, total_memory = gpu.mem_get_info()
                 free_memory //= 1024**2
                 used_memory = total_memory // 1024**2 - free_memory

@@ -13,6 +13,7 @@ class StepLRConfiguration:
     min: float = 1e-07
     gamma: float = 0.95
     step: int = 10
+    weight_decay: float = 0.0
 
 
 @dataclass(frozen=True)
