@@ -37,10 +37,13 @@ Preprocess/checkpoints_jak2/
 Preprocess/checkpoints_jak2_78/
 Preprocess/checkpoints_pd1_pdl1_pic50/
 Preprocess/checkpoints_pd1_pdl1_sol/
+!Preprocess/final_acc/
+!Preprocess/final_acc/*
 REINVENT4/tb_pd1_pdl1_eval_e*/
 tb_pd1_pdl1_eval_e*/
 tb_pd1_pdl1_rl_toml_*/
 tb_jak2_rl_run*/
 *.bak
 results/pd1_pdl1_epoch100_backup/
+
 
