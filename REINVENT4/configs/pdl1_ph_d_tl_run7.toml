@@ -1,0 +1,30 @@
+run_type        = "transfer_learning"
+device          = "mps"
+tb_logdir       = "../tb_pdl1_ph_d_TL_run7"
+json_out_config = "json_pdl1_ph_d_tl_run7.json"
+
+[parameters]
+input_model_file          = "/Users/vishnukasturi/Intern/reinvent-local/REINVENT4/priors/reinvent.prior"
+smiles_file               = "/Users/vishnukasturi/Intern/reinvent-local/data/ph_d_tl_train.smi"
+validation_smiles_file    = "/Users/vishnukasturi/Intern/reinvent-local/data/ph_d_tl_val.smi"
+output_model_file         = "/Users/vishnukasturi/Intern/reinvent-local/models/pdl1_ph_d_tl_run7.model"
+
+num_epochs          = 150
+save_every_n_epochs = 10
+batch_size          = 32
+sample_batch_size   = 100
+num_refs            = 50
+
+standardize_smiles   = true
+randomize_smiles     = true
+randomize_all_smiles = false
+internal_diversity   = true
+clip_gradient_norm   = 0.5
+
+# We keep the best scheduler parameters from Run 3 so we can directly compare 
+# the impact of the new `internal_diversity` parameter on the baseline.
+[scheduler]
+lr              = 0.00005
+step            = 20
+gamma           = 0.90
+weight_decay    = 0.0
