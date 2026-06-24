@@ -1,0 +1,29 @@
+run_type        = "transfer_learning"
+device          = "mps"
+tb_logdir       = "../tb_pdl1_ph_d_TL_run6"
+json_out_config = "json_pdl1_ph_d_tl_run6.json"
+
+[parameters]
+num_epochs          = 250
+batch_size          = 32
+save_every_n_epochs = 10
+
+# Dataset: filtered_smiles_tanimoto (652 unique, 521 train / 131 val)
+input_model_file          = "/Users/vishnukasturi/Intern/reinvent-local/REINVENT4/priors/reinvent.prior"
+smiles_file               = "/Users/vishnukasturi/Intern/reinvent-local/data/ph_d_tl_train.smi"
+validation_smiles_file    = "/Users/vishnukasturi/Intern/reinvent-local/data/ph_d_tl_val.smi"
+output_model_file         = "/Users/vishnukasturi/Intern/reinvent-local/models/pdl1_ph_d_tl_run6.model"
+
+standardize_smiles  = true
+randomize_smiles    = true
+shuffle_each_epoch  = true
+clip_gradient_norm  = 0.5
+
+# ── Scheduler: lr=5e-5, freeze_n_layers=2 ────────────────────────────────────
+# Run 6: Same as Run 3 (the best setup), but extended to 250 epochs.
+[scheduler]
+lr              = 0.00005
+step            = 20
+gamma           = 0.90
+weight_decay    = 0.0
+freeze_n_layers = 2
