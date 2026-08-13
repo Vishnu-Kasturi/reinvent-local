@@ -27,6 +27,7 @@ from rdkit import RDLogger
 
 from prolif_compat import (
     count_interactions,
+    iter_ifp_pairs,
     make_fingerprint,
     run_fingerprint,
     tyr56_residue_ids,
@@ -293,12 +294,12 @@ def analyze_tyr_interactions(
 
     fp = make_fingerprint(plf, count=True)
     residues = tyr56_residue_ids(tyr_residue)
-    run_fingerprint(fp, ligand, protein, residues=residues)
+    ifp = run_fingerprint(fp, ligand, protein, residues=residues)
 
     interactions: List[dict] = []
     total = 0
 
-    for (lig_res, prot_res), interaction_dict in fp.ifp.items():
+    for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
         if not _is_tyr_residue(prot_res, tyr_residue):
             continue
         n = count_interactions(interaction_dict, _is_pi_pi_stacking)

@@ -32,6 +32,8 @@ from rdkit import Chem
 
 from prolif_compat import (
     count_interactions,
+    ifp_to_dataframe,
+    iter_ifp_pairs,
     make_fingerprint,
     prolif_version,
     run_fingerprint,
@@ -255,20 +257,20 @@ def get_best_pose(out_sdf: str) -> Chem.Mol:
 
 
 def run_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
-    """Run ProLIF, return (fp, protein, ligand, plf_module)."""
+    """Run ProLIF, return (fp, ifp, protein, ligand, plf_module)."""
     protein, plf = load_protein_for_prolif(receptor_pdb)
     ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf))
     fp = make_fingerprint(plf, count=True)
     residues = tyr56_residue_ids(tyr_resid)
-    run_fingerprint(fp, ligand, protein, residues=residues)
-    return fp, protein, ligand, plf
+    ifp = run_fingerprint(fp, ligand, protein, residues=residues)
+    return fp, ifp, protein, ligand, plf
 
 
-def count_tyr56_pi_stacking(fp, tyr_resid: int = TYR_RESIDUE) -> tuple[int, list]:
+def count_tyr56_pi_stacking(ifp, tyr_resid: int = TYR_RESIDUE) -> tuple[int, list]:
     """Count pi-pi stacking at TYR{resid} using count=True fingerprint."""
     details = []
     total = 0
-    for (lig_res, prot_res), ix_dict in fp.ifp.items():
+    for lig_res, prot_res, ix_dict in iter_ifp_pairs(ifp):
         if not _is_tyr_residue(prot_res, tyr_resid):
             continue
         n = count_interactions(ix_dict, _is_pi_pi_stacking)
@@ -291,24 +293,25 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
 
     inspect_pdb_residue(receptor_pdb, tyr_resid)
 
-    fp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
+    fp, ifp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
     print(f"\nProLIF version: {prolif_version(plf)}")
     print(f"Fingerprint count=True (detects multiple stacks per residue)")
 
     # Try dataframe export if available
     try:
-        df = plf.to_dataframe(fp.ifp)
+        df = ifp_to_dataframe(plf, fp, ifp)
         print(f"\n--- ProLIF dataframe ({len(df)} rows) ---")
         print(df.to_string())
     except Exception as exc:
         print(f"\n(DataFrame export unavailable: {exc})")
 
-    print(f"\n--- ALL interactions (raw fp.ifp, {len(fp.ifp)} residue pairs) ---")
+    pairs = list(iter_ifp_pairs(ifp))
+    print(f"\n--- ALL interactions ({len(pairs)} residue pairs) ---")
     tyr_all = []
     tyr_target = []
     pi_all = []
 
-    for (lig_res, prot_res), ix_dict in fp.ifp.items():
+    for lig_res, prot_res, ix_dict in pairs:
         pinfo = _residue_info(prot_res)
         is_tyr = "TYR" in pinfo["str"].upper() or str(pinfo.get("resname", "")).upper() == "TYR"
         is_target = _is_tyr_residue(prot_res, tyr_resid)
@@ -346,7 +349,7 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
     for r in pi_all:
         print(f"  resid={r['protein_resid']} {r['protein']} | {r['interaction']}")
 
-    pi_at_target_count, pi_details = count_tyr56_pi_stacking(fp, tyr_resid)
+    pi_at_target_count, pi_details = count_tyr56_pi_stacking(ifp, tyr_resid)
     print(f"\n--- RESULT: TYR{tyr_resid} pi-pi stacking count = {pi_at_target_count} ---")
     for d in pi_details:
         print(f"  {d['protein']} x{d['count']}")
@@ -360,17 +363,17 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
             continue
         lig = plf.Molecule.from_rdkit(mol)
         fp2 = make_fingerprint(plf, count=True)
-        run_fingerprint(fp2, lig, protein, residues=residues)
-        count, _ = count_tyr56_pi_stacking(fp2, tyr_resid)
+        ifp2 = run_fingerprint(fp2, lig, protein, residues=residues)
+        count, _ = count_tyr56_pi_stacking(ifp2, tyr_resid)
         print(f"  Pose {pose_i + 1}: TYR{tyr_resid} pi-pi count = {count}")
 
 
 def analyze_tyr56_pi_stacking(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
-    fp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
-    count, interactions = count_tyr56_pi_stacking(fp, tyr_resid)
+    _, ifp, _, _, _ = run_prolif(receptor_pdb, out_sdf, tyr_resid)
+    count, interactions = count_tyr56_pi_stacking(ifp, tyr_resid)
 
     all_tyr_residues = set()
-    for (_, prot_res), ix_dict in fp.ifp.items():
+    for _, prot_res, ix_dict in iter_ifp_pairs(ifp):
         if "TYR" in str(prot_res):
             info = _residue_info(prot_res)
             all_tyr_residues.add(f"{info.get('resname','?')}{info.get('resid','?')} ({prot_res})")
