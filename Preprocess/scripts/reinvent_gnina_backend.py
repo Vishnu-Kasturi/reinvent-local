@@ -228,9 +228,23 @@ def load_best_pose(docked_sdf: str) -> Chem.Mol:
     raise ValueError(f"No valid pose in {docked_sdf}")
 
 
-def _is_pi_pi_stacking(interaction_name: str) -> bool:
+def _interaction_name(name) -> str:
+    if hasattr(name, "__name__"):
+        return name.__name__
+    return str(name)
+
+
+def _residue_info(prot_res) -> dict:
+    info = {"str": str(prot_res)}
+    for attr in ("resname", "resid", "chain", "segid", "icode"):
+        if hasattr(prot_res, attr):
+            info[attr] = getattr(prot_res, attr)
+    return info
+
+
+def _is_pi_pi_stacking(interaction_name) -> bool:
     """True only for pi-pi stacking (excludes cation-pi, H-bond, hydrophobic, etc.)."""
-    n = interaction_name.lower().replace("-", "").replace("_", "")
+    n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
     if "pication" in n or "cationpi" in n:
         return False
     return n == "pistacking" or ("pi" in n and "stack" in n)
@@ -238,12 +252,14 @@ def _is_pi_pi_stacking(interaction_name: str) -> bool:
 
 def _is_tyr_residue(prot_res, resid: int) -> bool:
     """True if protein residue is TYR with the given residue number."""
-    if hasattr(prot_res, "resname") and hasattr(prot_res, "resid"):
+    info = _residue_info(prot_res)
+    if str(info.get("resname", "")).upper() == "TYR":
         try:
-            return str(prot_res.resname).upper() == "TYR" and int(prot_res.resid) == resid
+            if int(info["resid"]) == resid:
+                return True
         except (ValueError, TypeError):
             pass
-    s = str(prot_res).upper()
+    s = info["str"].upper()
     if "TYR" not in s:
         return False
     if re.search(rf"TYR[^\d]*{resid}(?:[^\d]|$)", s):
