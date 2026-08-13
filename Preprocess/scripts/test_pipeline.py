@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-test_pipeline.py — Manual test for GNINA docking + ProLIF on docking outputs.
+test_pipeline.py — Standalone test for GNINA docking + ProLIF.
 
-Uses YOUR existing dock.py for docking, then runs ProLIF on mol0_out.sdf (pose 1).
-Prints every file generated, docking score, TYR interactions, and tiered rewards.
+Uses YOUR dock.py for docking, then runs ProLIF on mol0_out.sdf (pose 1).
+No other project files required except dock.py.
 
 Usage:
     python Preprocess/scripts/test_pipeline.py '<SMILES>'
 
-Environment overrides (optional):
-    DOCK_PY        path to dock.py
-    RECEPTOR_PDB   receptor PDB for ProLIF
-    OUTPUT_DIR     output folder (default: pipeline_output)
+Optional env vars:
+    DOCK_PY      path to your dock.py
+    RECEPTOR_PDB path to receptor.pdb (for ProLIF)
+    OUTPUT_DIR   output folder (default: pipeline_output)
 """
 from __future__ import annotations
 
@@ -20,36 +20,31 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
+import MDAnalysis as mda
 import pandas as pd
+import prolif as plf
 from rdkit import Chem
 
-# Import shared ProLIF + reward helpers (same logic used by REINVENT components)
-_SCRIPTS = Path(__file__).resolve().parent
-sys.path.insert(0, str(_SCRIPTS))
-from reinvent_gnina_backend import (  # noqa: E402
-    affinity_to_reward,
-    analyze_tyr_interactions,
-    tyr_count_to_reward,
-)
-
 # ============================================================
-# CONFIG — edit paths or set env vars
+# CONFIG — edit or set env vars
 # ============================================================
 DOCK_PY = os.environ.get(
     "DOCK_PY",
-    str(_SCRIPTS / "dock.py"),  # falls back to repo dock.py if you add one
+    "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/scripts/dock.py",
 )
-# If your dock.py lives elsewhere, set:
-# export DOCK_PY=/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/scripts/dock.py
-
 RECEPTOR_PDB = os.environ.get(
     "RECEPTOR_PDB",
     "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb",
 )
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "pipeline_output")
 
+
+# ============================================================
+# HELPERS
+# ============================================================
 
 def run(cmd: list) -> None:
     print("\n>> " + " ".join(map(str, cmd)))
@@ -59,26 +54,24 @@ def run(cmd: list) -> None:
 def clean_smiles(smiles: str) -> str:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        raise ValueError("Invalid SMILES — RDKit could not parse input.")
+        raise ValueError("Invalid SMILES.")
     return Chem.MolToSmiles(mol, canonical=True)
 
 
-def run_docking(smiles: str, output_dir: Path) -> tuple[str, str]:
-    """Call your dock.py. Returns (log_file, out_sdf)."""
-    input_csv = output_dir / "input.csv"
-    pd.DataFrame({"SMILES": [smiles]}).to_csv(input_csv, index=False)
+def affinity_to_reward(affinity: float) -> float:
+    if affinity <= -12.0:
+        return 1.0
+    if affinity <= -10.0:
+        return 0.5
+    return 0.0
 
-    run(["python", DOCK_PY, str(input_csv), str(output_dir) + "/"])
 
-    log_file = output_dir / "mol0_log.txt"
-    out_sdf = output_dir / "mol0_out.sdf"
-
-    if not log_file.exists():
-        raise FileNotFoundError(f"Missing: {log_file}")
-    if not out_sdf.exists():
-        raise FileNotFoundError(f"Missing: {out_sdf}")
-
-    return str(log_file), str(out_sdf)
+def tyr_count_to_reward(count: int) -> float:
+    if count >= 2:
+        return 1.0
+    if count == 1:
+        return 0.5
+    return 0.0
 
 
 def extract_affinity(log_file: str) -> float:
@@ -92,84 +85,97 @@ def extract_affinity(log_file: str) -> float:
     raise ValueError("Could not parse affinity from GNINA log.")
 
 
-def list_output_files(output_dir: Path) -> list[Path]:
-    files = sorted(output_dir.rglob("*"))
-    return [f for f in files if f.is_file()]
+def get_best_pose(out_sdf: str) -> Chem.Mol:
+    for mol in Chem.SDMolSupplier(out_sdf, removeHs=False):
+        if mol is not None:
+            return mol
+    raise ValueError(f"No valid pose in {out_sdf}")
 
 
-def print_file_inventory(output_dir: Path) -> None:
+def load_protein_for_prolif(receptor_pdb: str) -> plf.Molecule:
+    """Load receptor for ProLIF. Strips partial CONECT records that cause valence errors."""
+    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False)
+    with open(receptor_pdb) as f:
+        for line in f:
+            if not line.startswith("CONECT"):
+                tmp.write(line)
+    tmp.close()
+    try:
+        u = mda.Universe(tmp.name)
+        ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL")
+        if len(ag) == 0:
+            ag = u.atoms
+        ag.guess_bonds()
+        return plf.Molecule.from_mda(ag)
+    except Exception:
+        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
+        if rdmol is None:
+            raise RuntimeError(f"Cannot load receptor: {receptor_pdb}")
+        return plf.Molecule.from_rdkit(rdmol)
+    finally:
+        os.unlink(tmp.name)
+
+
+def analyze_tyr_interactions(receptor_pdb: str, out_sdf: str) -> tuple[int, int, list]:
+    protein = load_protein_for_prolif(receptor_pdb)
+    ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf))
+
+    fp = plf.Fingerprint()
+    fp.run(ligand, protein)
+
+    interactions = []
+    pi_count = 0
+    for (lig_res, prot_res), ix_dict in fp.ifp.items():
+        if "TYR" not in str(prot_res):
+            continue
+        for name, metadata in ix_dict.items():
+            if not metadata:
+                continue
+            interactions.append({
+                "ligand": str(lig_res),
+                "protein": str(prot_res),
+                "interaction": str(name),
+            })
+            if "pistack" in str(name).lower() or "pi_stack" in str(name).lower():
+                pi_count += 1
+
+    return len(interactions), pi_count, interactions
+
+
+# ============================================================
+# DOCKING (your dock.py)
+# ============================================================
+
+def run_docking(smiles: str, output_dir: Path) -> tuple[str, str]:
+    input_csv = output_dir / "input.csv"
+    pd.DataFrame({"SMILES": [smiles]}).to_csv(input_csv, index=False)
+    run(["python", DOCK_PY, str(input_csv), str(output_dir) + "/"])
+
+    log_file = output_dir / "mol0_log.txt"
+    out_sdf = output_dir / "mol0_out.sdf"
+    if not log_file.exists():
+        raise FileNotFoundError(f"Missing: {log_file}")
+    if not out_sdf.exists():
+        raise FileNotFoundError(f"Missing: {out_sdf}")
+    return str(log_file), str(out_sdf)
+
+
+# ============================================================
+# PRINT / SAVE
+# ============================================================
+
+def print_files(output_dir: Path) -> None:
     print("\n" + "=" * 60)
-    print("OUTPUT FILES GENERATED")
+    print("OUTPUT FILES")
     print("=" * 60)
-    files = list_output_files(output_dir)
-    if not files:
-        print("(no files)")
-        return
-    for f in files:
-        size_kb = f.stat().st_size / 1024
-        rel = f.relative_to(output_dir)
-        tag = ""
-        if f.name == "mol0_out.sdf":
-            tag = "  ← GNINA poses (pose 1 = best)"
-        elif f.name == "mol0_log.txt":
-            tag = "  ← GNINA log (affinity in row 1)"
-        elif f.name.endswith(".mol") or f.name == "mol0.sdf":
-            tag = "  ← intermediate (can delete)"
-        print(f"  {rel}  ({size_kb:.1f} KB){tag}")
-
-
-def print_docking_result(affinity: float, reward: float) -> None:
-    print("\n" + "=" * 60)
-    print("DOCKING RESULT")
-    print("=" * 60)
-    print(f"  Best affinity (mode 1):  {affinity:.2f} kcal/mol")
-    print(f"  Docking reward:          {reward:.1f}")
-    print("    <= -12  → 1.0 (high)")
-    print("    -12 to -10 → 0.5 (medium)")
-    print("    > -10  → 0.0 (low)")
-
-
-def print_prolif_result(count: int, pi_count: int, details: list, reward: float) -> None:
-    print("\n" + "=" * 60)
-    print("PROLIF — TYR INTERACTIONS (best pose only)")
-    print("=" * 60)
-    print(f"  Total TYR interactions:  {count}")
-    print(f"  Pi-stacking with TYR:    {pi_count}")
-    print(f"  TYR reward:              {reward:.1f}")
-    print("    >= 2  → 1.0 (high)")
-    print("    1     → 0.5 (ok)")
-    print("    0     → 0.0 (none)")
-
-    if not details:
-        print("\n  No TYR interactions detected.")
-        return
-
-    print()
-    for i, ix in enumerate(details, 1):
-        print(f"  {i}. {ix['protein']}  —  {ix['interaction']}")
-
-
-def save_summary(
-    output_dir: Path,
-    smiles: str,
-    affinity: float,
-    dock_reward: float,
-    tyr_count: int,
-    pi_count: int,
-    tyr_reward: float,
-    details: list,
-) -> None:
-    path = output_dir / "test_summary.txt"
-    with open(path, "w") as f:
-        f.write(f"SMILES: {smiles}\n\n")
-        f.write(f"Affinity: {affinity:.2f} kcal/mol\n")
-        f.write(f"Docking reward: {dock_reward}\n\n")
-        f.write(f"TYR interactions: {tyr_count}\n")
-        f.write(f"TYR pi-stacking: {pi_count}\n")
-        f.write(f"TYR reward: {tyr_reward}\n\n")
-        for ix in details:
-            f.write(f"  {ix['protein']} — {ix['interaction']}\n")
-    print(f"\nSummary saved: {path}")
+    for f in sorted(output_dir.rglob("*")):
+        if f.is_file():
+            tag = ""
+            if f.name == "mol0_out.sdf":
+                tag = "  <- GNINA poses (pose 1 = best)"
+            elif f.name == "mol0_log.txt":
+                tag = "  <- GNINA log"
+            print(f"  {f.relative_to(output_dir)}  ({f.stat().st_size/1024:.1f} KB){tag}")
 
 
 def main() -> None:
@@ -177,51 +183,50 @@ def main() -> None:
         print("Usage: python test_pipeline.py '<SMILES>'")
         sys.exit(1)
 
-    raw = sys.argv[1]
-    print("=" * 60)
-    print("INPUT SMILES")
-    print("=" * 60)
-    print(raw)
-
-    smiles = clean_smiles(raw)
-    print(f"\nCanonical: {smiles}")
+    smiles = clean_smiles(sys.argv[1])
+    print("SMILES:", smiles)
 
     output_dir = Path(OUTPUT_DIR)
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
 
-    # ── Step 1: GNINA docking via your dock.py ──────────────────────────────
+    # Step 1: dock
     print("\n" + "=" * 60)
-    print("STEP 1 — GNINA DOCKING (dock.py)")
+    print("STEP 1 — GNINA (dock.py)")
     print("=" * 60)
     log_file, out_sdf = run_docking(smiles, output_dir)
     affinity = extract_affinity(log_file)
     dock_reward = affinity_to_reward(affinity)
+    print_files(output_dir)
+    print(f"\n  Affinity:        {affinity:.2f} kcal/mol")
+    print(f"  Docking reward:  {dock_reward}  (<=−12→1.0, −12..−10→0.5, >−10→0.0)")
 
-    print_file_inventory(output_dir)
-    print_docking_result(affinity, dock_reward)
-
-    # ── Step 2: ProLIF on best pose from mol0_out.sdf ───────────────────────
+    # Step 2: prolif
     print("\n" + "=" * 60)
-    print("STEP 2 — PROLIF (receptor.pdb + pose 1 from mol0_out.sdf)")
+    print("STEP 2 — ProLIF (pose 1 vs receptor.pdb)")
     print("=" * 60)
     try:
         tyr_count, pi_count, details = analyze_tyr_interactions(RECEPTOR_PDB, out_sdf)
         tyr_reward = tyr_count_to_reward(tyr_count)
-        print_prolif_result(tyr_count, pi_count, details, tyr_reward)
+        print(f"  TYR interactions: {tyr_count}  (pi-stacking: {pi_count})")
+        print(f"  TYR reward:       {tyr_reward}  (>=2→1.0, 1→0.5, 0→0.0)")
+        for i, ix in enumerate(details, 1):
+            print(f"    {i}. {ix['protein']} — {ix['interaction']}")
     except Exception as exc:
-        print(f"\n  [!] ProLIF failed: {exc}")
-        tyr_count, pi_count, details, tyr_reward = 0, 0, [], 0.0
+        print(f"  [!] ProLIF failed: {exc}")
+        tyr_count, pi_count, tyr_reward = 0, 0, 0.0
 
-    save_summary(output_dir, smiles, affinity, dock_reward,
-                 tyr_count, pi_count, tyr_reward, details)
-
-    print("\n" + "=" * 60)
-    print("TEST COMPLETE")
-    print("=" * 60)
-    print(f"  Output dir:  {output_dir.resolve()}")
-    print(f"  Key files:   mol0_out.sdf, mol0_log.txt, test_summary.txt")
+    summary = output_dir / "test_summary.txt"
+    summary.write_text(
+        f"SMILES: {smiles}\n"
+        f"Affinity: {affinity:.2f} kcal/mol\n"
+        f"Docking reward: {dock_reward}\n"
+        f"TYR interactions: {tyr_count}\n"
+        f"TYR reward: {tyr_reward}\n"
+    )
+    print(f"\nSummary: {summary}")
+    print("\nDONE.")
 
 
 if __name__ == "__main__":
