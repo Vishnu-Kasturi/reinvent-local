@@ -1,35 +1,22 @@
 """
-TyrosineInteraction — ProLIF tyrosine interaction reward for REINVENT4
+TyrosineInteraction — ProLIF TYR56 pi-pi stacking reward for REINVENT4
 -----------------------------------------------------------------------
-Runs ProLIF on GNINA best pose (pose 1 in mol0_out.sdf) vs receptor.pdb.
-Counts interactions with ANY TYR residue (Pi-stacking, H-bond, hydrophobic, etc.).
+Counts ONLY pi-pi stacking between the ligand (GNINA best pose) and
+TYR residue 56. All other TYR residues and interaction types are ignored.
 
 Tiered reward:
-    >= 2 TYR interactions  →  1.0  (high)
-    1  TYR interaction     →  0.5  (ok)
-    0  TYR interactions    →  0.0  (no reward)
-    ProLIF failure         →  0.0
-
-Shares GNINA docking with DockingScore via BatchCache (docks once per molecule).
+    >= 2 pi-pi stacking at TYR56  →  1.0  (high)
+    1  pi-pi stacking at TYR56    →  0.5  (ok)
+    0                              →  0.0  (no reward)
 
 TOML:
 -----
-[[stage.scoring.component]]
-[stage.scoring.component.TyrosineInteraction]
 [[stage.scoring.component.TyrosineInteraction.endpoint]]
 name                  = "TyrInteractionReward"
 weight                = 2.0
 params.receptor_path  = ["docking/receptor.pdb"]
 params.autobox_ligand = ["docking/ref_ligand.pdb"]
-params.gnina_executable = ["gnina"]
-params.output_root    = ["docking_runs"]
-[[stage.scoring.component.TyrosineInteraction.endpoint]]
-name                  = "TyrInteractionCount_raw"
-weight                = 0.0
-params.receptor_path  = ["docking/receptor.pdb"]
-params.autobox_ligand = ["docking/ref_ligand.pdb"]
-params.gnina_executable = ["gnina"]
-params.output_root    = ["docking_runs"]
+params.tyr_residue    = ["56"]
 """
 from __future__ import annotations
 
@@ -68,6 +55,7 @@ class Parameters:
     cnn_scoring: List[str] = None
     timeout_sec: List[str] = None
     keep_outputs: List[str] = None
+    tyr_residue: List[str] = None
 
 
 @add_tag("__component")

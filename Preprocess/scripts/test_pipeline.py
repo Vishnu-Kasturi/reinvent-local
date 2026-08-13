@@ -40,6 +40,32 @@ RECEPTOR_PDB = os.environ.get(
     "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb",
 )
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "pipeline_output")
+TYR_RESIDUE = int(os.environ.get("TYR_RESIDUE", "56"))  # only this TYR residue
+
+
+def _is_pi_pi_stacking(interaction_name: str) -> bool:
+    """True only for pi-pi stacking (not cation-pi, H-bond, etc.)."""
+    n = interaction_name.lower().replace("-", "").replace("_", "")
+    if "pication" in n or "cationpi" in n:
+        return False
+    return n == "pistacking" or ("pi" in n and "stack" in n)
+
+
+def _is_tyr_residue(prot_res, resid: int) -> bool:
+    """True if protein residue is TYR with the given residue number."""
+    if hasattr(prot_res, "resname") and hasattr(prot_res, "resid"):
+        try:
+            return str(prot_res.resname).upper() == "TYR" and int(prot_res.resid) == resid
+        except (ValueError, TypeError):
+            pass
+    s = str(prot_res).upper()
+    if "TYR" not in s:
+        return False
+    if re.search(rf"TYR[^\d]*{resid}(?:[^\d]|$)", s):
+        return True
+    if re.search(rf"(?:^|[^\d]){resid}[^\d]*TYR", s):
+        return True
+    return f"TYR{resid}" in s.replace(" ", "").replace(".", "").replace(":", "")
 
 
 # ============================================================
@@ -116,7 +142,12 @@ def load_protein_for_prolif(receptor_pdb: str) -> plf.Molecule:
         os.unlink(tmp.name)
 
 
-def analyze_tyr_interactions(receptor_pdb: str, out_sdf: str) -> tuple[int, int, list]:
+def analyze_tyr56_pi_stacking(
+    receptor_pdb: str,
+    out_sdf: str,
+    tyr_resid: int = TYR_RESIDUE,
+) -> tuple[int, list]:
+    """Count pi-pi stacking at a specific TYR residue only (default: TYR56)."""
     protein = load_protein_for_prolif(receptor_pdb)
     ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf))
 
@@ -124,22 +155,21 @@ def analyze_tyr_interactions(receptor_pdb: str, out_sdf: str) -> tuple[int, int,
     fp.run(ligand, protein)
 
     interactions = []
-    pi_count = 0
     for (lig_res, prot_res), ix_dict in fp.ifp.items():
-        if "TYR" not in str(prot_res):
+        if not _is_tyr_residue(prot_res, tyr_resid):
             continue
         for name, metadata in ix_dict.items():
             if not metadata:
+                continue
+            if not _is_pi_pi_stacking(str(name)):
                 continue
             interactions.append({
                 "ligand": str(lig_res),
                 "protein": str(prot_res),
                 "interaction": str(name),
             })
-            if "pistack" in str(name).lower() or "pi_stack" in str(name).lower():
-                pi_count += 1
 
-    return len(interactions), pi_count, interactions
+    return len(interactions), interactions
 
 
 # ============================================================
@@ -202,27 +232,29 @@ def main() -> None:
     print(f"\n  Affinity:        {affinity:.2f} kcal/mol")
     print(f"  Docking reward:  {dock_reward}  (<=−12→1.0, −12..−10→0.5, >−10→0.0)")
 
-    # Step 2: prolif
+    # Step 2: prolif — TYR56 pi-pi stacking ONLY
     print("\n" + "=" * 60)
-    print("STEP 2 — ProLIF (pose 1 vs receptor.pdb)")
+    print(f"STEP 2 — ProLIF (TYR{TYR_RESIDUE} pi-pi stacking only, pose 1)")
     print("=" * 60)
     try:
-        tyr_count, pi_count, details = analyze_tyr_interactions(RECEPTOR_PDB, out_sdf)
-        tyr_reward = tyr_count_to_reward(tyr_count)
-        print(f"  TYR interactions: {tyr_count}  (pi-stacking: {pi_count})")
-        print(f"  TYR reward:       {tyr_reward}  (>=2→1.0, 1→0.5, 0→0.0)")
+        pi_count, details = analyze_tyr56_pi_stacking(RECEPTOR_PDB, out_sdf)
+        tyr_reward = tyr_count_to_reward(pi_count)
+        print(f"  TYR{TYR_RESIDUE} pi-pi stacking: {pi_count}")
+        print(f"  TYR reward:                  {tyr_reward}  (>=2→1.0, 1→0.5, 0→0.0)")
+        if not details:
+            print(f"    No pi-pi stacking at TYR{TYR_RESIDUE}.")
         for i, ix in enumerate(details, 1):
             print(f"    {i}. {ix['protein']} — {ix['interaction']}")
     except Exception as exc:
         print(f"  [!] ProLIF failed: {exc}")
-        tyr_count, pi_count, tyr_reward = 0, 0, 0.0
+        pi_count, tyr_reward = 0, 0.0
 
     summary = output_dir / "test_summary.txt"
     summary.write_text(
         f"SMILES: {smiles}\n"
         f"Affinity: {affinity:.2f} kcal/mol\n"
         f"Docking reward: {dock_reward}\n"
-        f"TYR interactions: {tyr_count}\n"
+        f"TYR{TYR_RESIDUE} pi-pi stacking count: {pi_count}\n"
         f"TYR reward: {tyr_reward}\n"
     )
     print(f"\nSummary: {summary}")

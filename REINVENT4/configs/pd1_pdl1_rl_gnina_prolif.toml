@@ -78,8 +78,8 @@ params.output_root    = ["../docking_runs"]
 params.cnn_scoring    = ["none"]
 params.keep_outputs   = ["true"]
 
-# ── TyrosineInteraction: ProLIF TYR contact reward ────────────────────────────
-#   >= 2 TYR interactions → 1.0 |  1 → 0.5 |  0 → 0.0
+# ── TyrosineInteraction: TYR56 pi-pi stacking ONLY ───────────────────────────
+#   >= 2 at TYR56 → 1.0 |  1 → 0.5 |  0 → 0.0
 [[stage.scoring.component]]
 [stage.scoring.component.TyrosineInteraction]
 [[stage.scoring.component.TyrosineInteraction.endpoint]]
@@ -91,6 +91,7 @@ params.gnina_executable = ["gnina"]
 params.output_root    = ["../docking_runs"]
 params.cnn_scoring    = ["none"]
 params.keep_outputs   = ["true"]
+params.tyr_residue    = ["56"]
 
 [[stage.scoring.component.TyrosineInteraction.endpoint]]
 name                  = "TyrInteractionCount_raw"
@@ -101,6 +102,7 @@ params.gnina_executable = ["gnina"]
 params.output_root    = ["../docking_runs"]
 params.cnn_scoring    = ["none"]
 params.keep_outputs   = ["true"]
+params.tyr_residue    = ["56"]
 
 # ── Optional: keep QSAR pIC50 as fast pre-filter ──────────────────────────────
 [[stage.scoring.component]]

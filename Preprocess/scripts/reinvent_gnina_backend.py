@@ -42,6 +42,7 @@ class GninaProlifConfig:
     cnn_scoring: str = "none"
     timeout_sec: int = 300
     keep_outputs: bool = True
+    tyr_residue: int = 56  # only count pi-pi stacking at this TYR residue
 
     def validate(self) -> None:
         if not os.path.exists(self.receptor_path):
@@ -66,6 +67,7 @@ def build_config_from_params(params) -> GninaProlifConfig:
         cnn_scoring=(params.cnn_scoring or ["none"])[0],
         timeout_sec=int((params.timeout_sec or ["300"])[0]),
         keep_outputs=_bool((params.keep_outputs or ["true"])[0]),
+        tyr_residue=int((getattr(params, "tyr_residue", None) or ["56"])[0]),
     )
 
 
@@ -226,36 +228,41 @@ def load_best_pose(docked_sdf: str) -> Chem.Mol:
     raise ValueError(f"No valid pose in {docked_sdf}")
 
 
-_PI_STACKING_NAMES = frozenset({
-    "pistacking", "pi_stacking", "pi-stacking", "pication",
-})
-
-_RELEVANT_TYR_NAMES = _PI_STACKING_NAMES | frozenset({
-    "hbond", "hbacceptor", "hbdonor", "hydrophobic",
-    "vdwcontact", "cationpi", "anionpi", "xbonddonor", "xbondacceptor",
-})
+def _is_pi_pi_stacking(interaction_name: str) -> bool:
+    """True only for pi-pi stacking (excludes cation-pi, H-bond, hydrophobic, etc.)."""
+    n = interaction_name.lower().replace("-", "").replace("_", "")
+    if "pication" in n or "cationpi" in n:
+        return False
+    return n == "pistacking" or ("pi" in n and "stack" in n)
 
 
-def _is_tyr_interaction(interaction_name: str) -> bool:
-    low = interaction_name.lower().replace("-", "").replace("_", "")
-    if any(t.replace("-", "").replace("_", "") in low for t in _RELEVANT_TYR_NAMES):
+def _is_tyr_residue(prot_res, resid: int) -> bool:
+    """True if protein residue is TYR with the given residue number."""
+    if hasattr(prot_res, "resname") and hasattr(prot_res, "resid"):
+        try:
+            return str(prot_res.resname).upper() == "TYR" and int(prot_res.resid) == resid
+        except (ValueError, TypeError):
+            pass
+    s = str(prot_res).upper()
+    if "TYR" not in s:
+        return False
+    if re.search(rf"TYR[^\d]*{resid}(?:[^\d]|$)", s):
         return True
-    return "pi" in low and "stack" in low
-
-
-def _is_pi_stacking(interaction_name: str) -> bool:
-    low = interaction_name.lower()
-    return any(t in low for t in _PI_STACKING_NAMES)
+    if re.search(rf"(?:^|[^\d]){resid}[^\d]*TYR", s):
+        return True
+    return f"TYR{resid}" in s.replace(" ", "").replace(".", "").replace(":", "")
 
 
 def analyze_tyr_interactions(
     receptor_pdb: str,
     docked_sdf: str,
+    tyr_residue: int = 56,
 ) -> Tuple[int, int, List[dict]]:
     """
-  Run ProLIF and count TYR interactions.
+    Run ProLIF and count pi-pi stacking at a specific TYR residue only.
 
-    Returns (total_tyr_interactions, pi_stacking_count, details_list).
+    Returns (pi_pi_stacking_count, pi_pi_stacking_count, details_list).
+    Both count values are identical (kept for backward compatibility).
     """
     protein = load_protein_for_prolif(receptor_pdb)
     ligand_mol = load_best_pose(docked_sdf)
@@ -265,26 +272,23 @@ def analyze_tyr_interactions(
     fp.run(ligand, protein)
 
     interactions: List[dict] = []
-    pi_count = 0
 
     for (lig_res, prot_res), interaction_dict in fp.ifp.items():
-        if "TYR" not in str(prot_res):
+        if not _is_tyr_residue(prot_res, tyr_residue):
             continue
         for name, metadata in interaction_dict.items():
             if not metadata:
                 continue
-            if not _is_tyr_interaction(str(name)):
+            if not _is_pi_pi_stacking(str(name)):
                 continue
-            entry = {
+            interactions.append({
                 "ligand": str(lig_res),
                 "protein": str(prot_res),
                 "interaction": str(name),
-            }
-            interactions.append(entry)
-            if _is_pi_stacking(str(name)):
-                pi_count += 1
+            })
 
-    return len(interactions), pi_count, interactions
+    count = len(interactions)
+    return count, count, interactions
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +352,7 @@ def run_molecule_pipeline(
 
     try:
         tyr_count, pi_count, details = analyze_tyr_interactions(
-            config.receptor_path, out_sdf
+            config.receptor_path, out_sdf, tyr_residue=config.tyr_residue
         )
         result.tyr_interaction_count = tyr_count
         result.tyr_pi_stacking_count = pi_count
