@@ -1,5 +1,35 @@
 """
-TyrosineInteraction — ProLIF TYR interaction reward for REINVENT4
+TyrosineInteraction — ProLIF tyrosine interaction reward for REINVENT4
+-----------------------------------------------------------------------
+Runs ProLIF on GNINA best pose (pose 1 in mol0_out.sdf) vs receptor.pdb.
+Counts interactions with ANY TYR residue (Pi-stacking, H-bond, hydrophobic, etc.).
+
+Tiered reward:
+    >= 2 TYR interactions  →  1.0  (high)
+    1  TYR interaction     →  0.5  (ok)
+    0  TYR interactions    →  0.0  (no reward)
+    ProLIF failure         →  0.0
+
+Shares GNINA docking with DockingScore via BatchCache (docks once per molecule).
+
+TOML:
+-----
+[[stage.scoring.component]]
+[stage.scoring.component.TyrosineInteraction]
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                  = "TyrInteractionReward"
+weight                = 2.0
+params.receptor_path  = ["docking/receptor.pdb"]
+params.autobox_ligand = ["docking/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["docking_runs"]
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                  = "TyrInteractionCount_raw"
+weight                = 0.0
+params.receptor_path  = ["docking/receptor.pdb"]
+params.autobox_ligand = ["docking/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["docking_runs"]
 """
 from __future__ import annotations
 
@@ -42,7 +72,13 @@ class Parameters:
 
 @add_tag("__component")
 class TyrosineInteraction:
-    """Tiered tyrosine interaction reward via ProLIF on GNINA best pose."""
+    """
+    REINVENT4 component — tiered tyrosine interaction reward.
+
+    Endpoints returned to REINVENT:
+      [0] TyrInteractionReward    — 0.0 / 0.5 / 1.0  (use weight > 0)
+      [1] TyrInteractionCount_raw — integer count     (weight = 0, logging only)
+    """
 
     def __init__(self, params: Parameters):
         self.smiles_type = "rdkit_smiles"
@@ -58,15 +94,12 @@ class TyrosineInteraction:
         raw_counts = np.zeros(n, dtype=np.float32)
         try:
             results = BatchCache.get_or_run(smilies, self.config)
-            n_ok = 0
             for i, res in enumerate(results):
                 rewards[i] = res.tyr_interaction_reward
                 raw_counts[i] = float(res.tyr_interaction_count)
-                if res.prolif_ok:
-                    n_ok += 1
             logger.info(
-                f"[TyrosineInteraction] batch={n} analyzed={n_ok} "
-                f"mean_reward={rewards.mean():.3f}"
+                f"[TyrosineInteraction] n={n} mean_reward={rewards.mean():.3f} "
+                f"max_tyr={raw_counts.max():.0f}"
             )
             return ComponentResults(
                 [rewards, raw_counts],

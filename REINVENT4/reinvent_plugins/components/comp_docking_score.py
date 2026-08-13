@@ -1,5 +1,31 @@
 """
-DockingScore — Tiered GNINA docking reward for REINVENT4
+DockingScore — GNINA docking reward component for REINVENT4
+------------------------------------------------------------
+Tiered reward from GNINA best-pose affinity (mode 1 in mol0_log.txt):
+
+    affinity <= -12.0 kcal/mol  →  1.0  (high)
+    -12.0 < affinity <= -10.0   →  0.5  (medium)
+    affinity > -10.0            →  0.0  (low)
+    failure (bad SMILES, GNINA crash)  →  0.0
+
+TOML:
+-----
+[[stage.scoring.component]]
+[stage.scoring.component.DockingScore]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                  = "DockingReward"
+weight                = 3.0
+params.receptor_path  = ["docking/receptor.pdb"]
+params.autobox_ligand = ["docking/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["docking_runs"]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                  = "DockingAffinity_raw"
+weight                = 0.0
+params.receptor_path  = ["docking/receptor.pdb"]
+params.autobox_ligand = ["docking/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["docking_runs"]
 """
 from __future__ import annotations
 
@@ -9,7 +35,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 from pydantic.dataclasses import dataclass
@@ -42,7 +68,13 @@ class Parameters:
 
 @add_tag("__component")
 class DockingScore:
-    """Tiered GNINA docking reward. See module docstring in repo docs."""
+    """
+    REINVENT4 component — tiered GNINA docking reward.
+
+    Endpoints returned to REINVENT:
+      [0] DockingReward       — 0.0 / 0.5 / 1.0  (use weight > 0)
+      [1] DockingAffinity_raw — kcal/mol           (weight = 0, logging only)
+    """
 
     def __init__(self, params: Parameters):
         self.smiles_type = "rdkit_smiles"
@@ -58,15 +90,13 @@ class DockingScore:
         raw_affinity = np.full(n, np.nan, dtype=np.float32)
         try:
             results = BatchCache.get_or_run(smilies, self.config)
-            n_ok = 0
             for i, res in enumerate(results):
                 rewards[i] = res.docking_reward
                 if res.docking_ok:
                     raw_affinity[i] = res.affinity
-                    n_ok += 1
             logger.info(
-                f"[DockingScore] batch={n} docked={n_ok} "
-                f"mean_reward={rewards.mean():.3f}"
+                f"[DockingScore] n={n} mean_reward={rewards.mean():.3f} "
+                f"best={np.nanmin(raw_affinity):.2f} kcal/mol"
             )
             return ComponentResults([rewards, raw_affinity])
         except Exception as exc:
