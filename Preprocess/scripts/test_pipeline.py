@@ -30,6 +30,7 @@ from typing import Any, Iterator, List, Optional, Tuple
 
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import AllChem
 
 
 # ============================================================
@@ -247,6 +248,50 @@ def run(cmd: list) -> None:
     subprocess.run(cmd, check=True)
 
 
+def _count_aromatic_rings(mol) -> int:
+    if mol is None:
+        return 0
+    try:
+        ri = mol.GetRingInfo()
+        return sum(
+            1 for ring in ri.AtomRings()
+            if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring)
+        )
+    except Exception:
+        return 0
+
+
+def _prepare_docked_ligand(pose_mol, smiles: str) -> Chem.Mol:
+    """
+    GNINA/OpenBabel SDFs often lack bond orders and aromaticity.
+    Copy them from the SMILES template onto the docked 3D coordinates.
+    """
+    template = Chem.MolFromSmiles(smiles)
+    if template is None:
+        raise ValueError(f"Invalid SMILES: {smiles}")
+
+    pose = Chem.Mol(pose_mol)
+    try:
+        fixed = AllChem.AssignBondOrdersFromTemplate(template, pose)
+    except (ValueError, RuntimeError):
+        pose_h = Chem.RemoveHs(pose)
+        template_h = Chem.RemoveHs(template)
+        fixed_h = AllChem.AssignBondOrdersFromTemplate(template_h, pose_h)
+        fixed = Chem.AddHs(fixed_h, addCoords=True)
+
+    Chem.SanitizeMol(fixed)
+    return fixed
+
+
+def _load_input_smiles(output_dir: str | Path) -> str:
+    csv_path = Path(output_dir) / "input.csv"
+    if not csv_path.is_file():
+        raise FileNotFoundError(
+            f"No {csv_path} — re-run with: python test_pipeline.py --debug '<SMILES>'"
+        )
+    return clean_smiles(str(pd.read_csv(csv_path)["SMILES"].iloc[0]))
+
+
 def clean_smiles(smiles: str) -> str:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -290,14 +335,7 @@ def load_protein_for_prolif(receptor_pdb: str):
     if not os.path.isfile(receptor_pdb):
         raise FileNotFoundError(f"Receptor file not found: {receptor_pdb}")
 
-    # RDKit first — avoids MDAnalysis valence errors on this receptor
-    try:
-        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
-        if rdmol is not None:
-            return plf.Molecule.from_rdkit(rdmol), plf
-    except Exception:
-        pass
-
+    # MDAnalysis first — keeps TYR phenyl rings aromatic for pi-stacking
     tmp_path = None
     try:
         tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False)
@@ -316,28 +354,42 @@ def load_protein_for_prolif(receptor_pdb: str):
         ag.guess_bonds()
         return plf.Molecule.from_mda(ag), plf
 
-    except Exception as exc_mda:
-        raise RuntimeError(
-            f"Cannot load receptor '{receptor_pdb}': {exc_mda}"
-        ) from exc_mda
+    except Exception:
+        pass
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
+    try:
+        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=True)
+        if rdmol is not None:
+            return plf.Molecule.from_rdkit(rdmol), plf
+    except Exception as exc:
+        raise RuntimeError(
+            f"Cannot load receptor '{receptor_pdb}': {exc}"
+        ) from exc
 
-def get_best_pose(out_sdf: str) -> Chem.Mol:
+    raise RuntimeError(f"Cannot load receptor '{receptor_pdb}'")
+
+
+def get_best_pose(out_sdf: str, smiles: str) -> Chem.Mol:
     if not os.path.isfile(out_sdf):
         raise FileNotFoundError(f"Docked SDF not found: {out_sdf}")
     for mol in Chem.SDMolSupplier(out_sdf, removeHs=False):
         if mol is not None:
-            return mol
+            return _prepare_docked_ligand(mol, smiles)
     raise ValueError(f"No valid pose in {out_sdf}")
 
 
-def run_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
+def run_prolif(
+    receptor_pdb: str,
+    out_sdf: str,
+    smiles: str,
+    tyr_resid: int = TYR_RESIDUE,
+):
     """Run ProLIF, return (fp, ifp, protein, ligand, plf_module)."""
     protein, plf = load_protein_for_prolif(receptor_pdb)
-    ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf))
+    ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf, smiles))
     fp = _make_fingerprint(plf, count=True)
     residues = _tyr_residue_ids(tyr_resid)
     ifp = _run_fingerprint(fp, ligand, protein, residues=residues)
@@ -363,7 +415,12 @@ def count_tyr56_pi_stacking(ifp, tyr_resid: int = TYR_RESIDUE) -> tuple[int, lis
     return total, details
 
 
-def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) -> None:
+def debug_prolif(
+    receptor_pdb: str,
+    out_sdf: str,
+    smiles: str,
+    tyr_resid: int = TYR_RESIDUE,
+) -> None:
     """Dump EVERY ProLIF interaction — use this when count is unexpectedly 0."""
     print("\n" + "=" * 70)
     print("PROLIF DEBUG DUMP")
@@ -371,7 +428,17 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
 
     inspect_pdb_residue(receptor_pdb, tyr_resid)
 
-    fp, ifp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
+    raw_pose = next(m for m in Chem.SDMolSupplier(out_sdf, removeHs=False) if m is not None)
+    n_raw = _count_aromatic_rings(raw_pose)
+    fixed_pose = _prepare_docked_ligand(raw_pose, smiles)
+    n_fixed = _count_aromatic_rings(fixed_pose)
+    print(f"\n--- Aromaticity fix (GNINA SDF → SMILES template) ---")
+    print(f"  Raw GNINA pose aromatic rings:    {n_raw}")
+    print(f"  After SMILES bond-order fix:      {n_fixed}")
+    if n_raw == 0 and n_fixed > 0:
+        print("  (Pi-stacking needs aromatic rings — raw SDF had none)")
+
+    fp, ifp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, smiles, tyr_resid)
     print(f"\nProLIF version: {_prolif_version(plf)}")
     print(f"Fingerprint count=True (detects multiple stacks per residue)")
 
@@ -439,15 +506,20 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
     for pose_i, mol in enumerate(supplier):
         if mol is None:
             continue
-        lig = plf.Molecule.from_rdkit(mol)
+        lig = plf.Molecule.from_rdkit(_prepare_docked_ligand(mol, smiles))
         fp2 = _make_fingerprint(plf, count=True)
         ifp2 = _run_fingerprint(fp2, lig, protein, residues=residues)
         count, _ = count_tyr56_pi_stacking(ifp2, tyr_resid)
         print(f"  Pose {pose_i + 1}: TYR{tyr_resid} pi-pi count = {count}")
 
 
-def analyze_tyr56_pi_stacking(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
-    _, ifp, _, _, _ = run_prolif(receptor_pdb, out_sdf, tyr_resid)
+def analyze_tyr56_pi_stacking(
+    receptor_pdb: str,
+    out_sdf: str,
+    smiles: str,
+    tyr_resid: int = TYR_RESIDUE,
+):
+    _, ifp, _, _, _ = run_prolif(receptor_pdb, out_sdf, smiles, tyr_resid)
     count, interactions = count_tyr56_pi_stacking(ifp, tyr_resid)
 
     all_tyr_residues = set()
@@ -485,7 +557,8 @@ def main() -> None:
             print(f"No docked output at {out_sdf}")
             print("Run docking first, or: python test_pipeline.py --debug '<SMILES>'")
             sys.exit(1)
-        debug_prolif(RECEPTOR_PDB, str(out_sdf))
+        smiles = _load_input_smiles(OUTPUT_DIR)
+        debug_prolif(RECEPTOR_PDB, str(out_sdf), smiles)
         return
 
     if len(sys.argv) == 3 and sys.argv[1] == "--debug":
@@ -497,7 +570,7 @@ def main() -> None:
         output_dir.mkdir(parents=True)
         print("=== DOCKING ===")
         _, out_sdf = run_docking(smiles, output_dir)
-        debug_prolif(RECEPTOR_PDB, out_sdf)
+        debug_prolif(RECEPTOR_PDB, out_sdf, smiles)
         return
 
     if len(sys.argv) != 2:
@@ -530,7 +603,7 @@ def main() -> None:
     # Step 2: ProLIF
     print(f"\n=== STEP 2: ProLIF (TYR{TYR_RESIDUE} pi-pi stacking only) ===")
     try:
-        pi_count, details, all_tyrs = analyze_tyr56_pi_stacking(RECEPTOR_PDB, out_sdf)
+        pi_count, details, all_tyrs = analyze_tyr56_pi_stacking(RECEPTOR_PDB, out_sdf, smiles)
         tyr_reward = tyr_count_to_reward(pi_count)
         print(f"TYR{TYR_RESIDUE} pi-pi stacking: {pi_count}")
         print(f"TYR reward:       {tyr_reward}")

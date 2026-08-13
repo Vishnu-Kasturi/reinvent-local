@@ -21,9 +21,8 @@ from typing import Dict, List, Optional, Tuple
 import MDAnalysis as mda
 import numpy as np
 import prolif as plf
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem
-from rdkit import RDLogger
 
 from prolif_compat import (
     count_interactions,
@@ -228,11 +227,28 @@ def load_protein_for_prolif(receptor_pdb: str) -> plf.Molecule:
             os.unlink(cleaned)
 
 
-def load_best_pose(docked_sdf: str) -> Chem.Mol:
+def prepare_docked_ligand(pose_mol: Chem.Mol, smiles: str) -> Chem.Mol:
+    """Assign bond orders/aromaticity from SMILES onto GNINA docked coordinates."""
+    template = Chem.MolFromSmiles(smiles)
+    if template is None:
+        raise ValueError(f"Invalid SMILES: {smiles}")
+    pose = Chem.Mol(pose_mol)
+    try:
+        fixed = AllChem.AssignBondOrdersFromTemplate(template, pose)
+    except (ValueError, RuntimeError):
+        pose_h = Chem.RemoveHs(pose)
+        template_h = Chem.RemoveHs(template)
+        fixed_h = AllChem.AssignBondOrdersFromTemplate(template_h, pose_h)
+        fixed = Chem.AddHs(fixed_h, addCoords=True)
+    Chem.SanitizeMol(fixed)
+    return fixed
+
+
+def load_best_pose(docked_sdf: str, smiles: str) -> Chem.Mol:
     supplier = Chem.SDMolSupplier(docked_sdf, removeHs=False)
     for mol in supplier:
         if mol is not None:
-            return mol
+            return prepare_docked_ligand(mol, smiles)
     raise ValueError(f"No valid pose in {docked_sdf}")
 
 
@@ -280,6 +296,7 @@ def _is_tyr_residue(prot_res, resid: int) -> bool:
 def analyze_tyr_interactions(
     receptor_pdb: str,
     docked_sdf: str,
+    smiles: str,
     tyr_residue: int = 56,
 ) -> Tuple[int, int, List[dict]]:
     """
@@ -289,7 +306,7 @@ def analyze_tyr_interactions(
     Both count values are identical (kept for backward compatibility).
     """
     protein = load_protein_for_prolif(receptor_pdb)
-    ligand_mol = load_best_pose(docked_sdf)
+    ligand_mol = load_best_pose(docked_sdf, smiles)
     ligand = plf.Molecule.from_rdkit(ligand_mol)
 
     fp = make_fingerprint(plf, count=True)
@@ -376,7 +393,7 @@ def run_molecule_pipeline(
 
     try:
         tyr_count, pi_count, details = analyze_tyr_interactions(
-            config.receptor_path, out_sdf, tyr_residue=config.tyr_residue
+            config.receptor_path, out_sdf, can, tyr_residue=config.tyr_residue
         )
         result.tyr_interaction_count = tyr_count
         result.tyr_pi_stacking_count = pi_count
