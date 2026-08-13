@@ -1,0 +1,96 @@
+run_type        = "staged_learning"
+device          = "cuda"
+tb_logdir       = "../tb_pd1_pdl1_mol2mol_gnina"
+json_out_config = "json_pd1_pdl1_mol2mol_gnina.json"
+
+[parameters]
+prior_file         = "priors/mol2mol_medium_similarity.prior"
+agent_file         = "priors/mol2mol_medium_similarity.prior"
+smiles_file        = "../data/filtered_smiles_tanimoto.smi"
+sample_strategy    = "multinomial"
+distance_threshold = 100
+summary_csv_prefix = "../results/pd1_pdl1_mol2mol_gnina"
+batch_size         = 8
+unique_sequences   = true
+randomize_smiles   = true
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 8
+minscore    = 0.40
+
+[[stage]]
+chkpt_file  = "../models/pd1_pdl1_mol2mol_gnina.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 30
+max_steps   = 50
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── SA Score ──────────────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.SAScore]
+[[stage.scoring.component.SAScore.endpoint]]
+name              = "SAScore"
+weight            = 1.0
+transform.type    = "reverse_sigmoid"
+transform.high    = 4.5
+transform.low     = 2.0
+transform.k       = 0.5
+
+# ── PD1-PDL1 pIC50 ────────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1pIC50]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50"
+weight             = 3.0
+transform.type     = "sigmoid"
+transform.high     = 11.0
+transform.low      = 8.5
+transform.k        = 0.5
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
+
+# ── Gnina Docking ─────────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.GninaDock]
+[[stage.scoring.component.GninaDock.endpoint]]
+name                    = "GninaAffinity"
+weight                  = 5.0
+transform.type          = "reverse_sigmoid"
+transform.high          = -6.0
+transform.low           = -12.0
+transform.k             = 0.3
+params.receptor_path    = ["../docking/receptor.pdbqt"]
+params.gnina_executable = ["gnina"]
+params.autobox_ligand   = ["../docking/ref_ligand.sdf"]
+params.autobox_add      = ["4.0"]
+params.exhaustiveness   = ["4"]
+params.num_modes        = ["1"]
+params.cnn_scoring      = ["rescore"]
+params.docking_mode     = ["full"]
+params.n_workers        = ["4"]
+params.use_gpu          = ["true"]
+params.cache_dir        = ["../docking/gnina_cache"]
+
+[[stage.scoring.component.GninaDock.endpoint]]
+name                    = "GninaAffinity_raw"
+weight                  = 0.0
+params.receptor_path    = ["../docking/receptor.pdbqt"]
+params.gnina_executable = ["gnina"]
+params.autobox_ligand   = ["../docking/ref_ligand.sdf"]
+params.autobox_add      = ["4.0"]
+params.exhaustiveness   = ["4"]
+params.num_modes        = ["1"]
+params.cnn_scoring      = ["rescore"]
+params.docking_mode     = ["full"]
+params.n_workers        = ["4"]
+params.use_gpu          = ["true"]
+params.cache_dir        = ["../docking/gnina_cache"]
