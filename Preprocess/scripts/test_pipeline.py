@@ -195,7 +195,9 @@ def _is_pi_pi_stacking(name) -> bool:
     n = _interaction_name(name).lower().replace("-", "").replace("_", "")
     if "pication" in n or "cationpi" in n:
         return False
-    return n == "pistacking" or ("pi" in n and "stack" in n)
+    return n in ("pistacking", "facetoface", "edgetoface") or (
+        "pi" in n and "stack" in n
+    )
 
 
 def _is_tyr_residue(prot_res, resid: int) -> bool:
@@ -329,47 +331,66 @@ def run_docking(smiles: str, output_dir: Path) -> tuple[str, str]:
 # ============================================================
 
 def load_protein_for_prolif(receptor_pdb: str):
-    """Load receptor for ProLIF. Returns (plf.Molecule, plf_module)."""
+    """Load receptor for ProLIF. Returns (plf.Molecule, plf_module, loader_name)."""
     import prolif as plf
 
     if not os.path.isfile(receptor_pdb):
         raise FileNotFoundError(f"Receptor file not found: {receptor_pdb}")
 
-    # MDAnalysis first — keeps TYR phenyl rings aromatic for pi-stacking
-    tmp_path = None
-    try:
+    errors = []
+
+    def _strip_conect_pdb() -> str:
         tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False)
-        tmp_path = tmp.name
         with open(receptor_pdb) as f:
             for line in f:
                 if not line.startswith("CONECT"):
                     tmp.write(line)
         tmp.close()
+        return tmp.name
 
+    # 1) MDAnalysis — best TYR aromaticity; skip guess_bonds if it breaks valence
+    tmp_path = None
+    try:
+        tmp_path = _strip_conect_pdb()
         import MDAnalysis as mda
-        u = mda.Universe(tmp_path)
-        ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL")
-        if len(ag) == 0:
-            ag = u.atoms
-        ag.guess_bonds()
-        return plf.Molecule.from_mda(ag), plf
-
-    except Exception:
-        pass
+        for guess_bonds in (True, False):
+            try:
+                u = mda.Universe(tmp_path)
+                ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL")
+                if len(ag) == 0:
+                    ag = u.atoms
+                if guess_bonds:
+                    ag.guess_bonds()
+                return plf.Molecule.from_mda(ag), plf, (
+                    "MDAnalysis+guess_bonds" if guess_bonds else "MDAnalysis"
+                )
+            except Exception as exc:
+                errors.append(f"MDAnalysis(guess_bonds={guess_bonds}): {exc}")
+    except Exception as exc:
+        errors.append(f"MDAnalysis setup: {exc}")
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
+    # 2) RDKit unsanitized — works on this PDB (bad CONECT / valence records)
     try:
-        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=True)
+        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
         if rdmol is not None:
-            return plf.Molecule.from_rdkit(rdmol), plf
+            try:
+                Chem.SanitizeMol(
+                    rdmol,
+                    sanitizeOps=Chem.SANITIZE_SETAROMATICITY | Chem.SANITIZE_SYMMRINGS,
+                )
+                loader = "RDKit(partial_aromaticity)"
+            except Exception:
+                loader = "RDKit(unsanitized)"
+            return plf.Molecule.from_rdkit(rdmol), plf, loader
     except Exception as exc:
-        raise RuntimeError(
-            f"Cannot load receptor '{receptor_pdb}': {exc}"
-        ) from exc
+        errors.append(f"RDKit unsanitized: {exc}")
 
-    raise RuntimeError(f"Cannot load receptor '{receptor_pdb}'")
+    raise RuntimeError(
+        f"Cannot load receptor '{receptor_pdb}'\n  " + "\n  ".join(errors)
+    )
 
 
 def get_best_pose(out_sdf: str, smiles: str) -> Chem.Mol:
@@ -388,12 +409,12 @@ def run_prolif(
     tyr_resid: int = TYR_RESIDUE,
 ):
     """Run ProLIF, return (fp, ifp, protein, ligand, plf_module)."""
-    protein, plf = load_protein_for_prolif(receptor_pdb)
+    protein, plf, protein_loader = load_protein_for_prolif(receptor_pdb)
     ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf, smiles))
     fp = _make_fingerprint(plf, count=True)
     residues = _tyr_residue_ids(tyr_resid)
     ifp = _run_fingerprint(fp, ligand, protein, residues=residues)
-    return fp, ifp, protein, ligand, plf
+    return fp, ifp, protein, ligand, plf, protein_loader
 
 
 def count_tyr56_pi_stacking(ifp, tyr_resid: int = TYR_RESIDUE) -> tuple[int, list]:
@@ -438,7 +459,10 @@ def debug_prolif(
     if n_raw == 0 and n_fixed > 0:
         print("  (Pi-stacking needs aromatic rings — raw SDF had none)")
 
-    fp, ifp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, smiles, tyr_resid)
+    fp, ifp, protein, ligand, plf, protein_loader = run_prolif(
+        receptor_pdb, out_sdf, smiles, tyr_resid
+    )
+    print(f"\nProtein loaded via: {protein_loader}")
     print(f"\nProLIF version: {_prolif_version(plf)}")
     print(f"Fingerprint count=True (detects multiple stacks per residue)")
 
@@ -519,7 +543,7 @@ def analyze_tyr56_pi_stacking(
     smiles: str,
     tyr_resid: int = TYR_RESIDUE,
 ):
-    _, ifp, _, _, _ = run_prolif(receptor_pdb, out_sdf, smiles, tyr_resid)
+    _, ifp, _, _, _, _ = run_prolif(receptor_pdb, out_sdf, smiles, tyr_resid)
     count, interactions = count_tyr56_pi_stacking(ifp, tyr_resid)
 
     all_tyr_residues = set()

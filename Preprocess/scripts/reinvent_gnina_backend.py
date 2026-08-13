@@ -208,23 +208,44 @@ def _strip_conect(pdb_path: str) -> str:
 
 
 def load_protein_for_prolif(receptor_pdb: str) -> plf.Molecule:
-    """Load receptor for ProLIF, handling partial CONECT records."""
+    """Load receptor for ProLIF, handling partial CONECT / valence issues."""
     cleaned = _strip_conect(receptor_pdb)
+    errors = []
     try:
-        u = mda.Universe(cleaned)
-        ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL CL NA K MG CA ZN")
-        if len(ag) == 0:
-            ag = u.atoms
-        ag.guess_bonds()
-        return plf.Molecule.from_mda(ag)
-    except Exception:
-        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
-        if rdmol is None:
-            raise RuntimeError(f"Cannot load receptor: {receptor_pdb}")
-        return plf.Molecule.from_rdkit(rdmol)
+        for guess_bonds in (True, False):
+            try:
+                u = mda.Universe(cleaned)
+                ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL CL NA K MG CA ZN")
+                if len(ag) == 0:
+                    ag = u.atoms
+                if guess_bonds:
+                    ag.guess_bonds()
+                return plf.Molecule.from_mda(ag)
+            except Exception as exc:
+                errors.append(f"MDAnalysis(guess_bonds={guess_bonds}): {exc}")
+    except Exception as exc:
+        errors.append(f"MDAnalysis setup: {exc}")
     finally:
         if os.path.exists(cleaned):
             os.unlink(cleaned)
+
+    try:
+        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
+        if rdmol is not None:
+            try:
+                Chem.SanitizeMol(
+                    rdmol,
+                    sanitizeOps=Chem.SANITIZE_SETAROMATICITY | Chem.SANITIZE_SYMMRINGS,
+                )
+            except Exception:
+                pass
+            return plf.Molecule.from_rdkit(rdmol)
+    except Exception as exc:
+        errors.append(f"RDKit unsanitized: {exc}")
+
+    raise RuntimeError(
+        f"Cannot load receptor: {receptor_pdb}\n  " + "\n  ".join(errors)
+    )
 
 
 def prepare_docked_ligand(pose_mol: Chem.Mol, smiles: str) -> Chem.Mol:
@@ -271,7 +292,9 @@ def _is_pi_pi_stacking(interaction_name) -> bool:
     n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
     if "pication" in n or "cationpi" in n:
         return False
-    return n == "pistacking" or ("pi" in n and "stack" in n)
+    return n in ("pistacking", "facetoface", "edgetoface") or (
+        "pi" in n and "stack" in n
+    )
 
 
 def _is_tyr_residue(prot_res, resid: int) -> bool:
