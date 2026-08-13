@@ -2,6 +2,8 @@
 """
 test_pipeline.py — Standalone test for GNINA docking + ProLIF (TYR56 pi-pi only).
 
+This is ONE self-contained script. The only external file you need is your dock.py.
+
 Usage:
     python Preprocess/scripts/test_pipeline.py '<SMILES>'
     python Preprocess/scripts/test_pipeline.py --check
@@ -16,6 +18,7 @@ Env vars:
 """
 from __future__ import annotations
 
+import inspect
 import os
 import re
 import shutil
@@ -23,22 +26,97 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
-# Ensure sibling imports (prolif_compat) resolve when invoked from repo root.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from typing import Any, Iterator, List, Optional, Tuple
 
 import pandas as pd
 from rdkit import Chem
 
-from prolif_compat import (
-    count_interactions,
-    ifp_to_dataframe,
-    iter_ifp_pairs,
-    make_fingerprint,
-    prolif_version,
-    run_fingerprint,
-    tyr56_residue_ids,
-)
+
+# ============================================================
+# ProLIF v1/v2 compat (inlined — no extra files needed)
+# ============================================================
+
+def _prolif_version(plf) -> str:
+    return getattr(plf, "__version__", "unknown")
+
+
+def _make_fingerprint(plf, count: bool = True):
+    try:
+        return plf.Fingerprint(count=count)
+    except TypeError:
+        return plf.Fingerprint()
+
+
+def _get_ifp_from_fingerprint(fp, frame: int = 0):
+    ifp = fp.ifp
+    if isinstance(ifp, dict) and ifp and all(isinstance(k, int) for k in ifp):
+        return ifp[frame]
+    return ifp
+
+
+def _run_fingerprint(fp, ligand, protein, residues: Optional[List[str]] = None, frame: int = 0):
+    if hasattr(fp, "generate"):
+        sig = inspect.signature(fp.generate)
+        kwargs: dict[str, Any] = {}
+        if residues is not None and "residues" in sig.parameters:
+            kwargs["residues"] = residues
+        if "metadata" in sig.parameters:
+            kwargs["metadata"] = True
+        try:
+            return fp.generate(ligand, protein, **kwargs)
+        except TypeError:
+            pass
+
+    if hasattr(fp, "run_from_iterable"):
+        if residues is not None:
+            fp.run_from_iterable([ligand], protein, residues=residues)
+        else:
+            fp.run_from_iterable([ligand], protein)
+        return _get_ifp_from_fingerprint(fp, frame=frame)
+
+    if residues is not None:
+        try:
+            fp.run(ligand, protein, residues=residues)
+        except TypeError:
+            fp.run(ligand, protein)
+    else:
+        fp.run(ligand, protein)
+    return fp.ifp
+
+
+def _iter_ifp_pairs(ifp) -> Iterator[Tuple[Any, Any, dict]]:
+    for key, ix_dict in ifp.items():
+        if isinstance(key, tuple) and len(key) == 2:
+            yield key[0], key[1], ix_dict
+
+
+def _ifp_to_dataframe(plf, fp, ifp):
+    if hasattr(plf, "to_dataframe"):
+        interactions = getattr(fp, "interactions", None)
+        if interactions is not None:
+            return plf.to_dataframe({0: ifp}, interactions)
+        return plf.to_dataframe({0: ifp})
+    if hasattr(fp, "to_dataframe"):
+        return fp.to_dataframe(ifp)
+    raise TypeError("No compatible to_dataframe API found")
+
+
+def _count_interactions(ix_dict, predicate) -> int:
+    total = 0
+    for name, metadata in ix_dict.items():
+        if not predicate(name) or metadata is None:
+            continue
+        if isinstance(metadata, (list, tuple)):
+            total += len(metadata)
+        elif isinstance(metadata, dict):
+            total += max(len(metadata), 1) if metadata else 0
+        else:
+            total += 1
+    return total
+
+
+def _tyr_residue_ids(resid: int, chains: str = "AB") -> List[str]:
+    return [f"TYR{resid}.{c}" for c in chains]
 
 # ============================================================
 # CONFIG — edit these paths for your machine
@@ -260,9 +338,9 @@ def run_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
     """Run ProLIF, return (fp, ifp, protein, ligand, plf_module)."""
     protein, plf = load_protein_for_prolif(receptor_pdb)
     ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf))
-    fp = make_fingerprint(plf, count=True)
-    residues = tyr56_residue_ids(tyr_resid)
-    ifp = run_fingerprint(fp, ligand, protein, residues=residues)
+    fp = _make_fingerprint(plf, count=True)
+    residues = _tyr_residue_ids(tyr_resid)
+    ifp = _run_fingerprint(fp, ligand, protein, residues=residues)
     return fp, ifp, protein, ligand, plf
 
 
@@ -270,10 +348,10 @@ def count_tyr56_pi_stacking(ifp, tyr_resid: int = TYR_RESIDUE) -> tuple[int, lis
     """Count pi-pi stacking at TYR{resid} using count=True fingerprint."""
     details = []
     total = 0
-    for lig_res, prot_res, ix_dict in iter_ifp_pairs(ifp):
+    for lig_res, prot_res, ix_dict in _iter_ifp_pairs(ifp):
         if not _is_tyr_residue(prot_res, tyr_resid):
             continue
-        n = count_interactions(ix_dict, _is_pi_pi_stacking)
+        n = _count_interactions(ix_dict, _is_pi_pi_stacking)
         if n > 0:
             total += n
             details.append({
@@ -294,18 +372,18 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
     inspect_pdb_residue(receptor_pdb, tyr_resid)
 
     fp, ifp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
-    print(f"\nProLIF version: {prolif_version(plf)}")
+    print(f"\nProLIF version: {_prolif_version(plf)}")
     print(f"Fingerprint count=True (detects multiple stacks per residue)")
 
     # Try dataframe export if available
     try:
-        df = ifp_to_dataframe(plf, fp, ifp)
+        df = _ifp_to_dataframe(plf, fp, ifp)
         print(f"\n--- ProLIF dataframe ({len(df)} rows) ---")
         print(df.to_string())
     except Exception as exc:
         print(f"\n(DataFrame export unavailable: {exc})")
 
-    pairs = list(iter_ifp_pairs(ifp))
+    pairs = list(_iter_ifp_pairs(ifp))
     print(f"\n--- ALL interactions ({len(pairs)} residue pairs) ---")
     tyr_all = []
     tyr_target = []
@@ -357,13 +435,13 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
     # Check multiple poses
     print(f"\n--- Checking all poses in {out_sdf} ---")
     supplier = Chem.SDMolSupplier(out_sdf, removeHs=False)
-    residues = tyr56_residue_ids(tyr_resid)
+    residues = _tyr_residue_ids(tyr_resid)
     for pose_i, mol in enumerate(supplier):
         if mol is None:
             continue
         lig = plf.Molecule.from_rdkit(mol)
-        fp2 = make_fingerprint(plf, count=True)
-        ifp2 = run_fingerprint(fp2, lig, protein, residues=residues)
+        fp2 = _make_fingerprint(plf, count=True)
+        ifp2 = _run_fingerprint(fp2, lig, protein, residues=residues)
         count, _ = count_tyr56_pi_stacking(ifp2, tyr_resid)
         print(f"  Pose {pose_i + 1}: TYR{tyr_resid} pi-pi count = {count}")
 
@@ -373,7 +451,7 @@ def analyze_tyr56_pi_stacking(receptor_pdb: str, out_sdf: str, tyr_resid: int = 
     count, interactions = count_tyr56_pi_stacking(ifp, tyr_resid)
 
     all_tyr_residues = set()
-    for _, prot_res, ix_dict in iter_ifp_pairs(ifp):
+    for _, prot_res, ix_dict in _iter_ifp_pairs(ifp):
         if "TYR" in str(prot_res):
             info = _residue_info(prot_res)
             all_tyr_residues.add(f"{info.get('resname','?')}{info.get('resid','?')} ({prot_res})")
