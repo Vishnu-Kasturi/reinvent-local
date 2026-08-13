@@ -1,199 +1,718 @@
-#!/usr/bin/env python3
-"""
-test_pipeline.py — Single-molecule docking + ProLIF interaction analysis.
-
-Usage:
-    python Preprocess/scripts/test_pipeline.py '<SMILES>'
-
-Environment variables (or edit defaults below):
-    GNINA_EXECUTABLE   path to gnina binary
-    RECEPTOR_PDB       receptor PDB file
-    REF_LIGAND_PDB     reference ligand for autobox
-"""
-from __future__ import annotations
-
 import os
+import sys
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pandas as pd
 from rdkit import Chem
 
-# Allow importing sibling scripts
-_SCRIPTS = Path(__file__).resolve().parent
-_REPO = _SCRIPTS.parent.parent
-sys.path.insert(0, str(_SCRIPTS))
+import MDAnalysis as mda
+import prolif as plf
 
-from prolif_utils import (  # noqa: E402
-    get_pi_stacking,
-    get_tyr_interactions,
-    load_ligand_for_prolif,
-    load_protein_for_prolif,
-    run_prolif,
-)
 
 # ============================================================
-# CONFIGURATION — override via env vars
+# CONFIGURATION
 # ============================================================
-DOCK_PY = str(_SCRIPTS / "dock.py")
-RECEPTOR_PDB = os.environ.get(
-    "RECEPTOR_PDB",
-    "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb",
+
+DOCK_PY = (
+    "/home/genai/Vishnu/psearch-master/reinvent-local-main/"
+    "Preprocess/scripts/dock.py"
 )
-REF_LIGAND_PDB = os.environ.get(
-    "REF_LIGAND_PDB",
-    "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb",
+
+RECEPTOR_PDB = (
+    "/home/genai/navneet/iict/pdl1/docking_TL_dataset/"
+    "receptor.pdb"
 )
+
 OUTPUT_DIR = "pipeline_output"
 
 
-def run(cmd: list) -> None:
+# ============================================================
+# RUN COMMAND
+# ============================================================
+
+def run(cmd):
     print("\n>> " + " ".join(map(str, cmd)))
     subprocess.run(cmd, check=True)
 
 
-def clean_smiles(smiles: str) -> str:
+# ============================================================
+# CLEAN / CANONICALIZE SMILES
+# ============================================================
+
+def clean_smiles(smiles):
+
     mol = Chem.MolFromSmiles(smiles)
+
     if mol is None:
-        raise ValueError("Invalid SMILES — RDKit could not parse input.")
-    return Chem.MolToSmiles(mol, canonical=True)
+        raise ValueError(
+            "Invalid SMILES. RDKit could not parse the input."
+        )
+
+    clean = Chem.MolToSmiles(
+        mol,
+        canonical=True
+    )
+
+    return clean
 
 
-def create_input_csv(smiles: str, output_dir: Path) -> str:
-    path = output_dir / "input.csv"
-    pd.DataFrame({"SMILES": [smiles]}).to_csv(path, index=False)
-    return str(path)
+# ============================================================
+# CREATE INPUT CSV
+# ============================================================
+
+def create_input_csv(smiles, output_dir):
+
+    input_csv = Path(output_dir) / "input.csv"
+
+    df = pd.DataFrame({
+        "SMILES": [smiles]
+    })
+
+    df.to_csv(
+        input_csv,
+        index=False
+    )
+
+    return str(input_csv)
 
 
-def run_docking(smiles: str, output_dir: Path) -> tuple[str, str]:
-    input_csv = create_input_csv(smiles, output_dir)
+# ============================================================
+# RUN DOCKING
+# ============================================================
+
+def run_docking(smiles, output_dir):
+
+    output_dir = Path(output_dir)
+
+    input_csv = create_input_csv(
+        smiles,
+        output_dir
+    )
+
     run([
-        "python", DOCK_PY, input_csv, str(output_dir) + "/",
-        "--receptor", RECEPTOR_PDB,
-        "--autobox_ligand", REF_LIGAND_PDB,
-        "--cnn_scoring", "none",
+        "python",
+        DOCK_PY,
+        str(input_csv),
+        str(output_dir) + "/"
     ])
 
     log_file = output_dir / "mol0_log.txt"
-    out_sdf = output_dir / "mol0_out.sdf"
+
+    output_sdf = output_dir / "mol0_out.sdf"
+
     if not log_file.exists():
-        raise FileNotFoundError(f"Docking log not found: {log_file}")
-    if not out_sdf.exists():
-        raise FileNotFoundError(f"Docked SDF not found: {out_sdf}")
-    return str(log_file), str(out_sdf)
+
+        raise FileNotFoundError(
+            f"Docking log not found: {log_file}"
+        )
+
+    if not output_sdf.exists():
+
+        raise FileNotFoundError(
+            f"Docked SDF not found: {output_sdf}"
+        )
+
+    return str(log_file), str(output_sdf)
 
 
-def extract_best_docking_score(log_file: str) -> float:
-    text = Path(log_file).read_text()
-    m = re.search(r"^\s*1\s+(-?\d+(?:\.\d+)?)", text, re.MULTILINE)
-    if m:
-        return float(m.group(1))
-    m = re.search(r"Docking Score:\s*(-?\d+(?:\.\d+)?)", text)
-    if m:
-        return float(m.group(1))
-    raise ValueError("Could not extract docking score from gnina log.")
+# ============================================================
+# EXTRACT BEST DOCKING SCORE
+# ============================================================
+
+def extract_best_docking_score(log_file):
+
+    with open(log_file, "r") as f:
+
+        text = f.read()
+
+    pattern = (
+        r"^\s*1\s+"
+        r"(-?\d+(?:\.\d+)?)"
+    )
+
+    match = re.search(
+        pattern,
+        text,
+        re.MULTILINE
+    )
+
+    if match:
+
+        return float(
+            match.group(1)
+        )
+
+    # Backup method
+    pattern = (
+        r"Docking Score:\s*"
+        r"(-?\d+(?:\.\d+)?)"
+    )
+
+    match = re.search(
+        pattern,
+        text
+    )
+
+    if match:
+
+        return float(
+            match.group(1)
+        )
+
+    raise ValueError(
+        "Could not extract docking score "
+        "from GNINA log."
+    )
 
 
-def analyze_interactions(receptor_pdb: str, docked_sdf: str):
-    """Run ProLIF with robust protein loading."""
-    print("\nLoading receptor for ProLIF...")
-    protein = load_protein_for_prolif(receptor_pdb)
-    print(f"  Protein loaded: {protein.n_residues} residues")
+# ============================================================
+# EXTRACT BEST GNINA POSE
+# GNINA stores poses in order:
+# molecule 0 = pose 1 = best pose
+# ============================================================
 
-    print("Loading best gnina pose...")
-    ligand = load_ligand_for_prolif(docked_sdf)
+def get_best_pose(output_sdf):
 
-    import prolif as plf
+    supplier = Chem.SDMolSupplier(
+        output_sdf,
+        removeHs=False
+    )
+
+    for mol in supplier:
+
+        if mol is not None:
+
+            return mol
+
+    raise ValueError(
+        "Could not read any valid pose "
+        "from docked SDF."
+    )
+
+
+# ============================================================
+# LOAD PROTEIN FOR PROLIF  (fixes AtomValenceException)
+# ============================================================
+
+def load_protein_for_prolif(receptor_pdb):
+    """
+    Load receptor PDB for ProLIF.
+
+    Partial CONECT records in crystal-structure PDBs prevent MDAnalysis
+    from guessing bonds, which causes:
+        AtomValenceException: Explicit valence for atom # N, 5, ...
+    Fix: strip CONECT records, then force guess_bonds().
+    See: https://github.com/chemosim-lab/ProLIF/issues/196
+    """
+    import tempfile
+
+    # Write a temp PDB with all CONECT records removed
+    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False)
+    with open(receptor_pdb) as f:
+        for line in f:
+            if not line.startswith("CONECT"):
+                tmp.write(line)
+    tmp.close()
+
+    try:
+        u = mda.Universe(tmp.name)
+        ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL")
+        if len(ag) == 0:
+            ag = u.atoms
+        ag.guess_bonds()
+        return plf.Molecule.from_mda(ag)
+    except Exception:
+        # Fallback: RDKit assigns bonds from residue templates
+        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
+        if rdmol is None:
+            raise
+        return plf.Molecule.from_rdkit(rdmol)
+    finally:
+        os.unlink(tmp.name)
+
+
+# ============================================================
+# PROLIF INTERACTION ANALYSIS
+# ============================================================
+
+def analyze_interactions(
+    receptor_pdb,
+    docked_sdf
+):
+
+    print(
+        "\nLoading receptor into MDAnalysis..."
+    )
+
+    print(
+        "Loading best GNINA pose..."
+    )
+
+    ligand_rdkit = get_best_pose(
+        docked_sdf
+    )
+
+    print(
+        "Using GNINA pose 1 (best docking pose)."
+    )
+
+    ligand = plf.Molecule.from_rdkit(
+        ligand_rdkit
+    )
+
+    protein = load_protein_for_prolif(
+        receptor_pdb
+    )
+
     fp = plf.Fingerprint()
-    print("Running ProLIF interaction analysis...")
-    fp.run(ligand, protein)
+
+    print(
+        "Running ProLIF interaction analysis..."
+    )
+
+    fp.run(
+        ligand,
+        protein
+    )
+
     return fp
 
 
-def print_results(docking_score, tyr_interactions, pi_pi_interactions):
-    print("\n" + "=" * 60)
-    print("DOCKING RESULT")
-    print("=" * 60)
-    print(f"Best docking score: {docking_score:.2f} kcal/mol")
+# ============================================================
+# EXTRACT TYR INTERACTIONS
+# ============================================================
+
+def get_tyr_interactions(fp):
+
+    tyr_interactions = []
+
+    interactions = fp.ifp
+
+    for residue_pair, interaction_dict in interactions.items():
+
+        ligand_residue = residue_pair[0]
+
+        protein_residue = residue_pair[1]
+
+        protein_residue_str = str(
+            protein_residue
+        )
+
+        if "TYR" not in protein_residue_str:
+
+            continue
+
+        for interaction_name, metadata in interaction_dict.items():
+
+            if metadata:
+
+                tyr_interactions.append({
+                    "ligand": str(
+                        ligand_residue
+                    ),
+
+                    "protein": str(
+                        protein_residue
+                    ),
+
+                    "interaction": interaction_name,
+
+                    "metadata": metadata
+                })
+
+    return tyr_interactions
+
+
+# ============================================================
+# GET PI-PI STACKING INTERACTIONS
+# ============================================================
+
+def get_pi_stacking_interactions(
+    tyr_interactions
+):
+
+    pi_pi = []
+
+    for interaction in tyr_interactions:
+
+        name = str(
+            interaction["interaction"]
+        ).lower()
+
+        if (
+            "pistacking" in name
+            or "pi_stack" in name
+            or "pi-stacking" in name
+        ):
+
+            pi_pi.append(
+                interaction
+            )
+
+    return pi_pi
+
+
+# ============================================================
+# PRINT RESULTS
+# ============================================================
+
+def print_results(
+    docking_score,
+    tyr_interactions,
+    pi_pi_interactions
+):
 
     print("\n" + "=" * 60)
-    print("TYROSINE INTERACTIONS")
+
+    print(
+        "DOCKING RESULT"
+    )
+
     print("=" * 60)
+
+    print(
+        f"Best docking score: "
+        f"{docking_score:.2f} kcal/mol"
+    )
+
+    print("\n" + "=" * 60)
+
+    print(
+        "TYROSINE INTERACTIONS"
+    )
+
+    print("=" * 60)
+
     if not tyr_interactions:
-        print("No TYR interactions detected.")
+
+        print(
+            "No TYR interactions detected."
+        )
+
     else:
-        print(f"Total TYR interactions: {len(tyr_interactions)}\n")
-        for i, ix in enumerate(tyr_interactions, 1):
-            print(f"{i}. Protein: {ix['protein']}")
-            print(f"   Interaction: {ix['interaction']}")
+
+        print(
+            f"Total TYR interactions: "
+            f"{len(tyr_interactions)}"
+        )
+
+        print()
+
+        for i, interaction in enumerate(
+            tyr_interactions,
+            start=1
+        ):
+
+            print(
+                f"{i}. "
+                f"Protein: "
+                f"{interaction['protein']}"
+            )
+
+            print(
+                f"   Interaction: "
+                f"{interaction['interaction']}"
+            )
 
     print("\n" + "=" * 60)
-    print("TYR PI-PI STACKING")
+
+    print(
+        "TYR PI-PI STACKING"
+    )
+
     print("=" * 60)
+
     if not pi_pi_interactions:
-        print("No TYR Pi-Pi stacking detected.")
+
+        print(
+            "No TYR Pi-Pi stacking detected."
+        )
+
     else:
-        print(f"TYR Pi-Pi stacking interactions: {len(pi_pi_interactions)}\n")
-        for i, ix in enumerate(pi_pi_interactions, 1):
-            print(f"{i}. Protein: {ix['protein']}")
-            print(f"   Interaction: {ix['interaction']}")
+
+        print(
+            f"TYR Pi-Pi stacking interactions: "
+            f"{len(pi_pi_interactions)}"
+        )
+
+        print()
+
+        for i, interaction in enumerate(
+            pi_pi_interactions,
+            start=1
+        ):
+
+            print(
+                f"{i}. "
+                f"Protein: "
+                f"{interaction['protein']}"
+            )
+
+            print(
+                f"   Interaction: "
+                f"{interaction['interaction']}"
+            )
 
 
-def save_results(output_dir, smiles, docking_score, tyr_interactions, pi_pi_interactions):
-    path = Path(output_dir) / "interaction_results.txt"
-    with open(path, "w") as f:
-        f.write("=" * 60 + "\nINPUT SMILES\n" + "=" * 60 + "\n")
-        f.write(smiles + "\n\n")
-        f.write("=" * 60 + "\nDOCKING RESULT\n" + "=" * 60 + "\n")
-        f.write(f"Best docking score: {docking_score:.2f} kcal/mol\n\n")
-        f.write("=" * 60 + "\nALL TYR INTERACTIONS\n" + "=" * 60 + "\n")
+# ============================================================
+# SAVE RESULTS
+# ============================================================
+
+def save_results(
+    output_dir,
+    smiles,
+    docking_score,
+    tyr_interactions,
+    pi_pi_interactions
+):
+
+    result_file = Path(
+        output_dir
+    ) / "interaction_results.txt"
+
+    with open(result_file, "w") as f:
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        f.write(
+            "INPUT SMILES\n"
+        )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        f.write(
+            smiles + "\n\n"
+        )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        f.write(
+            "DOCKING RESULT\n"
+        )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        f.write(
+            f"Best docking score: "
+            f"{docking_score:.2f} kcal/mol\n\n"
+        )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        f.write(
+            "ALL TYR INTERACTIONS\n"
+        )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
         if not tyr_interactions:
-            f.write("No TYR interactions detected.\n")
-        else:
-            for ix in tyr_interactions:
-                f.write(f"Protein: {ix['protein']}\nInteraction: {ix['interaction']}\n\n")
-        f.write("=" * 60 + "\nTYR PI-PI STACKING\n" + "=" * 60 + "\n")
-        if not pi_pi_interactions:
-            f.write("No TYR Pi-Pi stacking detected.\n")
-        else:
-            for ix in pi_pi_interactions:
-                f.write(f"Protein: {ix['protein']}\nInteraction: {ix['interaction']}\n\n")
-    print(f"\nResults saved to: {path}")
 
+            f.write(
+                "No TYR interactions detected.\n"
+            )
+
+        else:
+
+            for interaction in tyr_interactions:
+
+                f.write(
+                    f"Protein: "
+                    f"{interaction['protein']}\n"
+                )
+
+                f.write(
+                    f"Interaction: "
+                    f"{interaction['interaction']}\n"
+                )
+
+                f.write(
+                    "\n"
+                )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        f.write(
+            "TYR PI-PI STACKING\n"
+        )
+
+        f.write(
+            "=" * 60 + "\n"
+        )
+
+        if not pi_pi_interactions:
+
+            f.write(
+                "No TYR Pi-Pi stacking detected.\n"
+            )
+
+        else:
+
+            for interaction in pi_pi_interactions:
+
+                f.write(
+                    f"Protein: "
+                    f"{interaction['protein']}\n"
+                )
+
+                f.write(
+                    f"Interaction: "
+                    f"{interaction['interaction']}\n\n"
+                )
+
+    print(
+        f"\nResults saved to: "
+        f"{result_file}"
+    )
+
+
+# ============================================================
+# MAIN
+# ============================================================
 
 def main():
+
     if len(sys.argv) != 2:
-        print("Usage: python test_pipeline.py '<SMILES>'")
+
+        print(
+            "Usage:\n"
+            "python test_pipeline.py "
+            "'<SMILES>'"
+        )
+
         sys.exit(1)
 
     raw_smiles = sys.argv[1]
-    print("=" * 60 + "\nINPUT SMILES\n" + "=" * 60)
-    print(raw_smiles)
 
-    smiles = clean_smiles(raw_smiles)
-    print("\n" + "=" * 60 + "\nCLEAN SMILES\n" + "=" * 60)
-    print(smiles)
+    print("\n" + "=" * 60)
 
-    output_dir = Path(OUTPUT_DIR)
+    print(
+        "INPUT SMILES"
+    )
+
+    print("=" * 60)
+
+    print(
+        raw_smiles
+    )
+
+    print("\n" + "=" * 60)
+
+    print(
+        "CLEANING / CANONICALIZING SMILES"
+    )
+
+    print("=" * 60)
+
+    smiles = clean_smiles(
+        raw_smiles
+    )
+
+    print(
+        smiles
+    )
+
+    output_dir = Path(
+        OUTPUT_DIR
+    )
+
     if output_dir.exists():
-        shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True)
 
-    log_file, out_sdf = run_docking(smiles, output_dir)
-    docking_score = extract_best_docking_score(log_file)
-    print(f"\nBest docking score: {docking_score:.2f} kcal/mol")
+        shutil.rmtree(
+            output_dir
+        )
 
-    fp = analyze_interactions(RECEPTOR_PDB, out_sdf)
-    tyr_ix = get_tyr_interactions(fp)
-    pi_pi = get_pi_stacking(tyr_ix)
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    print_results(docking_score, tyr_ix, pi_pi)
-    save_results(output_dir, smiles, docking_score, tyr_ix, pi_pi)
-    print("\n" + "=" * 60 + "\nPIPELINE FINISHED SUCCESSFULLY\n" + "=" * 60)
+    log_file, output_sdf = run_docking(
+        smiles,
+        str(output_dir)
+    )
+
+    docking_score = (
+        extract_best_docking_score(
+            log_file
+        )
+    )
+
+    print("\n" + "=" * 60)
+
+    print(
+        "DOCKING RESULT"
+    )
+
+    print("=" * 60)
+
+    print(
+        f"Best docking score: "
+        f"{docking_score:.2f} kcal/mol"
+    )
+
+    print("\n" + "=" * 60)
+
+    print(
+        "RUNNING PROLIF INTERACTION ANALYSIS"
+    )
+
+    print("=" * 60)
+
+    fp = analyze_interactions(
+        RECEPTOR_PDB,
+        output_sdf
+    )
+
+    tyr_interactions = (
+        get_tyr_interactions(fp)
+    )
+
+    pi_pi_interactions = (
+        get_pi_stacking_interactions(
+            tyr_interactions
+        )
+    )
+
+    print_results(
+        docking_score,
+        tyr_interactions,
+        pi_pi_interactions
+    )
+
+    save_results(
+        str(output_dir),
+        smiles,
+        docking_score,
+        tyr_interactions,
+        pi_pi_interactions
+    )
+
+    print("\n" + "=" * 60)
+
+    print(
+        "PIPELINE FINISHED SUCCESSFULLY"
+    )
+
+    print("=" * 60)
 
 
 if __name__ == "__main__":
+
     main()
