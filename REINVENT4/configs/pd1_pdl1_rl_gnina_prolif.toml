@@ -1,0 +1,118 @@
+##############################################################################
+# pd1_pdl1_rl_gnina_prolif.toml
+# RL with GNINA docking reward + ProLIF tyrosine interaction reward
+#
+# Pipeline per molecule:
+#   SMILES → GNINA dock → mol0_out.sdf + mol0_log.txt
+#          → ProLIF (best pose vs receptor.pdb) → TYR interaction count
+#          → tiered rewards returned to REINVENT geometric mean
+#
+# IMPORTANT: reduce batch_size when docking on-the-fly (8–16 recommended)
+##############################################################################
+
+run_type        = "staged_learning"
+device          = "cuda"
+tb_logdir       = "../tb_pd1_pdl1_rl_gnina_prolif"
+json_out_config = "json_pd1_pdl1_rl_gnina_prolif.json"
+
+[parameters]
+use_checkpoint     = false
+summary_csv_prefix = "../results/pd1_pdl1_rl_gnina_prolif"
+
+prior_file = "priors/reinvent.prior"
+agent_file = "../models/pd1_pdl1_focused.model.80.chkpt"
+
+batch_size        = 8
+unique_sequences  = true
+randomize_smiles  = true
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 8
+minscore    = 0.35
+
+[inception]
+smiles_file = "../data/pd1_pdl1_TL_train.smi"
+memory_size = 200
+sample_size = 20
+
+##############################################################################
+# STAGE 1: Docking + TYR interactions (+ optional QSAR)
+##############################################################################
+[[stage]]
+chkpt_file  = "../models/pd1_pdl1_rl_gnina_prolif.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50
+max_steps   = 200
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── DockingScore: tiered GNINA affinity reward ────────────────────────────────
+#   <= -12 kcal/mol → 1.0 |  (-12, -10] → 0.5 |  > -10 → 0.0
+[[stage.scoring.component]]
+[stage.scoring.component.DockingScore]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                  = "DockingReward"
+weight                = 3.0
+params.receptor_path  = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["../docking_runs"]
+params.cnn_scoring    = ["none"]
+params.keep_outputs   = ["true"]
+
+[[stage.scoring.component.DockingScore.endpoint]]
+name                  = "DockingAffinity_raw"
+weight                = 0.0
+params.receptor_path  = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["../docking_runs"]
+params.cnn_scoring    = ["none"]
+params.keep_outputs   = ["true"]
+
+# ── TyrosineInteraction: ProLIF TYR contact reward ────────────────────────────
+#   >= 2 TYR interactions → 1.0 |  1 → 0.5 |  0 → 0.0
+[[stage.scoring.component]]
+[stage.scoring.component.TyrosineInteraction]
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                  = "TyrInteractionReward"
+weight                = 2.0
+params.receptor_path  = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["../docking_runs"]
+params.cnn_scoring    = ["none"]
+params.keep_outputs   = ["true"]
+
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                  = "TyrInteractionCount_raw"
+weight                = 0.0
+params.receptor_path  = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["gnina"]
+params.output_root    = ["../docking_runs"]
+params.cnn_scoring    = ["none"]
+params.keep_outputs   = ["true"]
+
+# ── Optional: keep QSAR pIC50 as fast pre-filter ──────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1pIC50]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50"
+weight             = 1.0
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
+
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50_raw"
+weight             = 0.0
+params.model_path  = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
+params.scaler_path = ["../Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
