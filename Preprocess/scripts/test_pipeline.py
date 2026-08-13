@@ -24,8 +24,19 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Ensure sibling imports (prolif_compat) resolve when invoked from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import pandas as pd
 from rdkit import Chem
+
+from prolif_compat import (
+    count_interactions,
+    make_fingerprint,
+    prolif_version,
+    run_fingerprint,
+    tyr56_residue_ids,
+)
 
 # ============================================================
 # CONFIG — edit these paths for your machine
@@ -193,12 +204,19 @@ def run_docking(smiles: str, output_dir: Path) -> tuple[str, str]:
 # ============================================================
 
 def load_protein_for_prolif(receptor_pdb: str):
-    """Load receptor for ProLIF. Returns plf.Molecule."""
-    import MDAnalysis as mda
+    """Load receptor for ProLIF. Returns (plf.Molecule, plf_module)."""
     import prolif as plf
 
     if not os.path.isfile(receptor_pdb):
         raise FileNotFoundError(f"Receptor file not found: {receptor_pdb}")
+
+    # RDKit first — avoids MDAnalysis valence errors on this receptor
+    try:
+        rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
+        if rdmol is not None:
+            return plf.Molecule.from_rdkit(rdmol), plf
+    except Exception:
+        pass
 
     tmp_path = None
     try:
@@ -210,6 +228,7 @@ def load_protein_for_prolif(receptor_pdb: str):
                     tmp.write(line)
         tmp.close()
 
+        import MDAnalysis as mda
         u = mda.Universe(tmp_path)
         ag = u.select_atoms("protein and not resname HOH WAT TIP3 SOL")
         if len(ag) == 0:
@@ -218,21 +237,9 @@ def load_protein_for_prolif(receptor_pdb: str):
         return plf.Molecule.from_mda(ag), plf
 
     except Exception as exc_mda:
-        try:
-            rdmol = Chem.MolFromPDBFile(receptor_pdb, removeHs=False, sanitize=False)
-            if rdmol is None:
-                raise RuntimeError(
-                    f"Cannot load receptor '{receptor_pdb}'.\n"
-                    f"  MDAnalysis error: {exc_mda}\n"
-                    f"  RDKit also returned None."
-                )
-            return plf.Molecule.from_rdkit(rdmol), plf
-        except Exception as exc_rdkit:
-            raise RuntimeError(
-                f"Cannot load receptor '{receptor_pdb}'.\n"
-                f"  MDAnalysis: {exc_mda}\n"
-                f"  RDKit:      {exc_rdkit}"
-            ) from exc_rdkit
+        raise RuntimeError(
+            f"Cannot load receptor '{receptor_pdb}': {exc_mda}"
+        ) from exc_mda
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
@@ -247,13 +254,33 @@ def get_best_pose(out_sdf: str) -> Chem.Mol:
     raise ValueError(f"No valid pose in {out_sdf}")
 
 
-def run_prolif(receptor_pdb: str, out_sdf: str):
+def run_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
     """Run ProLIF, return (fp, protein, ligand, plf_module)."""
     protein, plf = load_protein_for_prolif(receptor_pdb)
     ligand = plf.Molecule.from_rdkit(get_best_pose(out_sdf))
-    fp = plf.Fingerprint()
-    fp.run(ligand, protein)
+    fp = make_fingerprint(plf, count=True)
+    residues = tyr56_residue_ids(tyr_resid)
+    run_fingerprint(fp, ligand, protein, residues=residues)
     return fp, protein, ligand, plf
+
+
+def count_tyr56_pi_stacking(fp, tyr_resid: int = TYR_RESIDUE) -> tuple[int, list]:
+    """Count pi-pi stacking at TYR{resid} using count=True fingerprint."""
+    details = []
+    total = 0
+    for (lig_res, prot_res), ix_dict in fp.ifp.items():
+        if not _is_tyr_residue(prot_res, tyr_resid):
+            continue
+        n = count_interactions(ix_dict, _is_pi_pi_stacking)
+        if n > 0:
+            total += n
+            details.append({
+                "ligand": str(lig_res),
+                "protein": str(prot_res),
+                "interaction": "PiStacking",
+                "count": n,
+            })
+    return total, details
 
 
 def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) -> None:
@@ -264,7 +291,9 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
 
     inspect_pdb_residue(receptor_pdb, tyr_resid)
 
-    fp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf)
+    fp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
+    print(f"\nProLIF version: {prolif_version(plf)}")
+    print(f"Fingerprint count=True (detects multiple stacks per residue)")
 
     # Try dataframe export if available
     try:
@@ -317,59 +346,36 @@ def debug_prolif(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE) 
     for r in pi_all:
         print(f"  resid={r['protein_resid']} {r['protein']} | {r['interaction']}")
 
-    pi_at_target = [r for r in tyr_target if r["is_pi"]]
-    print(f"\n--- RESULT: TYR{tyr_resid} pi-pi stacking count = {len(pi_at_target)} ---")
-    if not pi_at_target and pi_all:
-        print("  [!] Pi-pi stacking exists but NOT at TYR{0} — check residue numbering!".format(tyr_resid))
-        print("      Compare 'resid' above with PDB residue number. They may differ.")
-    if not pi_at_target and tyr_target:
-        print(f"  [!] TYR{tyr_resid} has interactions but none classified as pi-pi stacking:")
-        for r in tyr_target:
-            print(f"      {r['interaction']}")
+    pi_at_target_count, pi_details = count_tyr56_pi_stacking(fp, tyr_resid)
+    print(f"\n--- RESULT: TYR{tyr_resid} pi-pi stacking count = {pi_at_target_count} ---")
+    for d in pi_details:
+        print(f"  {d['protein']} x{d['count']}")
 
     # Check multiple poses
     print(f"\n--- Checking all poses in {out_sdf} ---")
     supplier = Chem.SDMolSupplier(out_sdf, removeHs=False)
+    residues = tyr56_residue_ids(tyr_resid)
     for pose_i, mol in enumerate(supplier):
         if mol is None:
             continue
         lig = plf.Molecule.from_rdkit(mol)
-        fp2 = plf.Fingerprint()
-        fp2.run(lig, protein)
-        count = 0
-        for (lr, pr), ix_dict in fp2.ifp.items():
-            if not _is_tyr_residue(pr, tyr_resid):
-                continue
-            for name in ix_dict:
-                if _is_pi_pi_stacking(name):
-                    count += 1
+        fp2 = make_fingerprint(plf, count=True)
+        run_fingerprint(fp2, lig, protein, residues=residues)
+        count, _ = count_tyr56_pi_stacking(fp2, tyr_resid)
         print(f"  Pose {pose_i + 1}: TYR{tyr_resid} pi-pi count = {count}")
 
 
 def analyze_tyr56_pi_stacking(receptor_pdb: str, out_sdf: str, tyr_resid: int = TYR_RESIDUE):
-    fp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf)
+    fp, protein, ligand, plf = run_prolif(receptor_pdb, out_sdf, tyr_resid)
+    count, interactions = count_tyr56_pi_stacking(fp, tyr_resid)
 
-    interactions = []
     all_tyr_residues = set()
-
-    for (lig_res, prot_res), ix_dict in fp.ifp.items():
+    for (_, prot_res), ix_dict in fp.ifp.items():
         if "TYR" in str(prot_res):
             info = _residue_info(prot_res)
             all_tyr_residues.add(f"{info.get('resname','?')}{info.get('resid','?')} ({prot_res})")
-        if not _is_tyr_residue(prot_res, tyr_resid):
-            continue
-        for name, metadata in ix_dict.items():
-            # Key presence = interaction detected; don't skip on falsy metadata
-            if not _is_pi_pi_stacking(name):
-                continue
-            interactions.append({
-                "ligand": str(lig_res),
-                "protein": str(prot_res),
-                "interaction": _interaction_name(name),
-                "metadata": repr(metadata),
-            })
 
-    return len(interactions), interactions, sorted(all_tyr_residues)
+    return count, interactions, sorted(all_tyr_residues)
 
 
 # ============================================================

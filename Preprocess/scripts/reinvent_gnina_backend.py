@@ -25,6 +25,13 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import RDLogger
 
+from prolif_compat import (
+    count_interactions,
+    make_fingerprint,
+    run_fingerprint,
+    tyr56_residue_ids,
+)
+
 RDLogger.DisableLog("rdApp.*")
 logger = logging.getLogger("reinvent")
 
@@ -284,27 +291,27 @@ def analyze_tyr_interactions(
     ligand_mol = load_best_pose(docked_sdf)
     ligand = plf.Molecule.from_rdkit(ligand_mol)
 
-    fp = plf.Fingerprint()
-    fp.run(ligand, protein)
+    fp = make_fingerprint(plf, count=True)
+    residues = tyr56_residue_ids(tyr_residue)
+    run_fingerprint(fp, ligand, protein, residues=residues)
 
     interactions: List[dict] = []
+    total = 0
 
     for (lig_res, prot_res), interaction_dict in fp.ifp.items():
         if not _is_tyr_residue(prot_res, tyr_residue):
             continue
-        for name, metadata in interaction_dict.items():
-            if not metadata:
-                continue
-            if not _is_pi_pi_stacking(str(name)):
-                continue
+        n = count_interactions(interaction_dict, _is_pi_pi_stacking)
+        if n > 0:
+            total += n
             interactions.append({
                 "ligand": str(lig_res),
                 "protein": str(prot_res),
-                "interaction": str(name),
+                "interaction": "PiStacking",
+                "count": n,
             })
 
-    count = len(interactions)
-    return count, count, interactions
+    return total, total, interactions
 
 
 # ---------------------------------------------------------------------------
