@@ -1,0 +1,123 @@
+##############################################################################
+# iict_new_reward.toml
+# LibInvent RL: Sol > pIC50 > TYR56 pi-pi > GNINA docking
+#
+# IMPORTANT:
+#   params.* values use ONE set of brackets:  params.model_path = ["/path/to/file"]
+#   NOT double brackets:                     params.model_path = [["/path/to/file"]]
+#
+# Run from reinvent-local-main (has DockingScore + TyrosineInteraction):
+#   cd ~/Vishnu/psearch-master/reinvent-local-main/REINVENT4
+#   reinvent configs/iict_new_reward.toml
+##############################################################################
+
+run_type = "staged_learning"
+device   = "cuda:1"
+tb_logdir       = "tb_libinvent_run_5"
+json_out_config = "json_libinvent_run_5.json"
+
+[parameters]
+prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/libinvent.prior"
+agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/libinvent.prior"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/iict_lib4.smi"
+summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/libinvent_results_5"
+batch_size         = 16
+unique_sequences   = true
+randomize_smiles   = true
+use_checkpoint     = false
+
+[learning_strategy]
+type  = "dap"
+sigma = 96
+rate  = 0.00005
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 25
+minscore    = 0.35
+
+[[stage]]
+chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/libinvent_agent_4.chkpt"
+termination = "simple"
+max_score   = 0.80
+min_steps   = 150
+max_steps   = 400
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── Solubility (weight 5) ───────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1Sol]
+[[stage.scoring.component.PD1PDL1Sol.endpoint]]
+name               = "PD1PDL1Sol"
+weight             = 5.0
+transform.type     = "double_sigmoid"
+transform.low      = -4.0
+transform.high     = 2.0
+transform.coef_div = 100.0
+transform.coef_si  = 10.0
+transform.coef_se  = 10.0
+params.model_path  = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"]
+params.scaler_path = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"]
+
+# ── pIC50 (weight 4) ──────────────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1pIC50]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50"
+weight             = 4.0
+transform.type     = "sigmoid"
+transform.low      = 5.0
+transform.high     = 12.0
+transform.k        = 0.4
+params.model_path  = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
+params.scaler_path = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
+
+# ── TYR56 pi-pi stacking (weight 3) ───────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.TyrosineInteraction]
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                    = "TyrInteractionReward"
+weight                  = 3.0
+params.receptor_path    = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand   = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["/home/genai/Documents/gnina/gnina"]
+params.output_root      = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"]
+params.cnn_scoring      = ["none"]
+params.keep_outputs     = ["true"]
+params.tyr_residue      = ["56"]
+
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                    = "TyrInteractionCount_raw"
+weight                  = 0.0
+params.receptor_path    = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand   = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["/home/genai/Documents/gnina/gnina"]
+params.output_root      = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"]
+params.cnn_scoring      = ["none"]
+params.keep_outputs     = ["true"]
+params.tyr_residue      = ["56"]
+
+# ── GNINA docking (weight 2) ──────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.DockingScore]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingReward"
+weight                  = 2.0
+params.receptor_path    = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand   = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["/home/genai/Documents/gnina/gnina"]
+params.output_root      = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"]
+params.cnn_scoring      = ["none"]
+params.keep_outputs     = ["true"]
+
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingAffinity_raw"
+weight                  = 0.0
+params.receptor_path    = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
+params.autobox_ligand   = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
+params.gnina_executable = ["/home/genai/Documents/gnina/gnina"]
+params.output_root      = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"]
+params.cnn_scoring      = ["none"]
+params.keep_outputs     = ["true"]
