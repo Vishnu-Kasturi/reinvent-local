@@ -200,6 +200,21 @@ def _pose_label(sdf_path: str) -> str:
     return f"{parent}/{os.path.basename(sdf_path)}"
 
 
+def is_valid_sdf(sdf_path: str) -> bool:
+    """True if SDF exists and contains at least one readable molecule."""
+    if not os.path.isfile(sdf_path):
+        return False
+    if os.path.getsize(sdf_path) < 20:
+        return False
+    try:
+        for mol in Chem.SDMolSupplier(sdf_path, removeHs=False):
+            if mol is not None:
+                return True
+        return False
+    except OSError:
+        return False
+
+
 class DockPoseCache:
     """
     Index GNINA outputs under one or more folders (searched in order).
@@ -225,6 +240,8 @@ class DockPoseCache:
         return "docking"
 
     def _register_sdf(self, sdf_path: str, docking_dir: str) -> None:
+        if not is_valid_sdf(sdf_path):
+            return
         label = self._folder_label(sdf_path, docking_dir)
         self._sdf_source[sdf_path] = label
         try:
@@ -320,8 +337,22 @@ class DockPoseCache:
                 sdf = self._by_inchikey[f"inchikey:{ik}"]
 
         if sdf and os.path.isfile(sdf):
-            return sdf, self._sdf_source.get(sdf, "docking")
+            if not is_valid_sdf(sdf):
+                sdf = None
+            else:
+                return sdf, self._sdf_source.get(sdf, "docking")
         return None, "not_found"
+
+    def invalidate(self, smiles: str, sdf_path: str) -> None:
+        """Remove a bad pose mapping so it can be re-docked."""
+        can = canonicalize(smiles)
+        if can:
+            self._by_smiles.pop(can, None)
+            self._by_hash.pop(_smiles_hash(can), None)
+            ik = _inchikey_from_smiles(can)
+            if ik:
+                self._by_inchikey.pop(f"inchikey:{ik}", None)
+        self._sdf_source.pop(sdf_path, None)
 
     def find(self, smiles: str) -> Optional[str]:
         sdf, _ = self.find_with_source(smiles)
@@ -339,6 +370,19 @@ def get_pose_cache(docking_dirs: list[str]) -> DockPoseCache:
     return _POSE_CACHE
 
 
+def _run_asp122(
+    receptor_pdb: str,
+    sdf: str,
+    smiles: str,
+    asp_resid: int,
+    verbose: bool,
+) -> int:
+    count, _ = analyze_asp_interactions(receptor_pdb, sdf, smiles, asp_residue=asp_resid)
+    if verbose:
+        print(f"       ASP{asp_resid} interactions: {count}")
+    return count
+
+
 def compute_asp122_for_smiles(
     smiles: str,
     receptor_pdb: str,
@@ -354,12 +398,25 @@ def compute_asp122_for_smiles(
     sdf, source = pose_cache.find_with_source(smiles)
 
     if sdf and os.path.isfile(sdf):
-        if verbose:
-            print(f"  [{mol_index + 1}] POSE FOUND ({source}): {_pose_label(sdf)}")
-        count, _ = analyze_asp_interactions(receptor_pdb, sdf, smiles, asp_residue=asp_resid)
-        if verbose:
-            print(f"       ASP{asp_resid} interactions: {count}")
-        return count, sdf, False
+        if not is_valid_sdf(sdf):
+            if verbose:
+                print(f"  [{mol_index + 1}] INVALID SDF ({source}): {_pose_label(sdf)}")
+            pose_cache.invalidate(smiles, sdf)
+            sdf = None
+        else:
+            if verbose:
+                print(f"  [{mol_index + 1}] POSE FOUND ({source}): {_pose_label(sdf)}")
+            try:
+                count = _run_asp122(receptor_pdb, sdf, smiles, asp_resid, verbose)
+                return count, sdf, False
+            except Exception as exc:
+                if verbose:
+                    print(f"       ProLIF FAILED: {exc}")
+                pose_cache.invalidate(smiles, sdf)
+                sdf = None
+
+    if sdf:
+        return 0, "", False
 
     if not allow_redock or gnina_config is None:
         if verbose:
@@ -371,19 +428,21 @@ def compute_asp122_for_smiles(
         print(f"       SMILES: {smi_short}")
 
     res = run_molecule_pipeline(smiles, mol_index, 1, gnina_config)
-    if not res.docking_ok or not os.path.isfile(res.out_sdf):
+    if not res.docking_ok or not is_valid_sdf(res.out_sdf):
         if verbose:
-            print(f"       GNINA FAILED: {res.error or 'unknown error'}")
+            print(f"       GNINA FAILED: {res.error or 'invalid/empty output SDF'}")
         return 0, "", False
 
     pose_cache.register_pose(smiles, res.out_sdf, gnina_config.output_root)
     if verbose:
         print(f"       GNINA OK: {_pose_label(res.out_sdf)}")
-    count, _ = analyze_asp_interactions(
-        receptor_pdb, res.out_sdf, smiles, asp_residue=asp_resid
-    )
-    if verbose:
-        print(f"       ASP{asp_resid} interactions: {count}")
+    try:
+        count = _run_asp122(receptor_pdb, res.out_sdf, smiles, asp_resid, verbose)
+    except Exception as exc:
+        if verbose:
+            print(f"       ProLIF FAILED after GNINA: {exc}")
+        pose_cache.invalidate(smiles, res.out_sdf)
+        return 0, "", False
     return count, res.out_sdf, True
 
 

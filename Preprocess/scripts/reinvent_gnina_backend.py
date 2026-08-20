@@ -267,7 +267,14 @@ def prepare_docked_ligand(pose_mol: Chem.Mol, smiles: str) -> Chem.Mol:
 
 
 def load_best_pose(docked_sdf: str, smiles: str) -> Chem.Mol:
-    supplier = Chem.SDMolSupplier(docked_sdf, removeHs=False)
+    if not os.path.isfile(docked_sdf):
+        raise ValueError(f"Pose file not found: {docked_sdf}")
+    if os.path.getsize(docked_sdf) < 20:
+        raise ValueError(f"Pose file empty or truncated: {docked_sdf}")
+    try:
+        supplier = Chem.SDMolSupplier(docked_sdf, removeHs=False)
+    except OSError as exc:
+        raise ValueError(f"Invalid SDF file {docked_sdf}: {exc}") from exc
     for mol in supplier:
         if mol is not None:
             return prepare_docked_ligand(mol, smiles)
