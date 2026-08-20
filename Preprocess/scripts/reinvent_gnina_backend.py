@@ -383,17 +383,53 @@ def analyze_tyr_interactions(
     return total, total, interactions
 
 
+def _is_asp_small_mol_interaction(interaction_name) -> bool:
+    """
+    ASP122 carboxylate-relevant contacts with the ligand only.
+
+    Counts H-bonds and salt/ionic interactions; excludes hydrophobic and
+    pi-stacking (those inflate counts and are not the O-/COO- contacts of interest).
+    """
+    n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
+    if "hydrophobic" in n:
+        return False
+    if "pistacking" in n or "facetoface" in n or "edgetoface" in n:
+        return False
+    if "pi" in n and "stack" in n:
+        return False
+    return any(
+        k in n
+        for k in ("hbond", "saltbridge", "salt", "ionic", "anionic", "cationpi", "pication")
+    )
+
+
+def _asp_chain_key(prot_res) -> str:
+    """Stable key per ASP122 chain (e.g. ASP122.A)."""
+    info = _residue_info(prot_res)
+    chain = info.get("chain") or info.get("segid") or ""
+    if chain:
+        return f"ASP{info.get('resid', '')}.{chain}"
+    return info["str"]
+
+
 def analyze_asp_interactions(
     receptor_pdb: str,
     docked_sdf: str,
     smiles: str,
     asp_residue: int = 122,
     chains: str = "AB",
+    max_per_chain: int = 3,
 ) -> Tuple[int, List[dict]]:
     """
-    Run ProLIF and count any interaction at ASP{residue} (chains A/B by default).
+    Count ASP{residue}–ligand contacts on the best docked pose only (mol0 / first SDF record).
 
-    Returns (interaction_count, details_list).
+    Scoring is conservative (not ProLIF count=True duplicates):
+      - One pose only (load_best_pose)
+      - Only H-bond / salt-bridge–type contacts at ASP122
+      - Per chain (A/B): each interaction *type* counted once (not per geometric duplicate)
+      - Capped at max_per_chain (default 3 ≈ carboxylate oxygens + one extra) per chain
+
+    Returns (interaction_count, details_list). Typical range 0–6 for homodimer ASP122.
     """
     protein = load_protein_for_prolif(receptor_pdb)
     ligand_mol = load_best_pose(docked_sdf, smiles)
@@ -403,26 +439,32 @@ def analyze_asp_interactions(
     residues = residue_ids("ASP", asp_residue, chains=chains)
     ifp = run_fingerprint(fp, ligand, protein, residues=residues)
 
+    # Unique interaction types present per ASP122 chain
+    types_per_chain: dict[str, set[str]] = {}
     interactions: List[dict] = []
-    total = 0
 
     for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
         if not _is_residue(prot_res, "ASP", asp_residue):
             continue
-        n = count_interactions(interaction_dict, lambda _name: True)
-        if n > 0:
-            total += n
-            for name, metadata in interaction_dict.items():
-                if metadata is None:
-                    continue
-                cnt = len(metadata) if isinstance(metadata, (list, tuple)) else 1
-                if cnt > 0:
-                    interactions.append({
-                        "ligand": str(lig_res),
-                        "protein": str(prot_res),
-                        "interaction": _interaction_name(name),
-                        "count": cnt,
-                    })
+        chain_key = _asp_chain_key(prot_res)
+        for name, metadata in interaction_dict.items():
+            if metadata is None:
+                continue
+            if not _is_asp_small_mol_interaction(name):
+                continue
+            ix_name = _interaction_name(name)
+            types_per_chain.setdefault(chain_key, set()).add(ix_name)
+            interactions.append({
+                "ligand": str(lig_res),
+                "protein": str(prot_res),
+                "interaction": ix_name,
+                "count": 1,
+            })
+
+    total = 0
+    for chain_key, ix_types in types_per_chain.items():
+        n_chain = min(len(ix_types), max_per_chain)
+        total += n_chain
 
     return total, interactions
 

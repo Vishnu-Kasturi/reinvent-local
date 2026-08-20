@@ -52,6 +52,7 @@ TOP_N = 50
 TYR_MIN = 2             # minimum TYR56 pi-pi stacks (keep if count >= TYR_MIN)
 TYR_MAX = None          # optional max (e.g. 2 for exact match only); None = no limit
 ASP_RESIDUE = 122
+ASP_MAX_PER_CHAIN = 3   # cap ASP122 score per chain (carboxylate ≈ 2 O + buffer)
 REQUIRE_ASP122 = True   # keep only molecules with ASP122 interaction
 RUN_PROLIF = True       # compute ASP122 from docked poses
 
@@ -376,8 +377,11 @@ def _run_asp122(
     smiles: str,
     asp_resid: int,
     verbose: bool,
+    asp_max_per_chain: int = ASP_MAX_PER_CHAIN,
 ) -> int:
-    count, _ = analyze_asp_interactions(receptor_pdb, sdf, smiles, asp_residue=asp_resid)
+    count, _ = analyze_asp_interactions(
+        receptor_pdb, sdf, smiles, asp_residue=asp_resid, max_per_chain=asp_max_per_chain
+    )
     if verbose:
         print(f"       ASP{asp_resid} interactions: {count}")
     return count
