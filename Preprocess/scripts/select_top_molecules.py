@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit these paths/settings only
@@ -42,14 +44,18 @@ REPO_ROOT = _PROJECT_ROOT / "iict_libinvent"
 
 INPUT_CSV = REPO_ROOT / "run5" / "top100_balanced.csv"
 OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
-DOCKING_RUNS = REPO_ROOT / "run5" / "docking_runs"
+DOCKING_DIR = REPO_ROOT / "run5" / "docking"   # existing GNINA poses (mol0_out.sdf, etc.)
 
 TOP_N = 50
 TYR_MIN = 2             # minimum TYR56 pi-pi stacks (keep if count >= TYR_MIN)
 TYR_MAX = None          # optional max (e.g. 2 for exact match only); None = no limit
 ASP_RESIDUE = 122
 REQUIRE_ASP122 = True   # keep only molecules with ASP122 interaction
-RUN_PROLIF = True         # compute ASP122 from docked poses
+RUN_PROLIF = True       # compute ASP122 from existing docked poses
+
+# Docking behaviour — use poses already in DOCKING_DIR; do NOT re-run GNINA
+USE_EXISTING_DOCKING_ONLY = True   # True = never dock again, only read mol*_out.sdf
+REDock_IF_MISSING = False          # True = GNINA only when pose not found (slow)
 
 RECEPTOR_PDB = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
 AUTOBOX_LIGAND = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
@@ -69,8 +75,9 @@ from reinvent_gnina_backend import (  # noqa: E402
     _smiles_hash,
     analyze_asp_interactions,
     canonicalize,
-    run_molecule_pipeline,
 )
+if REDock_IF_MISSING:
+    from reinvent_gnina_backend import run_molecule_pipeline  # noqa: E402
 from prolif_compat import residue_ids  # noqa: E402
 
 COLUMN_ALIASES = {
@@ -139,30 +146,124 @@ def _weighted_mean(scores: list[float], weights: list[float]) -> float:
     return float(np.average(s_arr, weights=w_arr))
 
 
-def find_docked_sdf(smiles: str, docking_runs: str) -> Optional[str]:
-    can = canonicalize(smiles)
-    if not can:
+def _canonical_smiles_from_sdf(sdf_path: str) -> Optional[str]:
+    """Best-effort canonical SMILES from first valid pose in an SDF."""
+    try:
+        for mol in Chem.SDMolSupplier(sdf_path, removeHs=False):
+            if mol is None:
+                continue
+            for prop in ("SMILES", "_SMILES", "smiles"):
+                if mol.HasProp(prop):
+                    can = canonicalize(mol.GetProp(prop))
+                    if can:
+                        return can
+            return canonicalize(Chem.MolToSmiles(mol))
+    except Exception:
         return None
-    h = _smiles_hash(can)
-    pattern = os.path.join(docking_runs, "**", f"mol_*_{h}", "mol0_out.sdf")
-    matches = glob.glob(pattern, recursive=True)
-    return matches[0] if matches else None
+    return None
+
+
+class DockPoseCache:
+    """
+    Index existing GNINA outputs under DOCKING_DIR.
+
+    Finds poses like:
+      docking/batch_*/mol_0000_<hash>/mol0_out.sdf
+      docking/<any_subdir>/mol0_out.sdf, mol1_out.sdf, ...
+    Prefers mol0_out.sdf (best pose) over mol1, mol2, ...
+    """
+
+    def __init__(self, docking_dir: str):
+        self.docking_dir = docking_dir
+        self._by_hash: dict[str, str] = {}
+        self._by_smiles: dict[str, str] = {}
+        self._built = False
+
+    def build(self) -> None:
+        if self._built or not os.path.isdir(self.docking_dir):
+            self._built = True
+            return
+
+        candidates: list[tuple[int, str, str]] = []  # (pose_rank, path, hash_or_empty)
+
+        for pattern in ("**/mol*_out.sdf", "**/*_out.sdf"):
+            for sdf_path in glob.glob(os.path.join(self.docking_dir, pattern), recursive=True):
+                if not os.path.isfile(sdf_path):
+                    continue
+                base = os.path.basename(sdf_path)
+                pose_rank = 0
+                m_pose = re.match(r"mol(\d+)_out\.sdf$", base, re.I)
+                if m_pose:
+                    pose_rank = int(m_pose.group(1))
+
+                parent = os.path.basename(os.path.dirname(sdf_path))
+                h = ""
+                m_hash = re.search(r"([a-f0-9]{8})$", parent)
+                if m_hash:
+                    h = m_hash.group(1)
+
+                candidates.append((pose_rank, sdf_path, h))
+
+        # Lower pose_rank = better (mol0 before mol1)
+        candidates.sort(key=lambda x: (x[2], x[0], x[1]))
+
+        for pose_rank, sdf_path, h in candidates:
+            if h and h not in self._by_hash:
+                self._by_hash[h] = sdf_path
+            can = _canonical_smiles_from_sdf(sdf_path)
+            if can and can not in self._by_smiles:
+                self._by_smiles[can] = sdf_path
+
+        self._built = True
+        print(
+            f"Dock pose index: {len(self._by_hash)} by hash, "
+            f"{len(self._by_smiles)} by SMILES under {self.docking_dir}"
+        )
+
+    def find(self, smiles: str) -> Optional[str]:
+        self.build()
+        can = canonicalize(smiles)
+        if not can:
+            return None
+        h = _smiles_hash(can)
+        if h in self._by_hash:
+            return self._by_hash[h]
+        if can in self._by_smiles:
+            return self._by_smiles[can]
+        return None
+
+
+_POSE_CACHE: Optional[DockPoseCache] = None
+
+
+def get_pose_cache(docking_dir: str) -> DockPoseCache:
+    global _POSE_CACHE
+    if _POSE_CACHE is None or _POSE_CACHE.docking_dir != docking_dir:
+        _POSE_CACHE = DockPoseCache(docking_dir)
+    return _POSE_CACHE
+
+
+def find_docked_sdf(smiles: str, docking_dir: str) -> Optional[str]:
+    return get_pose_cache(docking_dir).find(smiles)
 
 
 def compute_asp122_for_smiles(
     smiles: str,
     receptor_pdb: str,
-    docking_runs: str,
+    docking_dir: str,
     asp_resid: int = 122,
     config: Optional[GninaProlifConfig] = None,
+    allow_redock: bool = False,
 ) -> tuple[int, str]:
-    sdf = find_docked_sdf(smiles, docking_runs)
+    sdf = find_docked_sdf(smiles, docking_dir)
     if sdf and os.path.isfile(sdf):
         count, _ = analyze_asp_interactions(receptor_pdb, sdf, smiles, asp_residue=asp_resid)
         return count, sdf
 
-    if config is None:
+    if not allow_redock or config is None:
         return 0, ""
+
+    from reinvent_gnina_backend import run_molecule_pipeline
 
     res = run_molecule_pipeline(smiles, 0, 0, config)
     if not res.docking_ok or not os.path.isfile(res.out_sdf):
@@ -193,10 +294,11 @@ def select_top(
     require_asp122: bool = REQUIRE_ASP122,
     top_n: int = TOP_N,
     receptor_pdb: Optional[str] = None,
-    docking_runs: Optional[str] = None,
+    docking_dir: Optional[str] = None,
     gnina_config: Optional[GninaProlifConfig] = None,
     asp_resid: int = ASP_RESIDUE,
     compute_asp: bool = RUN_PROLIF,
+    allow_redock: bool = False,
 ) -> pd.DataFrame:
     col_smiles = _find_column(df, COLUMN_ALIASES["smiles"])
     col_tyr = _find_column(df, COLUMN_ALIASES["tyr_count"])
@@ -231,21 +333,31 @@ def select_top(
     if work.empty:
         return work
 
-    if compute_asp and receptor_pdb and (docking_runs or gnina_config):
-        print(f"Computing ASP{asp_resid} via ProLIF (unique SMILES)...")
+    if compute_asp and receptor_pdb and docking_dir:
+        get_pose_cache(docking_dir).build()
+        print(f"Computing ASP{asp_resid} via ProLIF on existing poses (no GNINA)...")
         unique_smiles = work[col_smiles].dropna().unique()
         asp_cache: dict[str, int] = {}
+        sdf_cache: dict[str, str] = {}
+        missing: list[str] = []
         for i, smi in enumerate(unique_smiles, 1):
-            asp_cache[smi], _ = compute_asp122_for_smiles(
+            asp_cache[smi], sdf_cache[smi] = compute_asp122_for_smiles(
                 smi,
                 receptor_pdb,
-                str(docking_runs or gnina_config.output_root),
+                docking_dir,
                 asp_resid=asp_resid,
                 config=gnina_config,
+                allow_redock=allow_redock,
             )
+            if not sdf_cache[smi]:
+                missing.append(smi)
             if i % 10 == 0 or i == len(unique_smiles):
                 n_pos = sum(1 for v in asp_cache.values() if v > 0)
                 print(f"  ProLIF ASP{asp_resid}: {i}/{len(unique_smiles)} ({n_pos} with interactions)")
+        if missing:
+            print(f"  WARNING: {len(missing)} SMILES had no pose in {docking_dir}")
+            if not allow_redock:
+                print("  (set REDock_IF_MISSING=True to GNINA missing poses)")
         work["_asp122_count"] = work[col_smiles].map(asp_cache).fillna(0).astype(int)
         before = len(work)
         if require_asp122:
@@ -299,7 +411,8 @@ def select_top(
 def main() -> None:
     input_csv = _P(INPUT_CSV)
     output_csv = _P(OUTPUT_CSV)
-    docking_runs = str(_P(DOCKING_RUNS))
+    docking_dir = str(_P(DOCKING_DIR))
+    allow_redock = REDock_IF_MISSING and not USE_EXISTING_DOCKING_ONLY
 
     if not input_csv.is_file():
         sys.exit(
@@ -310,11 +423,15 @@ def main() -> None:
             f"Place your CSV there, or edit REPO_ROOT / INPUT_CSV in CONFIG."
         )
 
+    if not os.path.isdir(docking_dir):
+        sys.exit(f"ERROR: docking folder not found:\n  {docking_dir}")
+
     print("=== select_top_molecules ===")
     print(f"Input:        {input_csv}")
     print(f"Output:       {output_csv}")
     print(f"Receptor:     {RECEPTOR_PDB}")
-    print(f"Docking runs: {docking_runs}")
+    print(f"Docking dir:  {docking_dir}")
+    print(f"Use existing: {USE_EXISTING_DOCKING_ONLY}  (re-dock missing: {allow_redock})")
     print(f"Top N:        {TOP_N}")
     if TYR_MAX is not None and TYR_MAX == TYR_MIN:
         tyr_label = f"== {TYR_MIN}"
@@ -327,12 +444,12 @@ def main() -> None:
     print()
 
     gnina_config = None
-    if RUN_PROLIF and AUTOBOX_LIGAND:
+    if allow_redock and AUTOBOX_LIGAND:
         gnina_config = GninaProlifConfig(
             receptor_path=RECEPTOR_PDB,
             autobox_ligand=AUTOBOX_LIGAND,
             gnina_executable=GNINA_EXECUTABLE,
-            output_root=docking_runs,
+            output_root=docking_dir,
             keep_outputs=True,
         )
 
@@ -346,10 +463,11 @@ def main() -> None:
         require_asp122=REQUIRE_ASP122,
         top_n=TOP_N,
         receptor_pdb=RECEPTOR_PDB,
-        docking_runs=docking_runs if RUN_PROLIF else None,
+        docking_dir=docking_dir if RUN_PROLIF else None,
         gnina_config=gnina_config,
         asp_resid=ASP_RESIDUE,
         compute_asp=RUN_PROLIF,
+        allow_redock=allow_redock,
     )
 
     if result.empty:
