@@ -27,6 +27,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import inchi
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit these paths/settings only
@@ -56,6 +57,7 @@ RUN_PROLIF = True       # compute ASP122 from docked poses
 
 # If pose not in DOCKING_DIR → GNINA dock into NEW_DOCKING_DIR (never overwrites original)
 REDock_IF_MISSING = True
+VERBOSE = True          # print per-molecule pose lookup / docking status
 
 RECEPTOR_PDB = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
 AUTOBOX_LIGAND = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
@@ -82,14 +84,16 @@ from prolif_compat import residue_ids  # noqa: E402
 COLUMN_ALIASES = {
     "smiles": ["SMILES", "smiles"],
     "tyr_count": [
+        "Tyrosine_PiStacking",
+        "tyrosine_pistacking",
         "TyrInteractionCount_raw (raw)",
         "TyrInteractionCount_raw",
         "tyr_pi_stacking (TyrInteractionReward)",
     ],
-    "pic50": ["PD1PDL1pIC50 (raw)", "PD1PDL1pIC50_raw", "PD1PDL1pIC50"],
-    "sol": ["PD1PDL1Sol (raw)", "PD1PDL1Sol_raw", "PD1PDL1Sol"],
-    "docking": ["DockingAffinity_raw (raw)", "DockingAffinity_raw"],
-    "asp122": ["ASP122_interaction", "Asp122Interaction", "ASP122 (raw)", "ASP122"],
+    "pic50": ["pIC50", "PD1PDL1pIC50 (raw)", "PD1PDL1pIC50_raw", "PD1PDL1pIC50"],
+    "sol": ["Solubility", "PD1PDL1Sol (raw)", "PD1PDL1Sol_raw", "PD1PDL1Sol"],
+    "docking": ["Docking_Score", "DockingAffinity_raw (raw)", "DockingAffinity_raw"],
+    "asp122": ["ASP122_Interaction", "ASP122_interaction", "Asp122Interaction", "ASP122 (raw)", "ASP122"],
 }
 
 
@@ -145,6 +149,34 @@ def _weighted_mean(scores: list[float], weights: list[float]) -> float:
     return float(np.average(s_arr, weights=w_arr))
 
 
+def _inchikey_from_smiles(smiles: str) -> Optional[str]:
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    try:
+        return inchi.MolToInchiKey(mol)
+    except Exception:
+        return None
+
+
+def _mol_keys(mol) -> list[str]:
+    """Lookup keys for a pose molecule (canonical SMILES + InChIKey)."""
+    keys: list[str] = []
+    if mol is None:
+        return keys
+    try:
+        m = Chem.RemoveHs(mol)
+        can = Chem.MolToSmiles(m, canonical=True)
+        if can:
+            keys.append(can)
+        ik = inchi.MolToInchiKey(m)
+        if ik:
+            keys.append(f"inchikey:{ik}")
+    except Exception:
+        pass
+    return keys
+
+
 def _canonical_smiles_from_sdf(sdf_path: str) -> Optional[str]:
     """Best-effort canonical SMILES from first valid pose in an SDF."""
     try:
@@ -156,10 +188,16 @@ def _canonical_smiles_from_sdf(sdf_path: str) -> Optional[str]:
                     can = canonicalize(mol.GetProp(prop))
                     if can:
                         return can
-            return canonicalize(Chem.MolToSmiles(mol))
+            keys = _mol_keys(mol)
+            return keys[0] if keys else None
     except Exception:
         return None
     return None
+
+
+def _pose_label(sdf_path: str) -> str:
+    parent = os.path.basename(os.path.dirname(sdf_path))
+    return f"{parent}/{os.path.basename(sdf_path)}"
 
 
 class DockPoseCache:
@@ -173,10 +211,37 @@ class DockPoseCache:
     """
 
     def __init__(self, docking_dirs: list[str]):
-        self.docking_dirs = [d for d in docking_dirs if d]
+        self.docking_dirs = [os.path.abspath(d) for d in docking_dirs if d]
         self._by_hash: dict[str, str] = {}
         self._by_smiles: dict[str, str] = {}
+        self._by_inchikey: dict[str, str] = {}
+        self._sdf_source: dict[str, str] = {}  # sdf_path -> folder label
         self._built = False
+
+    def _folder_label(self, sdf_path: str, docking_dir: str) -> str:
+        base = os.path.basename(os.path.abspath(docking_dir))
+        if "new_docking" in base:
+            return "new_docking"
+        return "docking"
+
+    def _register_sdf(self, sdf_path: str, docking_dir: str) -> None:
+        label = self._folder_label(sdf_path, docking_dir)
+        self._sdf_source[sdf_path] = label
+        try:
+            for mol in Chem.SDMolSupplier(sdf_path, removeHs=False):
+                if mol is None:
+                    continue
+                for key in _mol_keys(mol):
+                    if key.startswith("inchikey:"):
+                        if key not in self._by_inchikey:
+                            self._by_inchikey[key] = sdf_path
+                    elif key not in self._by_smiles:
+                        self._by_smiles[key] = sdf_path
+                break
+        except Exception:
+            can = _canonical_smiles_from_sdf(sdf_path)
+            if can and can not in self._by_smiles:
+                self._by_smiles[can] = sdf_path
 
     def build(self) -> None:
         if self._built:
@@ -211,35 +276,56 @@ class DockPoseCache:
             for _pose_rank, sdf_path, h in candidates:
                 if h and h not in self._by_hash:
                     self._by_hash[h] = sdf_path
-                can = _canonical_smiles_from_sdf(sdf_path)
-                if can and can not in self._by_smiles:
-                    self._by_smiles[can] = sdf_path
+                self._register_sdf(sdf_path, docking_dir)
 
         self._built = True
         dirs_label = ", ".join(self.docking_dirs) or "(none)"
+        n_docking = sum(1 for v in self._sdf_source.values() if v == "docking")
+        n_new = sum(1 for v in self._sdf_source.values() if v == "new_docking")
         print(
             f"Dock pose index: {len(self._by_hash)} by hash, "
-            f"{len(self._by_smiles)} by SMILES — searched: {dirs_label}"
+            f"{len(self._by_smiles)} by SMILES, {len(self._by_inchikey)} by InChIKey"
         )
+        print(f"  SDF files: {n_docking} in docking/, {n_new} in new_docking/")
+        print(f"  Searched: {dirs_label}")
 
-    def register_pose(self, smiles: str, sdf_path: str) -> None:
+    def register_pose(self, smiles: str, sdf_path: str, docking_dir: str = "") -> None:
         can = canonicalize(smiles)
         if not can or not os.path.isfile(sdf_path):
             return
         self._by_smiles[can] = sdf_path
         self._by_hash[_smiles_hash(can)] = sdf_path
+        ik = _inchikey_from_smiles(can)
+        if ik:
+            self._by_inchikey[f"inchikey:{ik}"] = sdf_path
+        label = "new_docking" if docking_dir and "new_docking" in os.path.abspath(docking_dir) else "docking"
+        self._sdf_source[sdf_path] = label
 
-    def find(self, smiles: str) -> Optional[str]:
+    def find_with_source(self, smiles: str) -> tuple[Optional[str], str]:
+        """Return (sdf_path, source_label). source_label: docking|new_docking|not_found."""
         self.build()
         can = canonicalize(smiles)
         if not can:
-            return None
+            return None, "not_found"
+
+        sdf = None
         h = _smiles_hash(can)
         if h in self._by_hash:
-            return self._by_hash[h]
-        if can in self._by_smiles:
-            return self._by_smiles[can]
-        return None
+            sdf = self._by_hash[h]
+        elif can in self._by_smiles:
+            sdf = self._by_smiles[can]
+        else:
+            ik = _inchikey_from_smiles(can)
+            if ik and f"inchikey:{ik}" in self._by_inchikey:
+                sdf = self._by_inchikey[f"inchikey:{ik}"]
+
+        if sdf and os.path.isfile(sdf):
+            return sdf, self._sdf_source.get(sdf, "docking")
+        return None, "not_found"
+
+    def find(self, smiles: str) -> Optional[str]:
+        sdf, _ = self.find_with_source(smiles)
+        return sdf
 
 
 _POSE_CACHE: Optional[DockPoseCache] = None
@@ -261,24 +347,43 @@ def compute_asp122_for_smiles(
     gnina_config: Optional[GninaProlifConfig] = None,
     allow_redock: bool = False,
     mol_index: int = 0,
+    verbose: bool = VERBOSE,
 ) -> tuple[int, str, bool]:
     """Return (asp_count, sdf_path, was_newly_docked)."""
-    sdf = pose_cache.find(smiles)
+    smi_short = smiles if len(smiles) <= 50 else smiles[:47] + "..."
+    sdf, source = pose_cache.find_with_source(smiles)
+
     if sdf and os.path.isfile(sdf):
+        if verbose:
+            print(f"  [{mol_index + 1}] POSE FOUND ({source}): {_pose_label(sdf)}")
         count, _ = analyze_asp_interactions(receptor_pdb, sdf, smiles, asp_residue=asp_resid)
+        if verbose:
+            print(f"       ASP{asp_resid} interactions: {count}")
         return count, sdf, False
 
     if not allow_redock or gnina_config is None:
+        if verbose:
+            print(f"  [{mol_index + 1}] NO POSE — skipping (re-dock disabled): {smi_short}")
         return 0, "", False
 
-    print(f"  GNINA docking missing pose → {gnina_config.output_root}")
+    if verbose:
+        print(f"  [{mol_index + 1}] NO POSE — GNINA docking → {gnina_config.output_root}")
+        print(f"       SMILES: {smi_short}")
+
     res = run_molecule_pipeline(smiles, mol_index, 1, gnina_config)
     if not res.docking_ok or not os.path.isfile(res.out_sdf):
+        if verbose:
+            print(f"       GNINA FAILED: {res.error or 'unknown error'}")
         return 0, "", False
-    pose_cache.register_pose(smiles, res.out_sdf)
+
+    pose_cache.register_pose(smiles, res.out_sdf, gnina_config.output_root)
+    if verbose:
+        print(f"       GNINA OK: {_pose_label(res.out_sdf)}")
     count, _ = analyze_asp_interactions(
         receptor_pdb, res.out_sdf, smiles, asp_residue=asp_resid
     )
+    if verbose:
+        print(f"       ASP{asp_resid} interactions: {count}")
     return count, res.out_sdf, True
 
 
@@ -318,6 +423,11 @@ def select_top(
     if not col_smiles:
         raise ValueError(f"No SMILES column found. Columns: {list(df.columns)}")
 
+    print(
+        f"Detected columns: SMILES={col_smiles!r}, TYR={col_tyr!r}, "
+        f"pIC50={col_pic50!r}, Sol={col_sol!r}, Dock={col_dock!r}"
+    )
+
     work = df.copy()
     print(f"Input rows: {len(work)}")
 
@@ -335,7 +445,7 @@ def select_top(
             label = f">= {tyr_min}"
         print(f"After TYR56 pi-pi {label}: {len(work)} (removed {before - len(work)})")
     else:
-        print("WARNING: No TyrInteractionCount column — skipping TYR filter")
+        print(f"WARNING: No tyrosine column found — expected one of {COLUMN_ALIASES['tyr_count']}")
         work["_tyr"] = 0
 
     if work.empty:
@@ -349,8 +459,9 @@ def select_top(
         sdf_cache: dict[str, str] = {}
         missing: list[str] = []
         redocked = 0
+        found_existing = 0
         for i, smi in enumerate(unique_smiles, 1):
-            asp_cache[smi], sdf_cache[smi] = compute_asp122_for_smiles(
+            asp_cache[smi], sdf_cache[smi], newly_docked = compute_asp122_for_smiles(
                 smi,
                 receptor_pdb,
                 pose_cache,
@@ -358,16 +469,21 @@ def select_top(
                 gnina_config=gnina_config,
                 allow_redock=allow_redock,
                 mol_index=i - 1,
+                verbose=VERBOSE,
             )
             if not sdf_cache[smi]:
                 missing.append(smi)
-            elif allow_redock and gnina_config and sdf_cache[smi].startswith(str(gnina_config.output_root)):
+            elif newly_docked:
                 redocked += 1
-            if i % 10 == 0 or i == len(unique_smiles):
+            else:
+                found_existing += 1
+            if not VERBOSE and (i % 10 == 0 or i == len(unique_smiles)):
                 n_pos = sum(1 for v in asp_cache.values() if v > 0)
                 print(f"  ProLIF ASP{asp_resid}: {i}/{len(unique_smiles)} ({n_pos} with interactions)")
-        if redocked:
-            print(f"  Newly docked {redocked} poses → {gnina_config.output_root}")
+        print(
+            f"  Summary: {found_existing} poses from docking/, "
+            f"{redocked} newly docked → new_docking/, {len(missing)} failed"
+        )
         if missing:
             print(f"  WARNING: {len(missing)} SMILES still have no pose after docking")
         work["_asp122_count"] = work[col_smiles].map(asp_cache).fillna(0).astype(int)
