@@ -9,6 +9,8 @@ Run (no CLI args needed — edit CONFIG below):
     cd ~/Vishnu/psearch-master/reinvent-local-main
     python Preprocess/scripts/select_top_molecules.py
 
+Note: REPO_ROOT must be a Path (use _P("...") helper), not a plain string.
+
 Output columns:
     rank, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
     ASP122_Interaction, composite
@@ -26,12 +28,18 @@ import pandas as pd
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit these paths/settings only
+# REPO_ROOT must be a pathlib.Path (not a plain string), or use _P() below.
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+def _P(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve()
 
-INPUT_CSV = REPO_ROOT / "results" / "libinvent_results_5_1.csv"
-OUTPUT_CSV = REPO_ROOT / "top_hits.csv"
+
+REPO_ROOT = _P("~/Vishnu/psearch-master/reinvent-local-main/iict_libinvent")
+
+INPUT_CSV = REPO_ROOT / "run5" / "top100_balanced.csv"
+OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
+DOCKING_RUNS = REPO_ROOT / "run5" / "docking_runs"
 
 TOP_N = 50
 TYR_TARGET = 2          # require exactly this many TYR56 pi-pi stacks
@@ -42,7 +50,6 @@ RUN_PROLIF = True         # compute ASP122 from docked poses
 RECEPTOR_PDB = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
 AUTOBOX_LIGAND = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
 GNINA_EXECUTABLE = "/home/genai/Documents/gnina/gnina"
-DOCKING_RUNS = REPO_ROOT / "docking_runs"
 
 # Selection ranking weights (higher = more important in composite score)
 WEIGHT_SOL = 5.0
@@ -277,9 +284,9 @@ def select_top(
 
 
 def main() -> None:
-    input_csv = Path(INPUT_CSV)
-    output_csv = Path(OUTPUT_CSV)
-    docking_runs = str(DOCKING_RUNS)
+    input_csv = _P(INPUT_CSV)
+    output_csv = _P(OUTPUT_CSV)
+    docking_runs = str(_P(DOCKING_RUNS))
 
     if not input_csv.is_file():
         sys.exit(f"ERROR: input CSV not found: {input_csv}")
