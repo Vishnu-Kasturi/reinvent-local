@@ -45,7 +45,8 @@ OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
 DOCKING_RUNS = REPO_ROOT / "run5" / "docking_runs"
 
 TOP_N = 50
-TYR_TARGET = 2          # require exactly this many TYR56 pi-pi stacks
+TYR_MIN = 2             # minimum TYR56 pi-pi stacks (keep if count >= TYR_MIN)
+TYR_MAX = None          # optional max (e.g. 2 for exact match only); None = no limit
 ASP_RESIDUE = 122
 REQUIRE_ASP122 = True   # keep only molecules with ASP122 interaction
 RUN_PROLIF = True         # compute ASP122 from docked poses
@@ -187,7 +188,8 @@ def format_output(df: pd.DataFrame) -> pd.DataFrame:
 
 def select_top(
     df: pd.DataFrame,
-    tyr_target: int = TYR_TARGET,
+    tyr_min: int = TYR_MIN,
+    tyr_max: Optional[int] = TYR_MAX,
     require_asp122: bool = REQUIRE_ASP122,
     top_n: int = TOP_N,
     receptor_pdb: Optional[str] = None,
@@ -212,8 +214,16 @@ def select_top(
     if col_tyr:
         work["_tyr"] = work[col_tyr].apply(_to_float).round().astype(int)
         before = len(work)
-        work = work[work["_tyr"] == tyr_target]
-        print(f"After TYR56 pi-pi == {tyr_target}: {len(work)} (removed {before - len(work)})")
+        work = work[work["_tyr"] >= tyr_min]
+        if tyr_max is not None:
+            work = work[work["_tyr"] <= tyr_max]
+        if tyr_max is not None and tyr_max == tyr_min:
+            label = f"== {tyr_min}"
+        elif tyr_max is not None:
+            label = f"{tyr_min}–{tyr_max}"
+        else:
+            label = f">= {tyr_min}"
+        print(f"After TYR56 pi-pi {label}: {len(work)} (removed {before - len(work)})")
     else:
         print("WARNING: No TyrInteractionCount column — skipping TYR filter")
         work["_tyr"] = 0
@@ -306,7 +316,13 @@ def main() -> None:
     print(f"Receptor:     {RECEPTOR_PDB}")
     print(f"Docking runs: {docking_runs}")
     print(f"Top N:        {TOP_N}")
-    print(f"TYR target:   {TYR_TARGET}")
+    if tyr_max is not None and tyr_max == tyr_min:
+        tyr_label = f"== {tyr_min}"
+    elif tyr_max is not None:
+        tyr_label = f"{tyr_min}–{tyr_max}"
+    else:
+        tyr_label = f">= {tyr_min}"
+    print(f"TYR filter:   {tyr_label}")
     print(f"ASP residue:  {ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
     print()
 
@@ -325,7 +341,8 @@ def main() -> None:
 
     result = select_top(
         df,
-        tyr_target=TYR_TARGET,
+        tyr_min=TYR_MIN,
+        tyr_max=TYR_MAX,
         require_asp122=REQUIRE_ASP122,
         top_n=TOP_N,
         receptor_pdb=RECEPTOR_PDB,
