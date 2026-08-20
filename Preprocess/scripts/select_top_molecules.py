@@ -316,12 +316,12 @@ def main() -> None:
     print(f"Receptor:     {RECEPTOR_PDB}")
     print(f"Docking runs: {docking_runs}")
     print(f"Top N:        {TOP_N}")
-    if tyr_max is not None and tyr_max == tyr_min:
-        tyr_label = f"== {tyr_min}"
-    elif tyr_max is not None:
-        tyr_label = f"{tyr_min}–{tyr_max}"
+    if TYR_MAX is not None and TYR_MAX == TYR_MIN:
+        tyr_label = f"== {TYR_MIN}"
+    elif TYR_MAX is not None:
+        tyr_label = f"{TYR_MIN}–{TYR_MAX}"
     else:
-        tyr_label = f">= {tyr_min}"
+        tyr_label = f">= {TYR_MIN}"
     print(f"TYR filter:   {tyr_label}")
     print(f"ASP residue:  {ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
     print()
