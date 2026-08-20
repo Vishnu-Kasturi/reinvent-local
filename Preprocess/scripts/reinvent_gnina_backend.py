@@ -28,6 +28,7 @@ from prolif_compat import (
     count_interactions,
     iter_ifp_pairs,
     make_fingerprint,
+    residue_ids,
     run_fingerprint,
     tyr56_residue_ids,
 )
@@ -297,6 +298,26 @@ def _is_pi_pi_stacking(interaction_name) -> bool:
     )
 
 
+def _is_residue(prot_res, resname: str, resid: int) -> bool:
+    """True if protein residue matches resname + residue number."""
+    info = _residue_info(prot_res)
+    if str(info.get("resname", "")).upper() == resname.upper():
+        try:
+            if int(info["resid"]) == resid:
+                return True
+        except (ValueError, TypeError):
+            pass
+    s = info["str"].upper()
+    rn = resname.upper()
+    if rn not in s:
+        return False
+    if re.search(rf"{rn}[^\d]*{resid}(?:[^\d]|$)", s):
+        return True
+    if re.search(rf"(?:^|[^\d]){resid}[^\d]*{rn}", s):
+        return True
+    return f"{rn}{resid}" in s.replace(" ", "").replace(".", "").replace(":", "")
+
+
 def _is_tyr_residue(prot_res, resid: int) -> bool:
     """True if protein residue is TYR with the given residue number."""
     info = _residue_info(prot_res)
@@ -353,6 +374,50 @@ def analyze_tyr_interactions(
             })
 
     return total, total, interactions
+
+
+def analyze_asp_interactions(
+    receptor_pdb: str,
+    docked_sdf: str,
+    smiles: str,
+    asp_residue: int = 122,
+    chains: str = "AB",
+) -> Tuple[int, List[dict]]:
+    """
+    Run ProLIF and count any interaction at ASP{residue} (chains A/B by default).
+
+    Returns (interaction_count, details_list).
+    """
+    protein = load_protein_for_prolif(receptor_pdb)
+    ligand_mol = load_best_pose(docked_sdf, smiles)
+    ligand = plf.Molecule.from_rdkit(ligand_mol)
+
+    fp = make_fingerprint(plf, count=True)
+    residues = residue_ids("ASP", asp_residue, chains=chains)
+    ifp = run_fingerprint(fp, ligand, protein, residues=residues)
+
+    interactions: List[dict] = []
+    total = 0
+
+    for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
+        if not _is_residue(prot_res, "ASP", asp_residue):
+            continue
+        n = count_interactions(interaction_dict, lambda _name: True)
+        if n > 0:
+            total += n
+            for name, metadata in interaction_dict.items():
+                if metadata is None:
+                    continue
+                cnt = len(metadata) if isinstance(metadata, (list, tuple)) else 1
+                if cnt > 0:
+                    interactions.append({
+                        "ligand": str(lig_res),
+                        "protein": str(prot_res),
+                        "interaction": _interaction_name(name),
+                        "count": cnt,
+                    })
+
+    return total, interactions
 
 
 # ---------------------------------------------------------------------------

@@ -134,6 +134,11 @@ def count_interactions(ix_dict, predicate) -> int:
     return total
 
 
+def residue_ids(resname: str, resid: int, chains: str = "AB") -> List[str]:
+    """ProLIF residue ID strings for a residue on multiple chains."""
+    return [f"{resname.upper()}{resid}.{c}" for c in chains]
+
+
 def tyr56_residue_ids(tyr_resid: int, chains: str = "AB") -> List[str]:
     """ProLIF residue ID strings for TYR on multiple chains."""
-    return [f"TYR{tyr_resid}.{c}" for c in chains]
+    return residue_ids("TYR", tyr_resid, chains)
