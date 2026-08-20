@@ -9,7 +9,7 @@ Run (no CLI args needed — edit CONFIG below):
     cd ~/Vishnu/psearch-master/reinvent-local-main
     python Preprocess/scripts/select_top_molecules.py
 
-Note: REPO_ROOT must be a Path (use _P("...") helper), not a plain string.
+Note: REPO_ROOT = reinvent-local-main/iict_libinvent (auto-resolved from script path).
 
 Output columns:
     rank, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
@@ -28,14 +28,17 @@ import pandas as pd
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit these paths/settings only
-# REPO_ROOT must be a pathlib.Path (not a plain string), or use _P() below.
+# Paths resolve from this script's location (safe to run from any cwd).
+# Layout: reinvent-local-main/iict_libinvent/run5/...
 # ---------------------------------------------------------------------------
 
 def _P(path: str | Path) -> Path:
     return Path(path).expanduser().resolve()
 
 
-REPO_ROOT = _P("~/Vishnu/psearch-master/reinvent-local-main/iict_libinvent")
+# reinvent-local-main/  (auto-detected: parent of Preprocess/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+REPO_ROOT = _PROJECT_ROOT / "iict_libinvent"
 
 INPUT_CSV = REPO_ROOT / "run5" / "top100_balanced.csv"
 OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
@@ -289,7 +292,13 @@ def main() -> None:
     docking_runs = str(_P(DOCKING_RUNS))
 
     if not input_csv.is_file():
-        sys.exit(f"ERROR: input CSV not found: {input_csv}")
+        sys.exit(
+            f"ERROR: input CSV not found:\n  {input_csv}\n\n"
+            f"Expected layout:\n"
+            f"  {REPO_ROOT}/run5/top100_balanced.csv\n\n"
+            f"REPO_ROOT resolves to: {REPO_ROOT}\n"
+            f"Place your CSV there, or edit REPO_ROOT / INPUT_CSV in CONFIG."
+        )
 
     print("=== select_top_molecules ===")
     print(f"Input:        {input_csv}")
