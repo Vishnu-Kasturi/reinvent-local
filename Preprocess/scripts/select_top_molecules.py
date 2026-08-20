@@ -1,28 +1,20 @@
 #!/usr/bin/env python3
 """
-select_top_molecules.py — Filter, score, and rank REINVENT RL CSV hits.
+select_top_molecules.py — Post-RL molecule selection (not a REINVENT reward).
 
-Pipeline:
-  1. Keep molecules with exactly N TYR56 pi-pi interactions (default: 2)
-  2. Compute ASP122 interactions via ProLIF (filter to ASP122+ by default)
-  3. Rank by weighted geometric-mean composite (Sol 5, pIC50 4, Tyr 3, Dock 2)
+Filters RL results CSV, computes ASP122 via ProLIF, ranks top hits.
+
+Run (no CLI args needed — edit CONFIG below):
+    conda activate reinvent_qsar
+    cd ~/Vishnu/psearch-master/reinvent-local-main
+    python Preprocess/scripts/select_top_molecules.py
 
 Output columns:
-  rank, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
-  ASP122_Interaction, composite
-
-Usage:
-    python Preprocess/scripts/select_top_molecules.py results/libinvent_results_5_1.csv \\
-        -o top_hits.csv --top 50 --run-prolif \\
-        --receptor /path/receptor.pdb --docking-runs docking_runs
-
-    # Re-dock SMILES missing from docking_runs (slow)
-    python Preprocess/scripts/select_top_molecules.py input.csv -o out.csv --run-prolif \\
-        --receptor /path/receptor.pdb --autobox /path/ref_ligand.pdb --gnina gnina
+    rank, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
+    ASP122_Interaction, composite
 """
 from __future__ import annotations
 
-import argparse
 import glob
 import os
 import sys
@@ -32,28 +24,43 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from reinvent_gnina_backend import (  # noqa: E402
-    GninaProlifConfig,
-    _smiles_hash,
-    affinity_to_reward,
-    analyze_asp_interactions,
-    canonicalize,
-    run_molecule_pipeline,
-    tyr_count_to_reward,
-)
-from prolif_compat import residue_ids  # noqa: E402
+# ---------------------------------------------------------------------------
+# CONFIG — edit these paths/settings only
+# ---------------------------------------------------------------------------
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# RL reward weights (match iict_new_reward.toml)
+INPUT_CSV = REPO_ROOT / "results" / "libinvent_results_5_1.csv"
+OUTPUT_CSV = REPO_ROOT / "top_hits.csv"
+
+TOP_N = 50
+TYR_TARGET = 2          # require exactly this many TYR56 pi-pi stacks
+ASP_RESIDUE = 122
+REQUIRE_ASP122 = True   # keep only molecules with ASP122 interaction
+RUN_PROLIF = True         # compute ASP122 from docked poses
+
+RECEPTOR_PDB = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+AUTOBOX_LIGAND = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+GNINA_EXECUTABLE = "/home/genai/Documents/gnina/gnina"
+DOCKING_RUNS = REPO_ROOT / "docking_runs"
+
+# Selection ranking weights (higher = more important in composite score)
 WEIGHT_SOL = 5.0
 WEIGHT_PIC50 = 4.0
 WEIGHT_TYR = 3.0
 WEIGHT_DOCK = 2.0
 
-# Raw-value normalization bounds (from PD1-PDL1 scoring components)
-PIC50_MIN, PIC50_MAX = 4.01, 11.0
-SOL_MIN, SOL_MAX = -13.17, 2.14
+# ---------------------------------------------------------------------------
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from reinvent_gnina_backend import (  # noqa: E402
+    GninaProlifConfig,
+    _smiles_hash,
+    analyze_asp_interactions,
+    canonicalize,
+    run_molecule_pipeline,
+)
+from prolif_compat import residue_ids  # noqa: E402
 
 COLUMN_ALIASES = {
     "smiles": ["SMILES", "smiles"],
@@ -62,15 +69,10 @@ COLUMN_ALIASES = {
         "TyrInteractionCount_raw",
         "tyr_pi_stacking (TyrInteractionReward)",
     ],
-    "tyr_reward": ["TyrInteractionReward (raw)", "TyrInteractionReward"],
     "pic50": ["PD1PDL1pIC50 (raw)", "PD1PDL1pIC50_raw", "PD1PDL1pIC50"],
-    "pic50_reward": ["PD1PDL1pIC50"],
     "sol": ["PD1PDL1Sol (raw)", "PD1PDL1Sol_raw", "PD1PDL1Sol"],
-    "sol_reward": ["PD1PDL1Sol"],
-    "docking": ["DockingAffinity_raw (raw)", "DockingAffinity_raw", "DockingAffinity_raw"],
-    "dock_reward": ["DockingReward (raw)", "DockingReward"],
+    "docking": ["DockingAffinity_raw (raw)", "DockingAffinity_raw"],
     "asp122": ["ASP122_interaction", "Asp122Interaction", "ASP122 (raw)", "ASP122"],
-    "score": ["Score", "score", "total_score"],
 }
 
 
@@ -107,22 +109,23 @@ def _to_bool_yes(val) -> bool:
         return s in ("1", "1.0", "true", "yes", "y")
 
 
-def _normalize_raw(val: float, lo: float, hi: float) -> float:
-    if not np.isfinite(val):
-        return float("nan")
-    return float(np.clip((val - lo) / (hi - lo), 0.0, 1.0))
+def _minmax(series: pd.Series, invert: bool = False) -> pd.Series:
+    """Normalize column to [0, 1] within the filtered set."""
+    vals = series.astype(float)
+    lo, hi = vals.min(), vals.max()
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi == lo:
+        return pd.Series(0.5, index=series.index)
+    norm = (vals - lo) / (hi - lo)
+    return 1.0 - norm if invert else norm
 
 
-def _weighted_geometric_mean(scores: list[float], weights: list[float]) -> float:
+def _weighted_mean(scores: list[float], weights: list[float]) -> float:
     valid = [(s, w) for s, w in zip(scores, weights) if np.isfinite(s)]
     if not valid:
         return float("nan")
-    s_arr = np.array([max(s, 1e-8) for s, _ in valid], dtype=np.float64)
+    s_arr = np.array([s for s, _ in valid], dtype=np.float64)
     w_arr = np.array([w for _, w in valid], dtype=np.float64)
-    w_sum = w_arr.sum()
-    if w_sum <= 0:
-        return float("nan")
-    return float(np.prod(s_arr ** (w_arr / w_sum)))
+    return float(np.average(s_arr, weights=w_arr))
 
 
 def find_docked_sdf(smiles: str, docking_runs: str) -> Optional[str]:
@@ -142,7 +145,6 @@ def compute_asp122_for_smiles(
     asp_resid: int = 122,
     config: Optional[GninaProlifConfig] = None,
 ) -> tuple[int, str]:
-    """Return (asp_interaction_count, path_to_sdf_used)."""
     sdf = find_docked_sdf(smiles, docking_runs)
     if sdf and os.path.isfile(sdf):
         count, _ = analyze_asp_interactions(receptor_pdb, sdf, smiles, asp_residue=asp_resid)
@@ -160,53 +162,8 @@ def compute_asp122_for_smiles(
     return count, res.out_sdf
 
 
-def _reward_or_normalize(
-    raw_val: float,
-    reward_col_val: float,
-    raw_lo: float,
-    raw_hi: float,
-    tier_fn=None,
-) -> float:
-    """Prefer transformed RL reward column; else normalize raw or apply tier fn."""
-    if np.isfinite(reward_col_val):
-        return float(reward_col_val)
-    if tier_fn is not None:
-        try:
-            return float(tier_fn(int(raw_val) if np.isfinite(raw_val) else 0))
-        except (TypeError, ValueError):
-            pass
-    if tier_fn is not None and np.isfinite(raw_val):
-        return float(tier_fn(raw_val))
-    return _normalize_raw(raw_val, raw_lo, raw_hi)
-
-
-def compute_composite_row(
-    pic50_raw: float,
-    sol_raw: float,
-    dock_raw: float,
-    tyr_raw: float,
-    pic50_reward: float = float("nan"),
-    sol_reward: float = float("nan"),
-    dock_reward: float = float("nan"),
-    tyr_reward: float = float("nan"),
-) -> float:
-    sol_s = _reward_or_normalize(sol_raw, sol_reward, SOL_MIN, SOL_MAX)
-    pic50_s = _reward_or_normalize(pic50_raw, pic50_reward, PIC50_MIN, PIC50_MAX)
-    tyr_s = _reward_or_normalize(tyr_raw, tyr_reward, 0, 2, tier_fn=tyr_count_to_reward)
-    dock_s = (
-        dock_reward
-        if np.isfinite(dock_reward)
-        else affinity_to_reward(dock_raw)
-    )
-    return _weighted_geometric_mean(
-        [sol_s, pic50_s, tyr_s, dock_s],
-        [WEIGHT_SOL, WEIGHT_PIC50, WEIGHT_TYR, WEIGHT_DOCK],
-    )
-
-
 def format_output(df: pd.DataFrame) -> pd.DataFrame:
-    """Select and rename columns for final CSV."""
-    out = pd.DataFrame({
+    return pd.DataFrame({
         "rank": range(1, len(df) + 1),
         "SMILES": df["_smiles"],
         "pIC50": df["_pic50"],
@@ -216,29 +173,24 @@ def format_output(df: pd.DataFrame) -> pd.DataFrame:
         "ASP122_Interaction": df["_asp122_count"].astype("Int64"),
         "composite": df["_composite"],
     })
-    return out
 
 
 def select_top(
     df: pd.DataFrame,
-    tyr_target: int = 2,
-    require_asp122: bool = True,
-    top_n: int = 50,
+    tyr_target: int = TYR_TARGET,
+    require_asp122: bool = REQUIRE_ASP122,
+    top_n: int = TOP_N,
     receptor_pdb: Optional[str] = None,
     docking_runs: Optional[str] = None,
     gnina_config: Optional[GninaProlifConfig] = None,
-    asp_resid: int = 122,
-    compute_asp: bool = False,
+    asp_resid: int = ASP_RESIDUE,
+    compute_asp: bool = RUN_PROLIF,
 ) -> pd.DataFrame:
     col_smiles = _find_column(df, COLUMN_ALIASES["smiles"])
     col_tyr = _find_column(df, COLUMN_ALIASES["tyr_count"])
-    col_tyr_r = _find_column(df, COLUMN_ALIASES["tyr_reward"])
     col_pic50 = _find_column(df, COLUMN_ALIASES["pic50"])
-    col_pic50_r = _find_column(df, COLUMN_ALIASES["pic50_reward"])
     col_sol = _find_column(df, COLUMN_ALIASES["sol"])
-    col_sol_r = _find_column(df, COLUMN_ALIASES["sol_reward"])
     col_dock = _find_column(df, COLUMN_ALIASES["docking"])
-    col_dock_r = _find_column(df, COLUMN_ALIASES["dock_reward"])
     col_asp = _find_column(df, COLUMN_ALIASES["asp122"])
 
     if not col_smiles:
@@ -247,7 +199,6 @@ def select_top(
     work = df.copy()
     print(f"Input rows: {len(work)}")
 
-    # Step 1: TYR pi-pi count == tyr_target
     if col_tyr:
         work["_tyr"] = work[col_tyr].apply(_to_float).round().astype(int)
         before = len(work)
@@ -260,7 +211,6 @@ def select_top(
     if work.empty:
         return work
 
-    # Step 2: ASP122 interactions
     if compute_asp and receptor_pdb and (docking_runs or gnina_config):
         print(f"Computing ASP{asp_resid} via ProLIF (unique SMILES)...")
         unique_smiles = work[col_smiles].dropna().unique()
@@ -269,7 +219,7 @@ def select_top(
             asp_cache[smi], _ = compute_asp122_for_smiles(
                 smi,
                 receptor_pdb,
-                docking_runs or gnina_config.output_root,
+                str(docking_runs or gnina_config.output_root),
                 asp_resid=asp_resid,
                 config=gnina_config,
             )
@@ -290,7 +240,7 @@ def select_top(
             work = work[work["_asp122_count"] > 0]
         print(f"After ASP{asp_resid} (from CSV): {len(work)} (removed {before - len(work)})")
     else:
-        print("WARNING: ASP122 not computed — pass --run-prolif --receptor or add ASP122 column")
+        print("WARNING: ASP122 not computed — set RUN_PROLIF=True and RECEPTOR_PDB in CONFIG")
         work["_asp122_count"] = 0
         if require_asp122:
             work = work.iloc[0:0]
@@ -298,29 +248,21 @@ def select_top(
     if work.empty:
         return work
 
-    # Step 3: composite score and rank
     work["_smiles"] = work[col_smiles]
     work["_pic50"] = work[col_pic50].apply(_to_float) if col_pic50 else float("nan")
     work["_sol"] = work[col_sol].apply(_to_float) if col_sol else float("nan")
     work["_dock"] = work[col_dock].apply(_to_float) if col_dock else float("nan")
-    work["_pic50_r"] = work[col_pic50_r].apply(_to_float) if col_pic50_r else float("nan")
-    work["_sol_r"] = work[col_sol_r].apply(_to_float) if col_sol_r else float("nan")
-    work["_dock_r"] = work[col_dock_r].apply(_to_float) if col_dock_r else float("nan")
-    work["_tyr_r"] = work[col_tyr_r].apply(_to_float) if col_tyr_r else float("nan")
 
-    work["_composite"] = work.apply(
-        lambda row: compute_composite_row(
-            row["_pic50"],
-            row["_sol"],
-            row["_dock"],
-            row["_tyr"],
-            pic50_reward=row["_pic50_r"],
-            sol_reward=row["_sol_r"],
-            dock_reward=row["_dock_r"],
-            tyr_reward=row["_tyr_r"],
-        ),
-        axis=1,
-    )
+    # Composite for ranking only — normalized raw values within filtered set
+    pic50_n = _minmax(work["_pic50"])
+    sol_n = _minmax(work["_sol"])
+    tyr_n = _minmax(work["_tyr"].astype(float))
+    dock_n = _minmax(work["_dock"], invert=True)  # more negative = better
+
+    work["_composite"] = [
+        _weighted_mean([s, p, t, d], [WEIGHT_SOL, WEIGHT_PIC50, WEIGHT_TYR, WEIGHT_DOCK])
+        for s, p, t, d in zip(sol_n, pic50_n, tyr_n, dock_n)
+    ]
 
     work = work.sort_values(
         by=["_composite", "_pic50", "_sol", "_dock"],
@@ -335,59 +277,55 @@ def select_top(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Select top RL molecules from CSV")
-    parser.add_argument("input_csv", help="REINVENT results CSV")
-    parser.add_argument("-o", "--output", default="top_molecules.csv", help="Output CSV path")
-    parser.add_argument("--top", type=int, default=50, help="Number of top molecules to keep")
-    parser.add_argument("--tyr-count", type=int, default=2, help="Required TYR56 pi-pi count (default: 2)")
-    parser.add_argument("--asp-residue", type=int, default=122, help="ASP residue number (default: 122)")
-    parser.add_argument("--no-asp-required", action="store_true", help="Do not require ASP122 interaction")
-    parser.add_argument(
-        "--run-prolif",
-        action="store_true",
-        help="Compute ASP122 via ProLIF (required if ASP122 not in CSV)",
-    )
-    parser.add_argument("--receptor", default=os.environ.get("RECEPTOR_PDB", ""), help="Receptor PDB for ProLIF")
-    parser.add_argument("--docking-runs", default="docking_runs", help="Folder with mol0_out.sdf from RL")
-    parser.add_argument("--autobox", default="", help="Ref ligand for GNINA (only if re-docking needed)")
-    parser.add_argument("--gnina", default="gnina", help="GNINA executable")
-    args = parser.parse_args()
+    input_csv = Path(INPUT_CSV)
+    output_csv = Path(OUTPUT_CSV)
+    docking_runs = str(DOCKING_RUNS)
 
-    df = pd.read_csv(args.input_csv)
-    print(f"Columns: {list(df.columns)}\n")
-    print(f"ASP{args.asp_residue} ProLIF residues: {residue_ids('ASP', args.asp_residue)}\n")
+    if not input_csv.is_file():
+        sys.exit(f"ERROR: input CSV not found: {input_csv}")
+
+    print("=== select_top_molecules ===")
+    print(f"Input:        {input_csv}")
+    print(f"Output:       {output_csv}")
+    print(f"Receptor:     {RECEPTOR_PDB}")
+    print(f"Docking runs: {docking_runs}")
+    print(f"Top N:        {TOP_N}")
+    print(f"TYR target:   {TYR_TARGET}")
+    print(f"ASP residue:  {ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
+    print()
 
     gnina_config = None
-    if args.run_prolif:
-        if not args.receptor:
-            sys.exit("ERROR: --receptor required for --run-prolif")
-        if args.autobox:
-            gnina_config = GninaProlifConfig(
-                receptor_path=args.receptor,
-                autobox_ligand=args.autobox,
-                gnina_executable=args.gnina,
-                output_root=args.docking_runs,
-                keep_outputs=True,
-            )
+    if RUN_PROLIF and AUTOBOX_LIGAND:
+        gnina_config = GninaProlifConfig(
+            receptor_path=RECEPTOR_PDB,
+            autobox_ligand=AUTOBOX_LIGAND,
+            gnina_executable=GNINA_EXECUTABLE,
+            output_root=docking_runs,
+            keep_outputs=True,
+        )
+
+    df = pd.read_csv(input_csv)
+    print(f"Columns: {list(df.columns)}\n")
 
     result = select_top(
         df,
-        tyr_target=args.tyr_count,
-        require_asp122=not args.no_asp_required,
-        top_n=args.top,
-        receptor_pdb=args.receptor or None,
-        docking_runs=args.docking_runs if args.run_prolif else None,
+        tyr_target=TYR_TARGET,
+        require_asp122=REQUIRE_ASP122,
+        top_n=TOP_N,
+        receptor_pdb=RECEPTOR_PDB,
+        docking_runs=docking_runs if RUN_PROLIF else None,
         gnina_config=gnina_config,
-        asp_resid=args.asp_residue,
-        compute_asp=args.run_prolif,
+        asp_resid=ASP_RESIDUE,
+        compute_asp=RUN_PROLIF,
     )
 
     if result.empty:
         print("\nNo molecules passed filters.")
         sys.exit(1)
 
-    result.to_csv(args.output, index=False)
-    print(f"\nSaved {len(result)} molecules → {args.output}")
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(output_csv, index=False)
+    print(f"\nSaved {len(result)} molecules → {output_csv}")
     print(result.head(10).to_string(index=False))
 
 
