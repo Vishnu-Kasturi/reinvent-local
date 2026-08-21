@@ -49,9 +49,11 @@ DOCKING_DIR = REPO_ROOT / "run5" / "docking"          # existing GNINA poses
 NEW_DOCKING_DIR = REPO_ROOT / "run5" / "new_docking"  # missing poses docked here
 
 TOP_N = 50
-# TYR filter — uses TyrInteractionCount_raw or Tyrosine_PiStacking (same RL pi-pi count)
+# TYR filter — integer pi-pi stack count at TYR56 (2 ligand rings stacking → 2).
+# Tyrosine_PiStacking in LibInvent CSV = TyrInteractionCount_raw from RL.
+# Reward tier is separate: 0→0.0, 1 stack→0.5, >=2 stacks→1.0
 APPLY_TYR_FILTER = True
-TYR_MIN = 2
+TYR_MIN = 2          # keep molecules with >= 2 pi-pi ring stacks at TYR56
 TYR_MAX = None
 ASP_RESIDUE = 122
 REQUIRE_ASP122 = True
@@ -87,13 +89,12 @@ from prolif_compat import residue_ids  # noqa: E402
 
 COLUMN_ALIASES = {
     "smiles": ["SMILES", "smiles"],
-    # RL TYR56 pi-pi counts (TyrInteractionCount_raw or LibInvent export alias)
+    # RL TYR56 pi-pi stack count (integer: N rings stacking → N)
     "tyr_count": [
         "Tyrosine_PiStacking",
         "tyrosine_pistacking",
         "TyrInteractionCount_raw (raw)",
         "TyrInteractionCount_raw",
-        "tyr_pi_stacking (TyrInteractionReward)",
     ],
     "pic50": ["pIC50", "PD1PDL1pIC50 (raw)", "PD1PDL1pIC50_raw", "PD1PDL1pIC50"],
     "sol": ["Solubility", "PD1PDL1Sol (raw)", "PD1PDL1Sol_raw", "PD1PDL1Sol"],
@@ -536,8 +537,8 @@ def select_top(
         if work.empty and before > 0:
             max_tyr = int(df[col_tyr].apply(_to_float).round().max())
             print(
-                f"  Hint: max TYR count in input was {max_tyr}; "
-                f"lower TYR_MIN or check column is raw count (not 0/0.5/1 reward tier)"
+                f"  Hint: max TYR pi-pi count in input was {max_tyr}; "
+                f"lower TYR_MIN if you want to keep molecules with fewer stacks"
             )
     elif apply_tyr_filter and not col_tyr:
         print("WARNING: APPLY_TYR_FILTER=True but no TYR column — skipping TYR filter")
