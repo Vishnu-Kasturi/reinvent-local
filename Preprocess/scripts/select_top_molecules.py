@@ -49,8 +49,8 @@ DOCKING_DIR = REPO_ROOT / "run5" / "docking"          # existing GNINA poses
 NEW_DOCKING_DIR = REPO_ROOT / "run5" / "new_docking"  # missing poses docked here
 
 TOP_N = 50
-# TYR filter — only applies to raw RL columns (TyrInteractionCount_raw), NOT Tyrosine_PiStacking
-APPLY_TYR_FILTER = False   # set True for raw REINVENT CSV; False for top100_balanced.csv
+# TYR filter — uses TyrInteractionCount_raw or Tyrosine_PiStacking (same RL pi-pi count)
+APPLY_TYR_FILTER = True
 TYR_MIN = 2
 TYR_MAX = None
 ASP_RESIDUE = 122
@@ -87,16 +87,13 @@ from prolif_compat import residue_ids  # noqa: E402
 
 COLUMN_ALIASES = {
     "smiles": ["SMILES", "smiles"],
-    # Raw RL pi-pi counts — use ONLY these for TYR filtering
+    # RL TYR56 pi-pi counts (TyrInteractionCount_raw or LibInvent export alias)
     "tyr_count": [
+        "Tyrosine_PiStacking",
+        "tyrosine_pistacking",
         "TyrInteractionCount_raw (raw)",
         "TyrInteractionCount_raw",
         "tyr_pi_stacking (TyrInteractionReward)",
-    ],
-    # Display / pre-ranked CSV column — ranking only, not TYR filter
-    "tyr_display": [
-        "Tyrosine_PiStacking",
-        "tyrosine_pistacking",
     ],
     "pic50": ["pIC50", "PD1PDL1pIC50 (raw)", "PD1PDL1pIC50_raw", "PD1PDL1pIC50"],
     "sol": ["Solubility", "PD1PDL1Sol (raw)", "PD1PDL1Sol_raw", "PD1PDL1Sol"],
@@ -499,7 +496,6 @@ def select_top(
 ) -> pd.DataFrame:
     col_smiles = _find_column(df, COLUMN_ALIASES["smiles"])
     col_tyr = _find_column(df, COLUMN_ALIASES["tyr_count"])
-    col_tyr_disp = _find_column(df, COLUMN_ALIASES["tyr_display"])
     col_pic50 = _find_column(df, COLUMN_ALIASES["pic50"])
     col_sol = _find_column(df, COLUMN_ALIASES["sol"])
     col_dock = _find_column(df, COLUMN_ALIASES["docking"])
@@ -509,8 +505,8 @@ def select_top(
         raise ValueError(f"No SMILES column found. Columns: {list(df.columns)}")
 
     print(
-        f"Detected columns: SMILES={col_smiles!r}, TYR_filter={col_tyr!r}, "
-        f"TYR_display={col_tyr_disp!r}, pIC50={col_pic50!r}, Sol={col_sol!r}, Dock={col_dock!r}"
+        f"Detected columns: SMILES={col_smiles!r}, TYR={col_tyr!r}, "
+        f"pIC50={col_pic50!r}, Sol={col_sol!r}, Dock={col_dock!r}"
     )
     print(f"Filters: APPLY_TYR_FILTER={apply_tyr_filter}, REQUIRE_ASP122={require_asp122}, "
           f"ASP_FILTER_ANY={asp_filter_any}")
@@ -518,24 +514,18 @@ def select_top(
     work = df.copy()
     print(f"Input rows: {len(work)}")
 
-    # TYR values for output (prefer display column from pre-ranked CSV)
-    if col_tyr_disp:
-        work["_tyr"] = work[col_tyr_disp].apply(_to_float).round().astype(int)
-    elif col_tyr:
+    if col_tyr:
         work["_tyr"] = work[col_tyr].apply(_to_float).round().astype(int)
+        _print_series_stats(f"TYR56 pi-pi ({col_tyr})", work["_tyr"])
     else:
         work["_tyr"] = 0
-
-    if col_tyr_disp:
-        _print_series_stats("Tyrosine_PiStacking (display)", work["_tyr"])
+        print("WARNING: no TYR column found — defaulting counts to 0")
 
     if apply_tyr_filter and col_tyr:
-        work["_tyr_filter"] = work[col_tyr].apply(_to_float).round().astype(int)
-        _print_series_stats("TyrInteractionCount (filter)", work["_tyr_filter"])
         before = len(work)
-        work = work[work["_tyr_filter"] >= tyr_min]
+        work = work[work["_tyr"] >= tyr_min]
         if tyr_max is not None:
-            work = work[work["_tyr_filter"] <= tyr_max]
+            work = work[work["_tyr"] <= tyr_max]
         if tyr_max is not None and tyr_max == tyr_min:
             label = f"== {tyr_min}"
         elif tyr_max is not None:
@@ -543,10 +533,16 @@ def select_top(
         else:
             label = f">= {tyr_min}"
         print(f"After TYR56 pi-pi {label}: {len(work)} (removed {before - len(work)})")
+        if work.empty and before > 0:
+            max_tyr = int(df[col_tyr].apply(_to_float).round().max())
+            print(
+                f"  Hint: max TYR count in input was {max_tyr}; "
+                f"lower TYR_MIN or check column is raw count (not 0/0.5/1 reward tier)"
+            )
     elif apply_tyr_filter and not col_tyr:
-        print("WARNING: APPLY_TYR_FILTER=True but no TyrInteractionCount_raw column — skipping TYR filter")
+        print("WARNING: APPLY_TYR_FILTER=True but no TYR column — skipping TYR filter")
     else:
-        print("TYR filter skipped (APPLY_TYR_FILTER=False or using pre-ranked CSV)")
+        print("TYR filter skipped (APPLY_TYR_FILTER=False)")
 
     if work.empty:
         return work
