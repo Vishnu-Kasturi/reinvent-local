@@ -403,33 +403,23 @@ def _is_asp_small_mol_interaction(interaction_name) -> bool:
     )
 
 
-def _asp_chain_key(prot_res) -> str:
-    """Stable key per ASP122 chain (e.g. ASP122.A)."""
-    info = _residue_info(prot_res)
-    chain = info.get("chain") or info.get("segid") or ""
-    if chain:
-        return f"ASP{info.get('resid', '')}.{chain}"
-    return info["str"]
-
-
 def analyze_asp_interactions(
     receptor_pdb: str,
     docked_sdf: str,
     smiles: str,
     asp_residue: int = 122,
     chains: str = "AB",
-    max_per_chain: int = 3,
-) -> Tuple[int, List[dict]]:
+) -> Tuple[int, int, List[dict]]:
     """
-    Count ASP{residue}–ligand contacts on the best docked pose only (mol0 / first SDF record).
+    Same pattern as analyze_tyr_interactions().
 
-    Scoring is conservative (not ProLIF count=True duplicates):
-      - One pose only (load_best_pose)
-      - Only H-bond / salt-bridge–type contacts at ASP122
-      - Per chain (A/B): each interaction *type* counted once (not per geometric duplicate)
-      - Capped at max_per_chain (default 3 ≈ carboxylate oxygens + one extra) per chain
+    - Best docked pose only (mol0 / first SDF record via load_best_pose)
+    - ProLIF fingerprint at ASP{residue} on chains A/B
+    - Count polar ASP–ligand contacts via count_interactions() + predicate
+      (HBond / salt-bridge types only — parallel to TYR pi-pi filter)
 
-    Returns (interaction_count, details_list). Typical range 0–6 for homodimer ASP122.
+    Returns (contact_count, contact_count, details_list).
+    Both count values are identical (kept for parity with analyze_tyr_interactions).
     """
     protein = load_protein_for_prolif(receptor_pdb)
     ligand_mol = load_best_pose(docked_sdf, smiles)
@@ -439,34 +429,28 @@ def analyze_asp_interactions(
     residues = residue_ids("ASP", asp_residue, chains=chains)
     ifp = run_fingerprint(fp, ligand, protein, residues=residues)
 
-    # Unique interaction types present per ASP122 chain
-    types_per_chain: dict[str, set[str]] = {}
     interactions: List[dict] = []
+    total = 0
 
     for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
         if not _is_residue(prot_res, "ASP", asp_residue):
             continue
-        chain_key = _asp_chain_key(prot_res)
-        for name, metadata in interaction_dict.items():
-            if metadata is None:
-                continue
-            if not _is_asp_small_mol_interaction(name):
-                continue
-            ix_name = _interaction_name(name)
-            types_per_chain.setdefault(chain_key, set()).add(ix_name)
-            interactions.append({
-                "ligand": str(lig_res),
-                "protein": str(prot_res),
-                "interaction": ix_name,
-                "count": 1,
-            })
+        n = count_interactions(interaction_dict, _is_asp_small_mol_interaction)
+        if n > 0:
+            total += n
+            for name, metadata in interaction_dict.items():
+                if metadata is None or not _is_asp_small_mol_interaction(name):
+                    continue
+                cnt = len(metadata) if isinstance(metadata, (list, tuple)) else 1
+                if cnt > 0:
+                    interactions.append({
+                        "ligand": str(lig_res),
+                        "protein": str(prot_res),
+                        "interaction": _interaction_name(name),
+                        "count": cnt,
+                    })
 
-    total = 0
-    for chain_key, ix_types in types_per_chain.items():
-        n_chain = min(len(ix_types), max_per_chain)
-        total += n_chain
-
-    return total, interactions
+    return total, total, interactions
 
 
 # ---------------------------------------------------------------------------

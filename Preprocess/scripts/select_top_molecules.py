@@ -52,7 +52,6 @@ TOP_N = 50
 TYR_MIN = 2             # minimum TYR56 pi-pi stacks (keep if count >= TYR_MIN)
 TYR_MAX = None          # optional max (e.g. 2 for exact match only); None = no limit
 ASP_RESIDUE = 122
-ASP_MAX_PER_CHAIN = 3   # cap ASP122 score per chain (carboxylate ≈ 2 O + buffer)
 REQUIRE_ASP122 = True   # keep only molecules with ASP122 interaction
 RUN_PROLIF = True       # compute ASP122 from docked poses
 
