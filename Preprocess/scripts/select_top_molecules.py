@@ -12,14 +12,15 @@ Run (no CLI args needed — edit CONFIG below):
 Note: REPO_ROOT = reinvent-local-main/iict_libinvent (auto-resolved from script path).
 
 Output columns:
-    rank, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
-    ASP122_Interaction, composite
+    rank, molID, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
+    ASP122_Interaction, pose_sdf, composite
 """
 from __future__ import annotations
 
 import glob
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -47,6 +48,8 @@ INPUT_CSV = REPO_ROOT / "run5" / "top100_balanced.csv"
 OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
 DOCKING_DIR = REPO_ROOT / "run5" / "docking"          # existing GNINA poses
 NEW_DOCKING_DIR = REPO_ROOT / "run5" / "new_docking"  # missing poses docked here
+TOP_HITS_DOCKING_DIR = REPO_ROOT / "run5" / "top_hits_docking"  # mol{id}_out.sdf for CSV hits
+EXPORT_TOP_HIT_POSES = True
 
 TOP_N = 50
 # TYR filter — integer pi-pi stack count at TYR56 (2 ligand rings stacking → 2).
@@ -88,6 +91,7 @@ from prolif_compat import residue_ids  # noqa: E402
 
 COLUMN_ALIASES = {
     "smiles": ["SMILES", "smiles"],
+    "mol_id": ["molID", "mol_id", "molId", "MolID", "Mol_Id"],
     # RL TYR56 pi-pi stack count (integer: N rings stacking → N)
     "tyr_count": [
         "Tyrosine_PiStacking",
@@ -109,6 +113,74 @@ def _tyr_filter_label(tyr_min: int = TYR_MIN, tyr_max: Optional[int] = TYR_MAX) 
     if tyr_max is not None:
         return f"{tyr_min}–{tyr_max}"
     return f">= {tyr_min}"
+
+
+def mol_sdf_basename(mol_id: int) -> str:
+    """Flat GNINA pose filename for a molID (e.g. mol13_out.sdf)."""
+    return f"mol{mol_id}_out.sdf"
+
+
+def export_pose_flat(src_sdf: str, dest_dir: str, mol_id: int) -> str:
+    """Copy pose SDF to dest_dir/mol{mol_id}_out.sdf. Returns destination path."""
+    if not src_sdf or not os.path.isfile(src_sdf):
+        return ""
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, mol_sdf_basename(mol_id))
+    shutil.copy2(src_sdf, dest)
+    return dest
+
+
+def _assign_input_mol_ids(work: pd.DataFrame, col_smiles: str, col_molid: Optional[str]) -> pd.DataFrame:
+    """Stable molID per input row (0..N-1) for docking file names."""
+    if col_molid:
+        work["_input_mol_id"] = work[col_molid].apply(
+            lambda v: int(_to_float(v, 0)) if np.isfinite(_to_float(v, 0)) else 0
+        )
+    else:
+        work["_input_mol_id"] = np.arange(len(work), dtype=int)
+    return work
+
+
+def _smi_to_molid_map(work: pd.DataFrame, col_smiles: str) -> dict[str, int]:
+    """First input molID per unique SMILES (preserves CSV row order)."""
+    mapping: dict[str, int] = {}
+    for _, row in work.iterrows():
+        smi = row[col_smiles]
+        if pd.isna(smi) or smi in mapping:
+            continue
+        mapping[str(smi)] = int(row["_input_mol_id"])
+    return mapping
+
+
+def _export_top_hit_poses(
+    work: pd.DataFrame,
+    sdf_by_smiles: dict[str, str],
+    col_smiles: str,
+    dest_dir: str,
+    rel_to: Optional[Path] = None,
+) -> pd.DataFrame:
+    """
+    Assign molID 0..N-1 in final rank order and write top_hits_docking/mol{id}_out.sdf.
+    """
+    mol_ids: list[int] = []
+    pose_paths: list[str] = []
+    for i, (_, row) in enumerate(work.iterrows()):
+        smi = str(row[col_smiles])
+        src = sdf_by_smiles.get(smi, "")
+        dest_path = ""
+        if src and os.path.isfile(src):
+            dest_path = export_pose_flat(src, dest_dir, i)
+            if rel_to is not None and dest_path:
+                try:
+                    dest_path = str(Path(dest_path).relative_to(rel_to))
+                except ValueError:
+                    pass
+        mol_ids.append(i)
+        pose_paths.append(dest_path)
+    work = work.copy()
+    work["_mol_id"] = mol_ids
+    work["_pose_sdf"] = pose_paths
+    return work
 
 
 def _print_series_stats(name: str, series: pd.Series) -> None:
@@ -420,24 +492,31 @@ def compute_asp122_for_smiles(
     asp_resid: int = 122,
     gnina_config: Optional[GninaProlifConfig] = None,
     allow_redock: bool = False,
-    mol_index: int = 0,
+    mol_id: int = 0,
+    flat_pose_dirs: Optional[list[str]] = None,
     verbose: bool = VERBOSE,
 ) -> tuple[int, str, bool]:
     """Return (contact_count, sdf_path, was_newly_docked)."""
+
+    def _publish_flat_pose(sdf_path: str) -> None:
+        for dest_dir in flat_pose_dirs or []:
+            export_pose_flat(sdf_path, dest_dir, mol_id)
+
     smi_short = smiles if len(smiles) <= 50 else smiles[:47] + "..."
     sdf, source = pose_cache.find_with_source(smiles)
 
     if sdf and os.path.isfile(sdf):
         if not is_valid_sdf(sdf):
             if verbose:
-                print(f"  [{mol_index + 1}] INVALID SDF ({source}): {_pose_label(sdf)}")
+                print(f"  [mol{mol_id}] INVALID SDF ({source}): {_pose_label(sdf)}")
             pose_cache.invalidate(smiles, sdf)
             sdf = None
         else:
             if verbose:
-                print(f"  [{mol_index + 1}] POSE FOUND ({source}): {_pose_label(sdf)}")
+                print(f"  [mol{mol_id}] POSE FOUND ({source}): {_pose_label(sdf)}")
             try:
                 contacts = _run_asp122(receptor_pdb, sdf, smiles, asp_resid, verbose)
+                _publish_flat_pose(sdf)
                 return contacts, sdf, False
             except Exception as exc:
                 if verbose:
@@ -450,14 +529,14 @@ def compute_asp122_for_smiles(
 
     if not allow_redock or gnina_config is None:
         if verbose:
-            print(f"  [{mol_index + 1}] NO POSE — skipping (re-dock disabled): {smi_short}")
+            print(f"  [mol{mol_id}] NO POSE — skipping (re-dock disabled): {smi_short}")
         return 0, "", False
 
     if verbose:
-        print(f"  [{mol_index + 1}] NO POSE — GNINA docking → {gnina_config.output_root}")
+        print(f"  [mol{mol_id}] NO POSE — GNINA docking → {gnina_config.output_root}")
         print(f"       SMILES: {smi_short}")
 
-    res = run_molecule_pipeline(smiles, mol_index, 1, gnina_config)
+    res = run_molecule_pipeline(smiles, mol_id, 1, gnina_config)
     if not res.docking_ok or not is_valid_sdf(res.out_sdf):
         if verbose:
             print(f"       GNINA FAILED: {res.error or 'invalid/empty output SDF'}")
@@ -466,6 +545,7 @@ def compute_asp122_for_smiles(
     pose_cache.register_pose(smiles, res.out_sdf, gnina_config.output_root)
     if verbose:
         print(f"       GNINA OK: {_pose_label(res.out_sdf)}")
+    _publish_flat_pose(res.out_sdf)
     try:
         contacts = _run_asp122(receptor_pdb, res.out_sdf, smiles, asp_resid, verbose)
     except Exception as exc:
@@ -479,12 +559,14 @@ def compute_asp122_for_smiles(
 def format_output(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({
         "rank": range(1, len(df) + 1),
+        "molID": df["_mol_id"].astype(int),
         "SMILES": df["_smiles"],
         "pIC50": df["_pic50"],
         "Solubility": df["_sol"],
         "Docking_Score": df["_dock"],
         "Tyrosine_PiStacking": df["_tyr"].astype("Int64"),
         "ASP122_Interaction": df["_asp122_count"].astype("Int64"),
+        "pose_sdf": df["_pose_sdf"],
         "composite": df["_composite"],
     })
 
@@ -502,8 +584,12 @@ def select_top(
     compute_asp: bool = RUN_PROLIF,
     allow_redock: bool = False,
     apply_tyr_filter: bool = APPLY_TYR_FILTER,
+    new_docking_dir: Optional[str] = None,
+    top_hits_docking_dir: Optional[str] = None,
+    export_poses: bool = EXPORT_TOP_HIT_POSES,
 ) -> pd.DataFrame:
     col_smiles = _find_column(df, COLUMN_ALIASES["smiles"])
+    col_molid = _find_column(df, COLUMN_ALIASES["mol_id"])
     col_tyr = _find_column(df, COLUMN_ALIASES["tyr_count"])
     col_pic50 = _find_column(df, COLUMN_ALIASES["pic50"])
     col_sol = _find_column(df, COLUMN_ALIASES["sol"])
@@ -520,6 +606,7 @@ def select_top(
     print(f"Filters: APPLY_TYR_FILTER={apply_tyr_filter}, REQUIRE_ASP122={require_asp122}")
 
     work = df.copy()
+    work = _assign_input_mol_ids(work, col_smiles, col_molid)
     print(f"Input rows: {len(work)}")
 
     if col_tyr:
@@ -549,16 +636,20 @@ def select_top(
     if work.empty:
         return work
 
+    sdf_cache: dict[str, str] = {}
+
     if compute_asp and receptor_pdb and pose_cache is not None:
         pose_cache.build()
         print(f"Computing ASP{asp_resid} via ProLIF (existing poses first)...")
-        unique_smiles = work[col_smiles].dropna().unique()
+        smi_to_molid = _smi_to_molid_map(work, col_smiles)
+        unique_smiles = sorted(smi_to_molid.keys(), key=lambda s: smi_to_molid[s])
         asp_contact_cache: dict[str, int] = {}
-        sdf_cache: dict[str, str] = {}
+        flat_dirs = [d for d in [new_docking_dir] if d]
         missing: list[str] = []
         redocked = 0
         found_existing = 0
         for i, smi in enumerate(unique_smiles, 1):
+            mol_id = smi_to_molid[smi]
             contacts, sdf_cache[smi], newly_docked = compute_asp122_for_smiles(
                 smi,
                 receptor_pdb,
@@ -566,7 +657,8 @@ def select_top(
                 asp_resid=asp_resid,
                 gnina_config=gnina_config,
                 allow_redock=allow_redock,
-                mol_index=i - 1,
+                mol_id=mol_id,
+                flat_pose_dirs=flat_dirs,
                 verbose=VERBOSE,
             )
             asp_contact_cache[smi] = contacts
@@ -633,6 +725,24 @@ def select_top(
     if top_n > 0:
         work = work.head(top_n)
 
+    if export_poses and top_hits_docking_dir:
+        rel_root = Path(top_hits_docking_dir).parent
+        work = _export_top_hit_poses(
+            work, sdf_cache, col_smiles, top_hits_docking_dir, rel_to=rel_root
+        )
+        print(f"Exported {len(work)} poses → {top_hits_docking_dir}/mol{{id}}_out.sdf")
+    else:
+        work = work.copy()
+        work["_mol_id"] = np.arange(len(work), dtype=int)
+        if sdf_cache:
+            work["_pose_sdf"] = work[col_smiles].map(sdf_cache).fillna("")
+        elif pose_cache is not None:
+            work["_pose_sdf"] = work[col_smiles].map(
+                lambda s: pose_cache.find(str(s)) or ""
+            )
+        else:
+            work["_pose_sdf"] = ""
+
     return format_output(work)
 
 
@@ -641,6 +751,7 @@ def main() -> None:
     output_csv = _P(OUTPUT_CSV)
     docking_dir = str(_P(DOCKING_DIR))
     new_docking_dir = str(_P(NEW_DOCKING_DIR))
+    top_hits_docking_dir = str(_P(TOP_HITS_DOCKING_DIR))
     allow_redock = REDock_IF_MISSING
 
     if not input_csv.is_file():
@@ -657,6 +768,8 @@ def main() -> None:
 
     if allow_redock:
         os.makedirs(new_docking_dir, exist_ok=True)
+    if EXPORT_TOP_HIT_POSES:
+        os.makedirs(top_hits_docking_dir, exist_ok=True)
 
     # Search existing docking first, then any previously new-docked poses
     pose_cache = get_pose_cache([docking_dir, new_docking_dir])
@@ -666,7 +779,8 @@ def main() -> None:
     print(f"Output:       {output_csv}")
     print(f"Receptor:     {RECEPTOR_PDB}")
     print(f"Docking dir:  {docking_dir}")
-    print(f"New docking:  {new_docking_dir}  (missing poses → here)")
+    print(f"New docking:  {new_docking_dir}  (missing poses → mol{{id}}_out.sdf)")
+    print(f"Top poses:    {top_hits_docking_dir}  (final top hits → mol0..molN_out.sdf)")
     print(f"Re-dock miss: {allow_redock}")
     print(f"Top N:        {TOP_N}")
     print(f"TYR filter:   {_tyr_filter_label(TYR_MIN, TYR_MAX)}")
@@ -699,6 +813,9 @@ def main() -> None:
         compute_asp=RUN_PROLIF,
         allow_redock=allow_redock,
         apply_tyr_filter=APPLY_TYR_FILTER,
+        new_docking_dir=new_docking_dir,
+        top_hits_docking_dir=top_hits_docking_dir,
+        export_poses=EXPORT_TOP_HIT_POSES,
     )
 
     if result.empty:
