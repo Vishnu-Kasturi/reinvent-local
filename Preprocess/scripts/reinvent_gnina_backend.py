@@ -399,7 +399,18 @@ def _is_asp_small_mol_interaction(interaction_name) -> bool:
         return False
     return any(
         k in n
-        for k in ("hbond", "saltbridge", "salt", "ionic", "anionic", "cationpi", "pication")
+        for k in (
+            "hbond",
+            "hydrogenbond",
+            "hacceptor",
+            "hdonor",
+            "saltbridge",
+            "salt",
+            "ionic",
+            "anionic",
+            "cationpi",
+            "pication",
+        )
     )
 
 
