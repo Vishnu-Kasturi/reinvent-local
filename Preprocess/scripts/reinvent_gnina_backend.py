@@ -413,13 +413,9 @@ def analyze_asp_interactions(
     """
     Same pattern as analyze_tyr_interactions().
 
-    - Best docked pose only (mol0 / first SDF record via load_best_pose)
-    - ProLIF fingerprint at ASP{residue} on chains A/B
-    - Count polar ASP–ligand contacts via count_interactions() + predicate
-      (HBond / salt-bridge types only — parallel to TYR pi-pi filter)
-
-    Returns (contact_count, contact_count, details_list).
-    Both count values are identical (kept for parity with analyze_tyr_interactions).
+    Returns (polar_count, any_count, details_list):
+      polar_count — HBond/salt/ionic at ASP (displayed in CSV)
+      any_count   — any ProLIF contact at ASP (use for yes/no filter if needed)
     """
     protein = load_protein_for_prolif(receptor_pdb)
     ligand_mol = load_best_pose(docked_sdf, smiles)
@@ -430,14 +426,18 @@ def analyze_asp_interactions(
     ifp = run_fingerprint(fp, ligand, protein, residues=residues)
 
     interactions: List[dict] = []
-    total = 0
+    polar_total = 0
+    any_total = 0
 
     for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
         if not _is_residue(prot_res, "ASP", asp_residue):
             continue
-        n = count_interactions(interaction_dict, _is_asp_small_mol_interaction)
-        if n > 0:
-            total += n
+        n_any = count_interactions(interaction_dict, lambda _name: True)
+        n_polar = count_interactions(interaction_dict, _is_asp_small_mol_interaction)
+        if n_any > 0:
+            any_total += n_any
+        if n_polar > 0:
+            polar_total += n_polar
             for name, metadata in interaction_dict.items():
                 if metadata is None or not _is_asp_small_mol_interaction(name):
                     continue
@@ -450,7 +450,7 @@ def analyze_asp_interactions(
                         "count": cnt,
                     })
 
-    return total, total, interactions
+    return polar_total, any_total, interactions
 
 
 # ---------------------------------------------------------------------------
