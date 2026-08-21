@@ -13,7 +13,7 @@ Note: REPO_ROOT = reinvent-local-main/iict_libinvent (auto-resolved from script 
 
 Output columns:
     rank, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
-    ASP122_Polar, composite
+    ASP122_Interaction, composite
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ APPLY_TYR_FILTER = True
 TYR_MIN = 2          # keep molecules with >= 2 pi-pi ring stacks at TYR56
 TYR_MAX = None
 ASP_RESIDUE = 122
-REQUIRE_ASP122 = True   # keep only molecules with polar ASP122 contact (H-bond/salt/ionic)
+REQUIRE_ASP122 = True   # keep molecules with >=1 ProLIF contact at ASP122
 RUN_PROLIF = True
 
 # If pose not in DOCKING_DIR → GNINA dock into NEW_DOCKING_DIR (never overwrites original)
@@ -78,6 +78,7 @@ WEIGHT_DOCK = 2.0
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from reinvent_gnina_backend import (  # noqa: E402
     GninaProlifConfig,
+    _format_asp_breakdown,
     _smiles_hash,
     analyze_asp_interactions,
     canonicalize,
@@ -402,13 +403,14 @@ def _run_asp122(
     asp_resid: int,
     verbose: bool,
 ) -> int:
-    """Return polar contact count at ASP122 (H-bond / salt / ionic)."""
-    polar, _, _ = analyze_asp_interactions(
+    """Return total ProLIF contact count at ASP122 (all interaction types)."""
+    contacts, polar, _, breakdown = analyze_asp_interactions(
         receptor_pdb, sdf, smiles, asp_residue=asp_resid
     )
     if verbose:
-        print(f"       ASP{asp_resid} polar contacts: {polar}")
-    return polar
+        detail = _format_asp_breakdown(breakdown, polar)
+        print(f"       ASP{asp_resid} contacts: {contacts} ({detail})")
+    return contacts
 
 
 def compute_asp122_for_smiles(
@@ -421,7 +423,7 @@ def compute_asp122_for_smiles(
     mol_index: int = 0,
     verbose: bool = VERBOSE,
 ) -> tuple[int, str, bool]:
-    """Return (polar_count, sdf_path, was_newly_docked)."""
+    """Return (contact_count, sdf_path, was_newly_docked)."""
     smi_short = smiles if len(smiles) <= 50 else smiles[:47] + "..."
     sdf, source = pose_cache.find_with_source(smiles)
 
@@ -435,8 +437,8 @@ def compute_asp122_for_smiles(
             if verbose:
                 print(f"  [{mol_index + 1}] POSE FOUND ({source}): {_pose_label(sdf)}")
             try:
-                polar = _run_asp122(receptor_pdb, sdf, smiles, asp_resid, verbose)
-                return polar, sdf, False
+                contacts = _run_asp122(receptor_pdb, sdf, smiles, asp_resid, verbose)
+                return contacts, sdf, False
             except Exception as exc:
                 if verbose:
                     print(f"       ProLIF FAILED: {exc}")
@@ -465,13 +467,13 @@ def compute_asp122_for_smiles(
     if verbose:
         print(f"       GNINA OK: {_pose_label(res.out_sdf)}")
     try:
-        polar = _run_asp122(receptor_pdb, res.out_sdf, smiles, asp_resid, verbose)
+        contacts = _run_asp122(receptor_pdb, res.out_sdf, smiles, asp_resid, verbose)
     except Exception as exc:
         if verbose:
             print(f"       ProLIF FAILED after GNINA: {exc}")
         pose_cache.invalidate(smiles, res.out_sdf)
         return 0, "", False
-    return polar, res.out_sdf, True
+    return contacts, res.out_sdf, True
 
 
 def format_output(df: pd.DataFrame) -> pd.DataFrame:
@@ -482,7 +484,7 @@ def format_output(df: pd.DataFrame) -> pd.DataFrame:
         "Solubility": df["_sol"],
         "Docking_Score": df["_dock"],
         "Tyrosine_PiStacking": df["_tyr"].astype("Int64"),
-        "ASP122_Polar": df["_asp122_polar"].astype("Int64"),
+        "ASP122_Interaction": df["_asp122_count"].astype("Int64"),
         "composite": df["_composite"],
     })
 
@@ -515,7 +517,7 @@ def select_top(
         f"Detected columns: SMILES={col_smiles!r}, TYR={col_tyr!r}, "
         f"pIC50={col_pic50!r}, Sol={col_sol!r}, Dock={col_dock!r}"
     )
-    print(f"Filters: APPLY_TYR_FILTER={apply_tyr_filter}, REQUIRE_ASP122={require_asp122} (polar only)")
+    print(f"Filters: APPLY_TYR_FILTER={apply_tyr_filter}, REQUIRE_ASP122={require_asp122}")
 
     work = df.copy()
     print(f"Input rows: {len(work)}")
@@ -551,13 +553,13 @@ def select_top(
         pose_cache.build()
         print(f"Computing ASP{asp_resid} via ProLIF (existing poses first)...")
         unique_smiles = work[col_smiles].dropna().unique()
-        asp_polar_cache: dict[str, int] = {}
+        asp_contact_cache: dict[str, int] = {}
         sdf_cache: dict[str, str] = {}
         missing: list[str] = []
         redocked = 0
         found_existing = 0
         for i, smi in enumerate(unique_smiles, 1):
-            polar, sdf_cache[smi], newly_docked = compute_asp122_for_smiles(
+            contacts, sdf_cache[smi], newly_docked = compute_asp122_for_smiles(
                 smi,
                 receptor_pdb,
                 pose_cache,
@@ -567,7 +569,7 @@ def select_top(
                 mol_index=i - 1,
                 verbose=VERBOSE,
             )
-            asp_polar_cache[smi] = polar
+            asp_contact_cache[smi] = contacts
             if not sdf_cache[smi]:
                 missing.append(smi)
             elif newly_docked:
@@ -575,31 +577,31 @@ def select_top(
             else:
                 found_existing += 1
             if not VERBOSE and (i % 10 == 0 or i == len(unique_smiles)):
-                n_pos = sum(1 for v in asp_polar_cache.values() if v > 0)
-                print(f"  ProLIF ASP{asp_resid}: {i}/{len(unique_smiles)} ({n_pos} with polar contact)")
+                n_pos = sum(1 for v in asp_contact_cache.values() if v > 0)
+                print(f"  ProLIF ASP{asp_resid}: {i}/{len(unique_smiles)} ({n_pos} with ASP contact)")
         print(
             f"  Summary: {found_existing} poses from docking/, "
             f"{redocked} newly docked → new_docking/, {len(missing)} failed"
         )
-        _print_series_stats("ASP122 polar counts", pd.Series(list(asp_polar_cache.values())))
+        _print_series_stats("ASP122 contact counts", pd.Series(list(asp_contact_cache.values())))
         if missing:
             print(f"  WARNING: {len(missing)} SMILES still have no pose after docking")
-        work["_asp122_polar"] = work[col_smiles].map(asp_polar_cache).fillna(0).astype(int)
+        work["_asp122_count"] = work[col_smiles].map(asp_contact_cache).fillna(0).astype(int)
         before = len(work)
         if require_asp122:
-            work = work[work["_asp122_polar"] > 0]
-        print(f"After ASP{asp_resid} polar (ProLIF): {len(work)} (removed {before - len(work)})")
+            work = work[work["_asp122_count"] > 0]
+        print(f"After ASP{asp_resid} (ProLIF): {len(work)} (removed {before - len(work)})")
     elif col_asp:
-        work["_asp122_polar"] = work[col_asp].apply(
+        work["_asp122_count"] = work[col_asp].apply(
             lambda v: int(_to_float(v, 0)) if _to_float(v, 0) == int(_to_float(v, 0)) else int(_to_bool_yes(v))
         )
         before = len(work)
         if require_asp122:
-            work = work[work["_asp122_polar"] > 0]
-        print(f"After ASP{asp_resid} polar (from CSV): {len(work)} (removed {before - len(work)})")
+            work = work[work["_asp122_count"] > 0]
+        print(f"After ASP{asp_resid} (from CSV): {len(work)} (removed {before - len(work)})")
     else:
         print("WARNING: ASP122 not computed — set RUN_PROLIF=True and RECEPTOR_PDB in CONFIG")
-        work["_asp122_polar"] = 0
+        work["_asp122_count"] = 0
         if require_asp122:
             work = work.iloc[0:0]
 
@@ -668,7 +670,7 @@ def main() -> None:
     print(f"Re-dock miss: {allow_redock}")
     print(f"Top N:        {TOP_N}")
     print(f"TYR filter:   {_tyr_filter_label(TYR_MIN, TYR_MAX)}")
-    print(f"ASP filter:   polar contact at ASP{ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
+    print(f"ASP filter:   ProLIF contact at ASP{ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
     print()
 
     gnina_config = None

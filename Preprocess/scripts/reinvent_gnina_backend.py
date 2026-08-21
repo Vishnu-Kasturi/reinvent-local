@@ -383,15 +383,13 @@ def analyze_tyr_interactions(
     return total, total, interactions
 
 
-def _is_asp_small_mol_interaction(interaction_name) -> bool:
+def _is_asp_polar_interaction(interaction_name) -> bool:
     """
-    ASP122 carboxylate-relevant contacts with the ligand only.
-
-    Counts H-bonds and salt/ionic interactions; excludes hydrophobic and
-    pi-stacking (those inflate counts and are not the O-/COO- contacts of interest).
+    ProLIF v2 polar contacts at ASP: HBDonor, HBAcceptor, Anionic, Cationic, etc.
+    (ProLIF v1 used HBond / SaltBridge class names.)
     """
     n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
-    if "hydrophobic" in n:
+    if "hydrophobic" in n or "vdw" in n:
         return False
     if "pistacking" in n or "facetoface" in n or "edgetoface" in n:
         return False
@@ -401,17 +399,60 @@ def _is_asp_small_mol_interaction(interaction_name) -> bool:
         k in n
         for k in (
             "hbond",
-            "hydrogenbond",
-            "hacceptor",
+            "hbdonor",
+            "hbacceptor",
             "hdonor",
+            "hacceptor",
+            "hydrogenbond",
+            "implicit",
             "saltbridge",
             "salt",
             "ionic",
             "anionic",
+            "cationic",
             "cationpi",
             "pication",
         )
     )
+
+
+# Backward-compatible alias
+_is_asp_small_mol_interaction = _is_asp_polar_interaction
+
+
+def _asp_contact_category(interaction_name) -> str:
+    """Short label for verbose ASP122 breakdown."""
+    n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
+    if _is_asp_polar_interaction(interaction_name):
+        return "polar"
+    if "hydrophobic" in n:
+        return "hydrophobic"
+    if "pistacking" in n or "facetoface" in n or "edgetoface" in n or ("pi" in n and "stack" in n):
+        return "pistacking"
+    if "vdw" in n:
+        return "vdw"
+    return _interaction_name(interaction_name)
+
+
+def _count_by_category(interaction_dict: dict) -> dict[str, int]:
+    """Sum ProLIF contacts at one ligand–ASP pair by category."""
+    totals: dict[str, int] = {}
+    for name, metadata in interaction_dict.items():
+        if metadata is None:
+            continue
+        cnt = len(metadata) if isinstance(metadata, (list, tuple)) else 1
+        if cnt <= 0:
+            continue
+        cat = _asp_contact_category(name)
+        totals[cat] = totals.get(cat, 0) + cnt
+    return totals
+
+
+def _format_asp_breakdown(breakdown: dict[str, int], polar: int) -> str:
+    parts = [f"{k}={v}" for k, v in sorted(breakdown.items()) if k != "polar"]
+    if polar:
+        parts.append(f"polar={polar}")
+    return ", ".join(parts) if parts else "none"
 
 
 def analyze_asp_interactions(
@@ -420,13 +461,13 @@ def analyze_asp_interactions(
     smiles: str,
     asp_residue: int = 122,
     chains: str = "AB",
-) -> Tuple[int, int, List[dict]]:
+) -> Tuple[int, int, List[dict], dict[str, int]]:
     """
-    Same pattern as analyze_tyr_interactions().
+    ProLIF contacts at ASP122 (homodimer chains A/B).
 
-    Returns (polar_count, any_count, details_list):
-      polar_count — HBond/salt/ionic at ASP (displayed in CSV)
-      any_count   — any ProLIF contact at ASP (use for yes/no filter if needed)
+    Returns (contact_count, polar_count, details_list, category_breakdown):
+      contact_count — all ProLIF contacts (Hydrophobic, PiStacking, VdW, polar, …)
+      polar_count   — HBDonor/HBAcceptor/Anionic/Cationic subset only
     """
     protein = load_protein_for_prolif(receptor_pdb)
     ligand_mol = load_best_pose(docked_sdf, smiles)
@@ -438,19 +479,21 @@ def analyze_asp_interactions(
 
     interactions: List[dict] = []
     polar_total = 0
-    any_total = 0
+    contact_total = 0
+    breakdown: dict[str, int] = {}
 
     for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
         if not _is_residue(prot_res, "ASP", asp_residue):
             continue
-        n_any = count_interactions(interaction_dict, lambda _name: True)
-        n_polar = count_interactions(interaction_dict, _is_asp_small_mol_interaction)
-        if n_any > 0:
-            any_total += n_any
+        n_contact = count_interactions(interaction_dict, lambda _name: True)
+        n_polar = count_interactions(interaction_dict, _is_asp_polar_interaction)
+        contact_total += n_contact
+        polar_total += n_polar
+        for cat, cnt in _count_by_category(interaction_dict).items():
+            breakdown[cat] = breakdown.get(cat, 0) + cnt
         if n_polar > 0:
-            polar_total += n_polar
             for name, metadata in interaction_dict.items():
-                if metadata is None or not _is_asp_small_mol_interaction(name):
+                if metadata is None or not _is_asp_polar_interaction(name):
                     continue
                 cnt = len(metadata) if isinstance(metadata, (list, tuple)) else 1
                 if cnt > 0:
@@ -461,7 +504,7 @@ def analyze_asp_interactions(
                         "count": cnt,
                     })
 
-    return polar_total, any_total, interactions
+    return contact_total, polar_total, interactions, breakdown
 
 
 # ---------------------------------------------------------------------------
