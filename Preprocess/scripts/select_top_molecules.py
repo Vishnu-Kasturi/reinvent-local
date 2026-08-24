@@ -13,7 +13,10 @@ Note: REPO_ROOT = reinvent-local-main/iict_libinvent (auto-resolved from script 
 
 Output columns:
     rank, molID, SMILES, pIC50, Solubility, Docking_Score, Tyrosine_PiStacking,
-    ASP122_Interaction, pose_sdf, composite
+    ASP122_HBond, ASP122_SaltBridge, ASP122_Anionic, ASP122_CationPi, ASP122_PiCation,
+    ASP122_Interactions, ASP122_AllContacts, ASP122_Residues, pose_sdf, composite
+
+Also writes asp122_prolif_summary.txt with per-molecule ProLIF details.
 """
 from __future__ import annotations
 
@@ -46,6 +49,7 @@ REPO_ROOT = _PROJECT_ROOT / "iict_libinvent"
 
 INPUT_CSV = REPO_ROOT / "run5" / "top100_balanced.csv"
 OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
+PROLIF_SUMMARY_TXT = REPO_ROOT / "run5" / "asp122_prolif_summary.txt"
 DOCKING_DIR = REPO_ROOT / "run5" / "docking"          # existing GNINA poses
 NEW_DOCKING_DIR = REPO_ROOT / "run5" / "new_docking"  # missing poses docked here
 TOP_HITS_DOCKING_DIR = REPO_ROOT / "run5" / "top_hits_docking"  # mol{id}_out.sdf for CSV hits
@@ -59,7 +63,9 @@ APPLY_TYR_FILTER = True
 TYR_MIN = 2          # keep molecules with >= 2 pi-pi ring stacks at TYR56
 TYR_MAX = None
 ASP_RESIDUE = 122
-REQUIRE_ASP122 = True   # keep molecules with >=1 ProLIF contact at ASP122
+REQUIRE_ASP122 = True
+# Filter: typed = HBond+Salt+Anionic+CationPi+PiCation > 0; any = any ProLIF ASP contact > 0
+ASP_FILTER_MODE = "any"   # "typed" (5 polar types) or "any" (all ProLIF contacts)
 RUN_PROLIF = True
 
 # If pose not in DOCKING_DIR → GNINA dock into NEW_DOCKING_DIR (never overwrites original)
@@ -80,11 +86,12 @@ WEIGHT_DOCK = 2.0
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from reinvent_gnina_backend import (  # noqa: E402
+    AspInteractionResult,
     GninaProlifConfig,
-    _format_asp_breakdown,
     _smiles_hash,
     analyze_asp_interactions,
     canonicalize,
+    format_asp_prolif_summary,
     run_molecule_pipeline,
 )
 from prolif_compat import residue_ids  # noqa: E402
@@ -181,6 +188,41 @@ def _export_top_hit_poses(
     work["_mol_id"] = mol_ids
     work["_pose_sdf"] = pose_paths
     return work
+
+
+def _empty_asp_result() -> AspInteractionResult:
+    return AspInteractionResult()
+
+
+def _apply_asp_results(work: pd.DataFrame, col_smiles: str, asp_cache: dict[str, AspInteractionResult]) -> pd.DataFrame:
+    str_cols = {"_asp_residues": "residues_str"}
+    int_cols = {
+        "_asp_hbond": "h_bond",
+        "_asp_salt": "salt_bridge",
+        "_asp_anionic": "anionic",
+        "_asp_cationpi": "cation_pi",
+        "_asp_pication": "pi_cation",
+        "_asp122_count": "total_interactions",
+        "_asp_all": "all_contacts",
+    }
+    for col, attr in int_cols.items():
+        work[col] = work[col_smiles].map(
+            lambda s, a=attr: getattr(asp_cache.get(str(s), _empty_asp_result()), a)
+        ).fillna(0).astype(int)
+    for col, attr in str_cols.items():
+        work[col] = work[col_smiles].map(
+            lambda s, a=attr: getattr(asp_cache.get(str(s), _empty_asp_result()), a)
+        ).fillna("")
+    return work
+
+
+def _write_prolif_summary(path: Path, header: str, blocks: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(header.rstrip() + "\n\n")
+        fh.write("\n".join(blocks))
+        if blocks and not blocks[-1].endswith("\n"):
+            fh.write("\n")
 
 
 def _print_series_stats(name: str, series: pd.Series) -> None:
@@ -474,15 +516,19 @@ def _run_asp122(
     smiles: str,
     asp_resid: int,
     verbose: bool,
-) -> int:
-    """Return total ProLIF contact count at ASP122 (all interaction types)."""
-    contacts, polar, _, breakdown = analyze_asp_interactions(
+) -> AspInteractionResult:
+    """Return typed ProLIF ASP122 interaction counts."""
+    result = analyze_asp_interactions(
         receptor_pdb, sdf, smiles, asp_residue=asp_resid
     )
     if verbose:
-        detail = _format_asp_breakdown(breakdown, polar)
-        print(f"       ASP{asp_resid} contacts: {contacts} ({detail})")
-    return contacts
+        print(
+            f"       ASP{asp_resid}: total={result.total_interactions} "
+            f"(HBond={result.h_bond}, Salt={result.salt_bridge}, "
+            f"Anionic={result.anionic}, CationPi={result.cation_pi}, "
+            f"PiCation={result.pi_cation}) @ {result.residues_str or 'none'}"
+        )
+    return result
 
 
 def compute_asp122_for_smiles(
@@ -495,8 +541,8 @@ def compute_asp122_for_smiles(
     mol_id: int = 0,
     flat_pose_dirs: Optional[list[str]] = None,
     verbose: bool = VERBOSE,
-) -> tuple[int, str, bool]:
-    """Return (contact_count, sdf_path, was_newly_docked)."""
+) -> tuple[AspInteractionResult, str, bool]:
+    """Return (AspInteractionResult, sdf_path, was_newly_docked)."""
 
     def _publish_flat_pose(sdf_path: str) -> None:
         for dest_dir in flat_pose_dirs or []:
@@ -515,9 +561,9 @@ def compute_asp122_for_smiles(
             if verbose:
                 print(f"  [mol{mol_id}] POSE FOUND ({source}): {_pose_label(sdf)}")
             try:
-                contacts = _run_asp122(receptor_pdb, sdf, smiles, asp_resid, verbose)
+                asp_result = _run_asp122(receptor_pdb, sdf, smiles, asp_resid, verbose)
                 _publish_flat_pose(sdf)
-                return contacts, sdf, False
+                return asp_result, sdf, False
             except Exception as exc:
                 if verbose:
                     print(f"       ProLIF FAILED: {exc}")
@@ -525,12 +571,12 @@ def compute_asp122_for_smiles(
                 sdf = None
 
     if sdf:
-        return 0, "", False
+        return _empty_asp_result(), "", False
 
     if not allow_redock or gnina_config is None:
         if verbose:
             print(f"  [mol{mol_id}] NO POSE — skipping (re-dock disabled): {smi_short}")
-        return 0, "", False
+        return _empty_asp_result(), "", False
 
     if verbose:
         print(f"  [mol{mol_id}] NO POSE — GNINA docking → {gnina_config.output_root}")
@@ -540,20 +586,20 @@ def compute_asp122_for_smiles(
     if not res.docking_ok or not is_valid_sdf(res.out_sdf):
         if verbose:
             print(f"       GNINA FAILED: {res.error or 'invalid/empty output SDF'}")
-        return 0, "", False
+        return _empty_asp_result(), "", False
 
     pose_cache.register_pose(smiles, res.out_sdf, gnina_config.output_root)
     if verbose:
         print(f"       GNINA OK: {_pose_label(res.out_sdf)}")
     _publish_flat_pose(res.out_sdf)
     try:
-        contacts = _run_asp122(receptor_pdb, res.out_sdf, smiles, asp_resid, verbose)
+        asp_result = _run_asp122(receptor_pdb, res.out_sdf, smiles, asp_resid, verbose)
     except Exception as exc:
         if verbose:
             print(f"       ProLIF FAILED after GNINA: {exc}")
         pose_cache.invalidate(smiles, res.out_sdf)
-        return 0, "", False
-    return contacts, res.out_sdf, True
+        return _empty_asp_result(), "", False
+    return asp_result, res.out_sdf, True
 
 
 def format_output(df: pd.DataFrame) -> pd.DataFrame:
@@ -565,7 +611,14 @@ def format_output(df: pd.DataFrame) -> pd.DataFrame:
         "Solubility": df["_sol"],
         "Docking_Score": df["_dock"],
         "Tyrosine_PiStacking": df["_tyr"].astype("Int64"),
-        "ASP122_Interaction": df["_asp122_count"].astype("Int64"),
+        "ASP122_HBond": df["_asp_hbond"].astype("Int64"),
+        "ASP122_SaltBridge": df["_asp_salt"].astype("Int64"),
+        "ASP122_Anionic": df["_asp_anionic"].astype("Int64"),
+        "ASP122_CationPi": df["_asp_cationpi"].astype("Int64"),
+        "ASP122_PiCation": df["_asp_pication"].astype("Int64"),
+        "ASP122_Interactions": df["_asp122_count"].astype("Int64"),
+        "ASP122_AllContacts": df["_asp_all"].astype("Int64"),
+        "ASP122_Residues": df["_asp_residues"],
         "pose_sdf": df["_pose_sdf"],
         "composite": df["_composite"],
     })
@@ -587,6 +640,7 @@ def select_top(
     new_docking_dir: Optional[str] = None,
     top_hits_docking_dir: Optional[str] = None,
     export_poses: bool = EXPORT_TOP_HIT_POSES,
+    prolif_summary_path: Optional[str] = None,
 ) -> pd.DataFrame:
     col_smiles = _find_column(df, COLUMN_ALIASES["smiles"])
     col_molid = _find_column(df, COLUMN_ALIASES["mol_id"])
@@ -637,20 +691,21 @@ def select_top(
         return work
 
     sdf_cache: dict[str, str] = {}
+    asp_result_cache: dict[str, AspInteractionResult] = {}
+    prolif_summary_blocks: list[str] = []
 
     if compute_asp and receptor_pdb and pose_cache is not None:
         pose_cache.build()
         print(f"Computing ASP{asp_resid} via ProLIF (existing poses first)...")
         smi_to_molid = _smi_to_molid_map(work, col_smiles)
         unique_smiles = sorted(smi_to_molid.keys(), key=lambda s: smi_to_molid[s])
-        asp_contact_cache: dict[str, int] = {}
         flat_dirs = [d for d in [new_docking_dir] if d]
         missing: list[str] = []
         redocked = 0
         found_existing = 0
         for i, smi in enumerate(unique_smiles, 1):
             mol_id = smi_to_molid[smi]
-            contacts, sdf_cache[smi], newly_docked = compute_asp122_for_smiles(
+            asp_result, sdf_cache[smi], newly_docked = compute_asp122_for_smiles(
                 smi,
                 receptor_pdb,
                 pose_cache,
@@ -661,7 +716,17 @@ def select_top(
                 flat_pose_dirs=flat_dirs,
                 verbose=VERBOSE,
             )
-            asp_contact_cache[smi] = contacts
+            asp_result_cache[smi] = asp_result
+            prolif_summary_blocks.append(
+                format_asp_prolif_summary(
+                    mol_id=mol_id,
+                    smiles=smi,
+                    sdf_path=sdf_cache[smi],
+                    asp_residue=asp_resid,
+                    result=asp_result,
+                    prolif_table=asp_result.prolif_table,
+                )
+            )
             if not sdf_cache[smi]:
                 missing.append(smi)
             elif newly_docked:
@@ -669,24 +734,46 @@ def select_top(
             else:
                 found_existing += 1
             if not VERBOSE and (i % 10 == 0 or i == len(unique_smiles)):
-                n_pos = sum(1 for v in asp_contact_cache.values() if v > 0)
-                print(f"  ProLIF ASP{asp_resid}: {i}/{len(unique_smiles)} ({n_pos} with ASP contact)")
+                n_pos = sum(1 for v in asp_result_cache.values() if v.total_interactions > 0)
+                print(f"  ProLIF ASP{asp_resid}: {i}/{len(unique_smiles)} ({n_pos} with typed ASP contact)")
         print(
             f"  Summary: {found_existing} poses from docking/, "
             f"{redocked} newly docked → new_docking/, {len(missing)} failed"
         )
-        _print_series_stats("ASP122 contact counts", pd.Series(list(asp_contact_cache.values())))
+        totals = pd.Series([r.total_interactions for r in asp_result_cache.values()])
+        _print_series_stats("ASP122 typed interaction totals", totals)
         if missing:
             print(f"  WARNING: {len(missing)} SMILES still have no pose after docking")
-        work["_asp122_count"] = work[col_smiles].map(asp_contact_cache).fillna(0).astype(int)
+        work = _apply_asp_results(work, col_smiles, asp_result_cache)
         before = len(work)
         if require_asp122:
-            work = work[work["_asp122_count"] > 0]
-        print(f"After ASP{asp_resid} (ProLIF): {len(work)} (removed {before - len(work)})")
+            if ASP_FILTER_MODE == "any":
+                work = work[work[col_smiles].map(
+                    lambda s: asp_result_cache.get(str(s), _empty_asp_result()).all_contacts
+                ).fillna(0) > 0]
+            else:
+                work = work[work["_asp122_count"] > 0]
+        mode_label = "any contact" if ASP_FILTER_MODE == "any" else "typed interactions"
+        print(f"After ASP{asp_resid} ({mode_label}): {len(work)} (removed {before - len(work)})")
+        if prolif_summary_path:
+            header = (
+                f"ASP{asp_resid} ProLIF summary — all analyzed molecules\n"
+                f"Columns: HBond, SaltBridge, Anionic, CationPi, PiCation → ASP122_Interactions\n"
+                f"Residue labels: ASP{asp_resid}.A / ASP{asp_resid}.B (homodimer)"
+            )
+            _write_prolif_summary(Path(prolif_summary_path), header, prolif_summary_blocks)
+            print(f"  ProLIF summary → {prolif_summary_path}")
     elif col_asp:
         work["_asp122_count"] = work[col_asp].apply(
             lambda v: int(_to_float(v, 0)) if _to_float(v, 0) == int(_to_float(v, 0)) else int(_to_bool_yes(v))
         )
+        work["_asp_hbond"] = 0
+        work["_asp_salt"] = 0
+        work["_asp_anionic"] = work["_asp122_count"]
+        work["_asp_cationpi"] = 0
+        work["_asp_pication"] = 0
+        work["_asp_all"] = work["_asp122_count"]
+        work["_asp_residues"] = f"ASP{asp_resid}.A; ASP{asp_resid}.B"
         before = len(work)
         if require_asp122:
             work = work[work["_asp122_count"] > 0]
@@ -694,6 +781,13 @@ def select_top(
     else:
         print("WARNING: ASP122 not computed — set RUN_PROLIF=True and RECEPTOR_PDB in CONFIG")
         work["_asp122_count"] = 0
+        work["_asp_hbond"] = 0
+        work["_asp_salt"] = 0
+        work["_asp_anionic"] = 0
+        work["_asp_cationpi"] = 0
+        work["_asp_pication"] = 0
+        work["_asp_all"] = 0
+        work["_asp_residues"] = ""
         if require_asp122:
             work = work.iloc[0:0]
 
@@ -751,6 +845,7 @@ def main() -> None:
     output_csv = _P(OUTPUT_CSV)
     docking_dir = str(_P(DOCKING_DIR))
     new_docking_dir = str(_P(NEW_DOCKING_DIR))
+    prolif_summary_txt = str(_P(PROLIF_SUMMARY_TXT))
     top_hits_docking_dir = str(_P(TOP_HITS_DOCKING_DIR))
     allow_redock = REDock_IF_MISSING
 
@@ -784,7 +879,8 @@ def main() -> None:
     print(f"Re-dock miss: {allow_redock}")
     print(f"Top N:        {TOP_N}")
     print(f"TYR filter:   {_tyr_filter_label(TYR_MIN, TYR_MAX)}")
-    print(f"ASP filter:   ProLIF contact at ASP{ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
+    print(f"ProLIF sum:   {prolif_summary_txt}")
+    print(f"ASP filter:   {ASP_FILTER_MODE} ASP{ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
     print()
 
     gnina_config = None
@@ -816,6 +912,7 @@ def main() -> None:
         new_docking_dir=new_docking_dir,
         top_hits_docking_dir=top_hits_docking_dir,
         export_poses=EXPORT_TOP_HIT_POSES,
+        prolif_summary_path=prolif_summary_txt,
     )
 
     if result.empty:

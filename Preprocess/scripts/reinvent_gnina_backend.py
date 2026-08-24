@@ -420,6 +420,112 @@ def _is_asp_polar_interaction(interaction_name) -> bool:
 _is_asp_small_mol_interaction = _is_asp_polar_interaction
 
 
+def _format_prolif_residue(prot_res) -> str:
+    """ProLIF protein residue label, e.g. ASP122.A."""
+    info = _residue_info(prot_res)
+    rn = str(info.get("resname", "") or "").upper()
+    resid = info.get("resid", "")
+    chain = info.get("chain") or info.get("segid") or ""
+    if rn and resid != "":
+        label = f"{rn}{resid}"
+        if chain:
+            label += f".{chain}"
+        return label
+    return str(info["str"])
+
+
+def classify_asp_interaction_bucket(interaction_name) -> str:
+    """
+    Map ProLIF interaction class → ASP122 report bucket.
+
+    ProLIF v2: HBDonor, HBAcceptor, Anionic, Cationic, CationPi, PiCation, …
+    ProLIF v1: HBond, SaltBridge, PiStacking, Hydrophobic, …
+    """
+    n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
+    if "saltbridge" in n or n == "saltbridge":
+        return "salt_bridge"
+    if "cationpi" in n:
+        return "cation_pi"
+    if "pication" in n:
+        return "pi_cation"
+    if "anionic" in n:
+        return "anionic"
+    if any(k in n for k in ("hbdonor", "hbacceptor", "hbond", "hdonor", "hacceptor", "implicithb")):
+        return "h_bond"
+    if "cationic" in n:
+        return "cationic"
+    if "hydrophobic" in n:
+        return "hydrophobic"
+    if "pistacking" in n or "facetoface" in n or "edgetoface" in n or ("pi" in n and "stack" in n):
+        return "pi_stacking"
+    if "vdw" in n:
+        return "vdw"
+    return "other"
+
+
+@dataclass
+class AspInteractionResult:
+    """Typed ProLIF interaction counts at ASP122."""
+
+    h_bond: int = 0
+    salt_bridge: int = 0
+    anionic: int = 0
+    cation_pi: int = 0
+    pi_cation: int = 0
+    hydrophobic: int = 0
+    pi_stacking: int = 0
+    vdw: int = 0
+    cationic: int = 0
+    other: int = 0
+    total_interactions: int = 0
+    all_contacts: int = 0
+    residues: List[str] = field(default_factory=list)
+    interaction_rows: List[dict] = field(default_factory=list)
+    prolif_table: str = ""
+
+    @property
+    def residues_str(self) -> str:
+        return "; ".join(self.residues)
+
+    def as_dict(self) -> dict:
+        return {
+            "h_bond": self.h_bond,
+            "salt_bridge": self.salt_bridge,
+            "anionic": self.anionic,
+            "cation_pi": self.cation_pi,
+            "pi_cation": self.pi_cation,
+            "total_interactions": self.total_interactions,
+            "all_contacts": self.all_contacts,
+            "residues": self.residues_str,
+        }
+
+
+def _asp_bucket_field(bucket: str) -> Optional[str]:
+    mapping = {
+        "h_bond": "h_bond",
+        "salt_bridge": "salt_bridge",
+        "anionic": "anionic",
+        "cation_pi": "cation_pi",
+        "pi_cation": "pi_cation",
+        "hydrophobic": "hydrophobic",
+        "pi_stacking": "pi_stacking",
+        "vdw": "vdw",
+        "cationic": "cationic",
+        "other": "other",
+    }
+    return mapping.get(bucket)
+
+
+def _count_interaction_metadata(metadata) -> int:
+    if metadata is None:
+        return 0
+    if isinstance(metadata, (list, tuple)):
+        return len(metadata)
+    if isinstance(metadata, dict):
+        return max(len(metadata), 1) if metadata else 0
+    return 1
+
+
 def _asp_contact_category(interaction_name) -> str:
     """Short label for verbose ASP122 breakdown."""
     n = _interaction_name(interaction_name).lower().replace("-", "").replace("_", "")
@@ -455,19 +561,76 @@ def _format_asp_breakdown(breakdown: dict[str, int], polar: int) -> str:
     return ", ".join(parts) if parts else "none"
 
 
+def format_asp_prolif_summary(
+    mol_id: int,
+    smiles: str,
+    sdf_path: str,
+    asp_residue: int,
+    result: AspInteractionResult,
+    prolif_table: str = "",
+) -> str:
+    """Human-readable ProLIF summary block for one molecule."""
+    lines = [
+        "=" * 72,
+        f"molID {mol_id}",
+        f"SMILES: {smiles}",
+        f"Pose SDF: {sdf_path or '(none)'}",
+        f"Target: ASP{asp_residue} (homodimer chains A/B)",
+        f"Residues with contacts: {result.residues_str or 'none'}",
+        "",
+        "ASP122 interaction counts:",
+        f"  HBond:        {result.h_bond}",
+        f"  SaltBridge:   {result.salt_bridge}",
+        f"  Anionic:      {result.anionic}",
+        f"  CationPi:     {result.cation_pi}",
+        f"  PiCation:     {result.pi_cation}",
+        f"  TOTAL:        {result.total_interactions}",
+        "",
+        "Other ProLIF contacts at ASP122:",
+        f"  Hydrophobic:  {result.hydrophobic}",
+        f"  PiStacking:   {result.pi_stacking}",
+        f"  VdW:          {result.vdw}",
+        f"  Cationic:     {result.cationic}",
+        f"  Other:        {result.other}",
+        f"  All contacts: {result.all_contacts}",
+        "",
+        "Detailed interactions:",
+    ]
+    if result.interaction_rows:
+        for row in result.interaction_rows:
+            lines.append(
+                f"  {row['protein']:16s} | {row['interaction']:14s} | "
+                f"n={row['count']:2d} | ligand={row['ligand']}"
+            )
+    else:
+        lines.append("  (none)")
+    if prolif_table:
+        lines.extend(["", "ProLIF dataframe:", prolif_table])
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _prolif_ifp_to_text(plf, fp, ifp) -> str:
+    from prolif_compat import ifp_to_dataframe
+    try:
+        df = ifp_to_dataframe(plf, fp, ifp)
+        return df.to_string()
+    except Exception as exc:
+        return f"(dataframe export unavailable: {exc})"
+
+
 def analyze_asp_interactions(
     receptor_pdb: str,
     docked_sdf: str,
     smiles: str,
     asp_residue: int = 122,
     chains: str = "AB",
-) -> Tuple[int, int, List[dict], dict[str, int]]:
+) -> AspInteractionResult:
     """
-    ProLIF contacts at ASP122 (homodimer chains A/B).
+    ProLIF contacts at ASP122 with per-type counts.
 
-    Returns (contact_count, polar_count, details_list, category_breakdown):
-      contact_count — all ProLIF contacts (Hydrophobic, PiStacking, VdW, polar, …)
-      polar_count   — HBDonor/HBAcceptor/Anionic/Cationic subset only
+    total_interactions = HBond + SaltBridge + Anionic + CationPi + PiCation
+    all_contacts       = every ProLIF contact type at ASP122
     """
     protein = load_protein_for_prolif(receptor_pdb)
     ligand_mol = load_best_pose(docked_sdf, smiles)
@@ -477,34 +640,65 @@ def analyze_asp_interactions(
     residues = residue_ids("ASP", asp_residue, chains=chains)
     ifp = run_fingerprint(fp, ligand, protein, residues=residues)
 
-    interactions: List[dict] = []
-    polar_total = 0
-    contact_total = 0
-    breakdown: dict[str, int] = {}
+    result = AspInteractionResult()
+    residue_set: set[str] = set()
 
     for lig_res, prot_res, interaction_dict in iter_ifp_pairs(ifp):
         if not _is_residue(prot_res, "ASP", asp_residue):
             continue
-        n_contact = count_interactions(interaction_dict, lambda _name: True)
-        n_polar = count_interactions(interaction_dict, _is_asp_polar_interaction)
-        contact_total += n_contact
-        polar_total += n_polar
-        for cat, cnt in _count_by_category(interaction_dict).items():
-            breakdown[cat] = breakdown.get(cat, 0) + cnt
-        if n_polar > 0:
-            for name, metadata in interaction_dict.items():
-                if metadata is None or not _is_asp_polar_interaction(name):
-                    continue
-                cnt = len(metadata) if isinstance(metadata, (list, tuple)) else 1
-                if cnt > 0:
-                    interactions.append({
-                        "ligand": str(lig_res),
-                        "protein": str(prot_res),
-                        "interaction": _interaction_name(name),
-                        "count": cnt,
-                    })
+        prot_label = _format_prolif_residue(prot_res)
+        for name, metadata in interaction_dict.items():
+            cnt = _count_interaction_metadata(metadata)
+            if cnt <= 0:
+                continue
+            bucket = classify_asp_interaction_bucket(name)
+            field = _asp_bucket_field(bucket)
+            if field:
+                setattr(result, field, getattr(result, field) + cnt)
+            result.all_contacts += cnt
+            residue_set.add(prot_label)
+            result.interaction_rows.append({
+                "ligand": str(lig_res),
+                "protein": prot_label,
+                "interaction": _interaction_name(name),
+                "bucket": bucket,
+                "count": cnt,
+            })
 
-    return contact_total, polar_total, interactions, breakdown
+    result.residues = sorted(residue_set)
+    result.total_interactions = (
+        result.h_bond
+        + result.salt_bridge
+        + result.anionic
+        + result.cation_pi
+        + result.pi_cation
+    )
+    result.prolif_table = _prolif_ifp_to_text(plf, fp, ifp)
+    return result
+
+
+def analyze_asp_interactions_legacy(
+    receptor_pdb: str,
+    docked_sdf: str,
+    smiles: str,
+    asp_residue: int = 122,
+    chains: str = "AB",
+) -> Tuple[int, int, List[dict], dict[str, int]]:
+    """Backward-compatible tuple return for older callers."""
+    result = analyze_asp_interactions(
+        receptor_pdb, docked_sdf, smiles, asp_residue=asp_residue, chains=chains
+    )
+    breakdown: dict[str, int] = {}
+    for key in ("hydrophobic", "pi_stacking", "vdw", "other"):
+        val = getattr(result, key, 0)
+        if val:
+            breakdown[key] = val
+    polar = result.total_interactions
+    details = [
+        row for row in result.interaction_rows
+        if row["bucket"] in {"h_bond", "salt_bridge", "anionic", "cation_pi", "pi_cation"}
+    ]
+    return result.all_contacts, polar, details, breakdown
 
 
 # ---------------------------------------------------------------------------
