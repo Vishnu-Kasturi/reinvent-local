@@ -86,8 +86,9 @@ AUTOBOX_LIGAND = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pd
 GNINA_EXECUTABLE = "/home/genai/Documents/gnina/gnina"
 
 # Selection ranking weights (higher = more important in composite score)
+# Priority: 1–2 Sol + pIC50 (equal), 3 TYR, 4 Dock; ASP122 is filter-only (skip if 0)
 WEIGHT_SOL = 5.0
-WEIGHT_PIC50 = 4.0
+WEIGHT_PIC50 = 5.0
 WEIGHT_TYR = 3.0
 WEIGHT_DOCK = 2.0
 
@@ -857,7 +858,7 @@ def select_top(
     ]
 
     ranked = work.sort_values(
-        by=["_composite", "_pic50", "_sol", "_dock"],
+        by=["_composite", "_sol", "_pic50", "_dock"],
         ascending=[False, False, False, True],
         na_position="last",
     )
