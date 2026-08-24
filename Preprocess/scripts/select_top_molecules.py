@@ -17,6 +17,10 @@ Output columns:
     ASP122_Interactions, ASP122_AllContacts, ASP122_Residues, pose_sdf, composite
 
 Also writes asp122_prolif_summary.txt with per-molecule ProLIF details.
+
+Outputs:
+    run5/top50_hits.csv + top50_hits_docking/mol{id}_out.sdf
+    run5/top10_hits.csv + top10_hits_docking/mol{id}_out.sdf
 """
 from __future__ import annotations
 
@@ -48,14 +52,19 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 REPO_ROOT = _PROJECT_ROOT / "iict_libinvent"
 
 INPUT_CSV = REPO_ROOT / "run5" / "top100_balanced.csv"
-OUTPUT_CSV = REPO_ROOT / "run5" / "top_hits.csv"
+OUTPUT_CSV_TOP50 = REPO_ROOT / "run5" / "top50_hits.csv"
+OUTPUT_CSV_TOP10 = REPO_ROOT / "run5" / "top10_hits.csv"
+OUTPUT_CSV = OUTPUT_CSV_TOP50  # backward-compatible alias
 PROLIF_SUMMARY_TXT = REPO_ROOT / "run5" / "asp122_prolif_summary.txt"
 DOCKING_DIR = REPO_ROOT / "run5" / "docking"          # existing GNINA poses
 NEW_DOCKING_DIR = REPO_ROOT / "run5" / "new_docking"  # missing poses docked here
-TOP_HITS_DOCKING_DIR = REPO_ROOT / "run5" / "top_hits_docking"  # mol{id}_out.sdf for CSV hits
+TOP50_DOCKING_DIR = REPO_ROOT / "run5" / "top50_hits_docking"
+TOP10_DOCKING_DIR = REPO_ROOT / "run5" / "top10_hits_docking"
+TOP_HITS_DOCKING_DIR = TOP50_DOCKING_DIR  # backward-compatible alias
 EXPORT_TOP_HIT_POSES = True
 
 TOP_N = 50
+TOP_10_N = 10
 # TYR filter — integer pi-pi stack count at TYR56 (2 ligand rings stacking → 2).
 # Tyrosine_PiStacking in LibInvent CSV = TyrInteractionCount_raw from RL.
 # Reward tier is separate: 0→0.0, 1 stack→0.5, >=2 stacks→1.0
@@ -624,6 +633,41 @@ def format_output(df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
+def _finalize_hit_slice(
+    ranked: pd.DataFrame,
+    n: int,
+    col_smiles: str,
+    sdf_cache: dict[str, str],
+    pose_cache: Optional[DockPoseCache],
+    docking_dir: Optional[str],
+    rel_root: Optional[Path],
+    export_poses: bool,
+    label: str,
+) -> pd.DataFrame:
+    """Take top-n ranked rows, export mol{id}_out.sdf poses, return formatted CSV."""
+    if n <= 0 or ranked.empty:
+        return format_output(ranked.iloc[0:0])
+
+    chunk = ranked.head(n).copy()
+    if export_poses and docking_dir:
+        chunk = _export_top_hit_poses(
+            chunk, sdf_cache, col_smiles, docking_dir, rel_to=rel_root
+        )
+        print(f"Exported {len(chunk)} {label} poses → {docking_dir}/mol{{id}}_out.sdf")
+    else:
+        chunk["_mol_id"] = np.arange(len(chunk), dtype=int)
+        if sdf_cache:
+            chunk["_pose_sdf"] = chunk[col_smiles].map(sdf_cache).fillna("")
+        elif pose_cache is not None:
+            chunk["_pose_sdf"] = chunk[col_smiles].map(
+                lambda s: pose_cache.find(str(s)) or ""
+            )
+        else:
+            chunk["_pose_sdf"] = ""
+
+    return format_output(chunk)
+
+
 def select_top(
     df: pd.DataFrame,
     tyr_min: int = TYR_MIN,
@@ -639,9 +683,11 @@ def select_top(
     apply_tyr_filter: bool = APPLY_TYR_FILTER,
     new_docking_dir: Optional[str] = None,
     top_hits_docking_dir: Optional[str] = None,
+    top10_docking_dir: Optional[str] = None,
     export_poses: bool = EXPORT_TOP_HIT_POSES,
     prolif_summary_path: Optional[str] = None,
-) -> pd.DataFrame:
+    top_10_n: int = TOP_10_N,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     col_smiles = _find_column(df, COLUMN_ALIASES["smiles"])
     col_molid = _find_column(df, COLUMN_ALIASES["mol_id"])
     col_tyr = _find_column(df, COLUMN_ALIASES["tyr_count"])
@@ -688,7 +734,7 @@ def select_top(
         print("TYR filter skipped (APPLY_TYR_FILTER=False)")
 
     if work.empty:
-        return work
+        return format_output(work), format_output(work)
 
     sdf_cache: dict[str, str] = {}
     asp_result_cache: dict[str, AspInteractionResult] = {}
@@ -792,7 +838,7 @@ def select_top(
             work = work.iloc[0:0]
 
     if work.empty:
-        return work
+        return format_output(work), format_output(work)
 
     work["_smiles"] = work[col_smiles]
     work["_pic50"] = work[col_pic50].apply(_to_float) if col_pic50 else float("nan")
@@ -810,43 +856,35 @@ def select_top(
         for s, p, t, d in zip(sol_n, pic50_n, tyr_n, dock_n)
     ]
 
-    work = work.sort_values(
+    ranked = work.sort_values(
         by=["_composite", "_pic50", "_sol", "_dock"],
         ascending=[False, False, False, True],
         na_position="last",
     )
 
-    if top_n > 0:
-        work = work.head(top_n)
+    rel50 = Path(top_hits_docking_dir).parent if top_hits_docking_dir else None
+    rel10 = Path(top10_docking_dir).parent if top10_docking_dir else None
 
-    if export_poses and top_hits_docking_dir:
-        rel_root = Path(top_hits_docking_dir).parent
-        work = _export_top_hit_poses(
-            work, sdf_cache, col_smiles, top_hits_docking_dir, rel_to=rel_root
-        )
-        print(f"Exported {len(work)} poses → {top_hits_docking_dir}/mol{{id}}_out.sdf")
-    else:
-        work = work.copy()
-        work["_mol_id"] = np.arange(len(work), dtype=int)
-        if sdf_cache:
-            work["_pose_sdf"] = work[col_smiles].map(sdf_cache).fillna("")
-        elif pose_cache is not None:
-            work["_pose_sdf"] = work[col_smiles].map(
-                lambda s: pose_cache.find(str(s)) or ""
-            )
-        else:
-            work["_pose_sdf"] = ""
-
-    return format_output(work)
+    result_top50 = _finalize_hit_slice(
+        ranked, top_n, col_smiles, sdf_cache, pose_cache,
+        top_hits_docking_dir, rel50, export_poses, "top50",
+    )
+    result_top10 = _finalize_hit_slice(
+        ranked, top_10_n, col_smiles, sdf_cache, pose_cache,
+        top10_docking_dir, rel10, export_poses, "top10",
+    )
+    return result_top50, result_top10
 
 
 def main() -> None:
     input_csv = _P(INPUT_CSV)
-    output_csv = _P(OUTPUT_CSV)
+    output_csv_top50 = _P(OUTPUT_CSV_TOP50)
+    output_csv_top10 = _P(OUTPUT_CSV_TOP10)
     docking_dir = str(_P(DOCKING_DIR))
     new_docking_dir = str(_P(NEW_DOCKING_DIR))
     prolif_summary_txt = str(_P(PROLIF_SUMMARY_TXT))
-    top_hits_docking_dir = str(_P(TOP_HITS_DOCKING_DIR))
+    top50_docking_dir = str(_P(TOP50_DOCKING_DIR))
+    top10_docking_dir = str(_P(TOP10_DOCKING_DIR))
     allow_redock = REDock_IF_MISSING
 
     if not input_csv.is_file():
@@ -864,20 +902,23 @@ def main() -> None:
     if allow_redock:
         os.makedirs(new_docking_dir, exist_ok=True)
     if EXPORT_TOP_HIT_POSES:
-        os.makedirs(top_hits_docking_dir, exist_ok=True)
+        os.makedirs(top50_docking_dir, exist_ok=True)
+        os.makedirs(top10_docking_dir, exist_ok=True)
 
     # Search existing docking first, then any previously new-docked poses
     pose_cache = get_pose_cache([docking_dir, new_docking_dir])
 
     print("=== select_top_molecules ===")
     print(f"Input:        {input_csv}")
-    print(f"Output:       {output_csv}")
+    print(f"Output top50: {output_csv_top50}")
+    print(f"Output top10: {output_csv_top10}")
     print(f"Receptor:     {RECEPTOR_PDB}")
     print(f"Docking dir:  {docking_dir}")
     print(f"New docking:  {new_docking_dir}  (missing poses → mol{{id}}_out.sdf)")
-    print(f"Top poses:    {top_hits_docking_dir}  (final top hits → mol0..molN_out.sdf)")
+    print(f"Top50 poses:  {top50_docking_dir}  (mol0..mol49_out.sdf)")
+    print(f"Top10 poses:  {top10_docking_dir}  (mol0..mol9_out.sdf)")
     print(f"Re-dock miss: {allow_redock}")
-    print(f"Top N:        {TOP_N}")
+    print(f"Top N:        {TOP_N}  |  Top 10: {TOP_10_N}")
     print(f"TYR filter:   {_tyr_filter_label(TYR_MIN, TYR_MAX)}")
     print(f"ProLIF sum:   {prolif_summary_txt}")
     print(f"ASP filter:   {ASP_FILTER_MODE} ASP{ASP_RESIDUE}  {residue_ids('ASP', ASP_RESIDUE)}")
@@ -896,7 +937,7 @@ def main() -> None:
     df = pd.read_csv(input_csv)
     print(f"Columns: {list(df.columns)}\n")
 
-    result = select_top(
+    result_top50, result_top10 = select_top(
         df,
         tyr_min=TYR_MIN,
         tyr_max=TYR_MAX,
@@ -910,19 +951,24 @@ def main() -> None:
         allow_redock=allow_redock,
         apply_tyr_filter=APPLY_TYR_FILTER,
         new_docking_dir=new_docking_dir,
-        top_hits_docking_dir=top_hits_docking_dir,
+        top_hits_docking_dir=top50_docking_dir,
+        top10_docking_dir=top10_docking_dir,
         export_poses=EXPORT_TOP_HIT_POSES,
         prolif_summary_path=prolif_summary_txt,
+        top_10_n=TOP_10_N,
     )
 
-    if result.empty:
+    if result_top50.empty:
         print("\nNo molecules passed filters.")
         sys.exit(1)
 
-    output_csv.parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(output_csv, index=False)
-    print(f"\nSaved {len(result)} molecules → {output_csv}")
-    print(result.head(10).to_string(index=False))
+    output_csv_top50.parent.mkdir(parents=True, exist_ok=True)
+    result_top50.to_csv(output_csv_top50, index=False)
+    result_top10.to_csv(output_csv_top10, index=False)
+    print(f"\nSaved top {len(result_top50)} → {output_csv_top50}")
+    print(f"Saved top {len(result_top10)} → {output_csv_top10}")
+    print("\n--- top 10 preview ---")
+    print(result_top10.to_string(index=False))
 
 
 if __name__ == "__main__":
