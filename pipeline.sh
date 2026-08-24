@@ -149,16 +149,7 @@ fi
 if [[ $START_STEP -le 6 ]]; then
     echo ""
     echo "[*] Step 6: Tanimoto Validation of RL Output"
-    if [[ "$TARGET" == "jak2" ]]; then
-        REF_CSV="Preprocess/Data_jak2/data_csvs/jak2_preprocess_all.csv"
-    else
-        REF_CSV="$PREPROCESS_CSV"
-    fi
-    python Preprocess/scripts/validate_tanimoto_pipeline.py --target "$TARGET" --raw_csv "$REF_CSV"
-    python Preprocess/scripts/measure_tanimoto.py \
-        --input_csv "results/${TARGET}_rl_toml_1.csv" \
-        --output_csv "results/${TARGET}_rl_tanimoto.csv" \
-        --reference "$REF_CSV" || true
+    python Preprocess/scripts/validate_tanimoto_pipeline.py --target "$TARGET" --raw_csv "$RAW_CSV"
 fi
 
 echo ""

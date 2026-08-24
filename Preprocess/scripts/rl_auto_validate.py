@@ -89,7 +89,7 @@ raw_pic50    = df_raw["pic50"].dropna().values
 # ── 1. TOP HITS ───────────────────────────────────────────────────────────────
 df_hits = df_opt[df_opt["pic50"] > 8.5].drop_duplicates("SMILES").sort_values("pic50", ascending=False)
 print(f"[*] Hits pIC50 > 8.5: {len(df_hits)}")
-top30 = df_hits.head(30)[["SMILES", "pic50", "logS", SA_COL]].rename(columns={SA_COL: "SA"})
+top30 = df_hits.head(30)[["SMILES", "pic50", "logS", SA_COL, "Score"]].rename(columns={SA_COL: "SA"})
 top30.to_csv(os.path.join(RES_DIR, "pd1_pdl1_e30_rl_top30.csv"), index=False)
 print(top30.head(10).to_string(index=False))
 

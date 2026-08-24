@@ -224,17 +224,6 @@ fi
 python Preprocess/scripts/run_mol2mol_analysis.py "${PYTHON_ARGS[@]}"
 
 echo ""
-echo "[*] Step 4: Measuring Tanimoto vs JAK2 reference (SMILES-only)..."
-MEASURE_ARGS=(
-    --input_csv "$RESULTS_CSV"
-    --output_csv "results/${RUN_NAME}_tanimoto.csv"
-)
-if [[ "$TARGET" == "jak2" ]]; then
-    MEASURE_ARGS+=(--reference "Preprocess/Data_jak2/data_csvs/jak2_preprocess_all.csv")
-fi
-python Preprocess/scripts/measure_tanimoto.py "${MEASURE_ARGS[@]}" || echo "[!] Tanimoto measurement skipped (missing deps or input)"
-
-echo ""
 echo "========================================================================"
 echo "[+] Mol2Mol Pipeline finished successfully!"
 echo "========================================================================"

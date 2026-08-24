@@ -92,22 +92,6 @@ transform.k        = 0.5
 params.model_path  = "../Preprocess/final_acc/jak2_pic50_final_acc_model.ubj"
 params.scaler_path = "../Preprocess/final_acc/jak2_pic50_final_acc_scaler.pkl"
 
-# ── Tanimoto novelty penalty (vs JAK2 TL train, pIC50 > 6) ───────────────────
-[[stage.scoring.component]]
-[stage.scoring.component.TanimotoPenalty]
-[[stage.scoring.component.TanimotoPenalty.endpoint]]
-name               = "TanimotoPenalty"
-weight             = 1.0
-params.smiles_file = "../data/jak2_TL_train.smi"
-params.threshold   = 0.50
-params.radius      = 2
-[[stage.scoring.component.TanimotoPenalty.endpoint]]
-name               = "MaxTanimoto"
-weight             = 0.0
-params.smiles_file = "../data/jak2_TL_train.smi"
-params.threshold   = 0.50
-params.radius      = 2
-
 
 ##############################################################################
 # STAGE 2: ADMET Refinement (300 steps)
@@ -167,19 +151,3 @@ transform.low      = 6.0
 transform.k        = 0.5
 params.model_path  = "../Preprocess/final_acc/jak2_pic50_final_acc_model.ubj"
 params.scaler_path = "../Preprocess/final_acc/jak2_pic50_final_acc_scaler.pkl"
-
-# ── Tanimoto novelty penalty (vs JAK2 TL train, pIC50 > 6) ───────────────────
-[[stage.scoring.component]]
-[stage.scoring.component.TanimotoPenalty]
-[[stage.scoring.component.TanimotoPenalty.endpoint]]
-name               = "TanimotoPenalty"
-weight             = 1.0
-params.smiles_file = "../data/jak2_TL_train.smi"
-params.threshold   = 0.50
-params.radius      = 2
-[[stage.scoring.component.TanimotoPenalty.endpoint]]
-name               = "MaxTanimoto"
-weight             = 0.0
-params.smiles_file = "../data/jak2_TL_train.smi"
-params.threshold   = 0.50
-params.radius      = 2
