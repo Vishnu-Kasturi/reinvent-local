@@ -1,0 +1,6 @@
+rank,molID,SMILES,pIC50,Solubility,Docking_Score,Tyrosine_PiStacking,TYR56_Interactions,ASP122_HBond,ASP122_SaltBridge,ASP122_Anionic,ASP122_CationPi,ASP122_PiCation,ASP122_Interactions,ASP122_AllContacts,pose_sdf,composite
+1,44,Nc1nn[nH]c1-c1ccc2c(-c3cc4cc(-c5ccc(C6(O)CN(C(=O)N7CCC7C(=O)N7CCCC7)C6)cc5)ccc4[nH]3)n[nH]c2c1,7.7223,-4.1745,-16.9400005,2,2,0,0,0,0,0,0,4,new_docking/batch_000001/mol_0044_e7bd09a9/mol0_out.sdf,
+2,74,Nc1nn[nH]c1-c1ccc2c(-c3cc4cc(-c5cccc(N6CCNCC6CN6CCNC6)n5)ccc4[nH]3)n[nH]c2c1,7.353,-3.9724,-15.5100002,2,2,0,0,0,0,0,0,9,new_docking/batch_000001/mol_0074_985f8ab4/mol0_out.sdf,
+3,18,Cc1ccc(-c2ccc3[nH]c(-c4n[nH]c5cc(-c6[nH]nnc6N)ccc45)cc3c2)cc1CN1CCN(C)CC1=O,7.0178,-4.626,-15.2799997,3,3,0,0,0,0,0,0,7,docking/mol18_out.sdf,
+4,99,Nc1nn[nH]c1-c1ccc2c(-c3cc4cc(-c5cnc(N6CCNCC6)c(NC(=O)C6OCCO6)c5)ccc4[nH]3)n[nH]c2c1,7.5424,-4.2591,-15.1899996,2,2,0,0,0,0,0,0,15,docking/mol99_out.sdf,
+5,76,CNC1CCN(CCc2cc(C(=O)N3CC(O)C3)ccc2-c2ccc3[nH]c(-c4n[nH]c5cc(-c6[nH]nnc6N)ccc45)cc3c2)C1,7.4468,-4.0401,-15.1300001,2,2,0,0,0,0,0,0,7,new_docking/batch_000001/mol_0076_c7a17ed3/mol0_out.sdf,

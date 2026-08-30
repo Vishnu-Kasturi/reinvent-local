@@ -1,0 +1,11 @@
+rank,molID,SMILES,pIC50,Solubility,Docking_Score,Tyrosine_PiStacking,ASP122_HBond,ASP122_SaltBridge,ASP122_Anionic,ASP122_CationPi,ASP122_PiCation,ASP122_Interactions,ASP122_AllContacts,ASP122_Residues,pose_sdf,composite
+1,0,Cn1cc(-c2cc3[nH]nc(-c4ccnc(Cc5ccccc5-n5ncc(CN6CCN(CCO)CC6)n5)c4)c3cn2)cn1,7.7811,-3.1823,-12.7399998,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top10_hits_docking/mol0_out.sdf,0.6942158525115361
+2,1,CNCc1cc(-c2n[nH]c3cc(-c4cnc(NC(=O)c5ccccc5NC(=O)CN5CCN(C)CC5)nc4)ncc23)ccn1,8.2658,-3.9127,-12.0799999,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top10_hits_docking/mol1_out.sdf,0.6795696665744285
+3,2,CN1CCN(Cc2ccc(-c3cc4[nH]nc(-c5ccnc(CN6CCN(C(=O)c7ccc(C(=O)NC8NCCCNC8=O)cc7)CC6)c5)c4cn3)cn2)CC1,8.2885,-2.7425,-14.3599997,2,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top10_hits_docking/mol2_out.sdf,0.6683122777337132
+4,3,CC(=O)NCCCc1cc(-c2n[nH]c3cc(-c4cncc(NC(=O)NCc5ccc(CNC(=O)C6CN(C)CCN6)nc5)c4)ncc23)ccn1,8.6325,-3.0788,-12.6499996,2,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top10_hits_docking/mol3_out.sdf,0.6523960045895627
+5,4,CC1C(=O)NCCN1CCOc1ncc(CN2CCN(c3cc4[nH]nc(-c5ccnc(CCC(O)CO)c5)c4cn3)CC2)cn1,8.3659,-2.5567,-11.1899996,2,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top10_hits_docking/mol4_out.sdf,0.635281742729121
+6,5,CNC(=O)c1cccnc1-c1cc2[nH]nc(-c3ccnc(CNC(CN)c4ccc(C(N)=NCCN5CCN(C)CC5)cc4)c3)c2cn1,7.9708,-2.3504,-12.5299997,2,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top10_hits_docking/mol5_out.sdf,0.6192743477609287
+7,6,Nc1ncc(-c2cc(Nc3cc4[nH]nc(-c5ccnc(CN6CCCC6)c5)c4cn3)c[nH]c2=O)cc1NC(=O)NCCO,8.1811,-4.4155,-12.21,3,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top10_hits_docking/mol6_out.sdf,0.6092609050567875
+8,7,O=C(c1cc(CN2CCN(Cc3cc(-c4n[nH]c5cc(-c6cccnc6)ncc45)ccn3)CC2)ccn1)N1CCOCC1COCCN1CCCN1CCO,8.2039,-2.8774,-11.9700003,2,0,0,0,0,0,0,3,ASP122.B,top10_hits_docking/mol7_out.sdf,0.5866217059332176
+9,8,CC(c1ccc(Nc2ccc(Nc3cc4[nH]nc(-c5ccnc(CNCC6CCCN6)c5)c4cn3)nc2F)nc1)N(C)C1CNC1,7.825,-4.0448,-12.0200005,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top10_hits_docking/mol8_out.sdf,0.5862712865319603
+10,9,CNNC(=Nc1cc(CNc2ccc(-c3cc4[nH]nc(-c5ccnc(CN(C)C)c5)c4cn3)cn2)ccn1)NC1CNCCC1N,8.171,-2.901,-12.25,2,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top10_hits_docking/mol9_out.sdf,0.5841711073629842

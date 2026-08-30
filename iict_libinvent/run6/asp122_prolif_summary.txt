@@ -1,0 +1,3423 @@
+ASP122 ProLIF summary — all analyzed molecules
+Columns: HBond, SaltBridge, Anionic, CationPi, PiCation → ASP122_Interactions
+Residue labels: ASP122.A / ASP122.B (homodimer)
+
+========================================================================
+molID 0
+SMILES: Cn1cc(-c2cc3[nH]nc(-c4ccnc(Cc5ccccc5-n5ncc(CN6CCN(CCO)CC6)n5)c4)c3cn2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 1
+SMILES: CNCc1cc(-c2n[nH]c3cc(-c4cnc(NC(=O)c5ccccc5NC(=O)CN5CCN(C)CC5)nc4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol1_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 2
+SMILES: Nc1ncc(-c2cc(Nc3cc4[nH]nc(-c5ccnc(CN6CCCC6)c5)c4cn3)c[nH]c2=O)cc1NC(=O)NCCO
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol2_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          8
+  Cationic:     0
+  Other:        0
+  All contacts: 8
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 7 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 3
+SMILES: CC(c1ccc(Nc2ccc(Nc3cc4[nH]nc(-c5ccnc(CNCC6CCCN6)c5)c4cn3)nc2F)nc1)N(C)C1CNC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0003_f03eca02/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 4
+SMILES: C=CCNCc1cc(-c2n[nH]c3cc(Nc4cncc(NC(=O)c5cccc(C6CNCCN6)c5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0004_bab8db9a/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 5
+SMILES: CN1CCN(Cc2ccc(-c3cc4[nH]nc(-c5ccnc(CN6CCN(C(=O)c7ccc(C(=O)NC8NCCCNC8=O)cc7)CC6)c5)c4cn3)cn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0005_1755c452/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 6
+SMILES: CC1C(=O)NCCN1CCOc1ncc(CN2CCN(c3cc4[nH]nc(-c5ccnc(CCC(O)CO)c5)c4cn3)CC2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0006_a09bca45/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 7
+SMILES: CC(=O)NCCCc1cc(-c2n[nH]c3cc(-c4cncc(NC(=O)NCc5ccc(CNC(=O)C6CN(C)CCN6)nc5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0007_24e2cc6b/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 8
+SMILES: CNC(=O)c1cccnc1-c1cc2[nH]nc(-c3ccnc(CNC(CN)c4ccc(C(N)=NCCN5CCN(C)CC5)cc4)c3)c2cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0008_1a76528a/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          8
+  Cationic:     0
+  Other:        0
+  All contacts: 8
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 5 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 9
+SMILES: CN1CCSC(=O)C1COc1cccc(NCc2ccc(-c3cc4[nH]nc(-c5ccnc(CC6CNOC6)c5)c4cn3)cn2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0009_a6a4381a/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 10
+SMILES: O=C(c1cc(CN2CCN(Cc3cc(-c4n[nH]c5cc(-c6cccnc6)ncc45)ccn3)CC2)ccn1)N1CCOCC1COCCN1CCCN1CCO
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0010_4474d24c/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 11
+SMILES: CNNC(=Nc1cc(CNc2ccc(-c3cc4[nH]nc(-c5ccnc(CN(C)C)c5)c4cn3)cn2)ccn1)NC1CNCCC1N
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0011_90c6d0e7/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 4 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 12
+SMILES: O=C1NCCN(Cc2cccc(CNc3ncc(-c4cc5[nH]nc(-c6ccnc(CNCc7ccccc7)c6)c5cn4)cn3)c2)C1CO
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0012_4995000d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 4 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 13
+SMILES: CN(C)Cc1cc(-c2n[nH]c3cc(-c4cc(Cn5cnc(NC6CNCCC6N)c5)ccn4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0013_48fe536f/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 14
+SMILES: CN(C)CCCc1cc(-c2n[nH]c3cc(-c4cnc(NC(=O)C(=O)N5CC(NC(=O)c6ccc(CN7CCN(C)CC7)cc6)C5)cn4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol14_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 15
+SMILES: CN(C)CC(=O)N1CCN(CCNc2ccc(Cc3cc(-c4n[nH]c5cc(-c6ccnc(NCC(CO)n7ccccc7=O)n6)ncc45)ccn3)cn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0015_1dd724c8/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          9
+  Cationic:     0
+  Other:        0
+  All contacts: 9
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 7 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 16
+SMILES: Cn1cc(Cn2cc(-c3cc4[nH]nc(-c5ccnc(CC6CCNCC6)c5)c4cn3)cn2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol16_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 17
+SMILES: CC(C)Cc1cc(-c2n[nH]c3cc(N4CCN(Cc5cnc(NC(=O)Cc6ccccn6)nc5)CC4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol17_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 18
+SMILES: CN1CCN(Cc2ccccc2CN2CCN(Cc3cc(-c4n[nH]c5cc(-c6cncnc6)ncc45)ccn3)CC2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol18_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 19
+SMILES: CN1CCC1NC(=O)C(=O)NC1CCN(Cc2ncccc2Cc2cc(-c3n[nH]c4cc(-c5cnnc(N)c5)ncc34)ccn2)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0019_fabc3b36/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 4 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand          UNL1                      
+protein     ASP122.A              ASP122.B
+interaction  HBDonor VdWContact VdWContact
+Frame                                     
+0               True       True       True
+
+========================================================================
+molID 20
+SMILES: CS(=O)(=O)CCN1CCN(CCNC(=O)c2cncnc2-c2cc3[nH]nc(-c4ccnc(CNCCc5cccc(C(=O)N6CCNCC6=O)c5)c4)c3cn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol20_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 21
+SMILES: CN1CCNC(C(=O)NCc2ccccc2CNc2cc3[nH]nc(-c4ccnc(CN5CCOCC5)c4)c3cn2)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0021_1985daaa/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 22
+SMILES: CN1CCN(Cc2cccc(Cc3cc(-c4n[nH]c5cc(-c6cnc(NCCN7CCNCC7)cn6)ncc45)ccn3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol22_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                    
+protein       ASP122.A ASP122.B           
+interaction VdWContact  HBDonor VdWContact
+Frame                                     
+0                 True     True       True
+
+========================================================================
+molID 23
+SMILES: Cc1nc(-c2cc3[nH]nc(-c4ccnc(CN(C)S(=O)(=O)N5CCNC(C)C5)c4)c3cn2)cn1CCO
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0023_af3bc044/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 24
+SMILES: CN1CC(N)C(NC(=O)c2cccc(Cc3cc(-c4n[nH]c5cc(-c6ccccn6)ncc45)ccn3)n2)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0024_77495341/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 25
+SMILES: O=C(O)CCc1cc(-c2n[nH]c3cc(-c4ccc(C(=O)Nc5ccc(CN6CCN(C(=O)C7CC(O)CN7)CC6)nc5)cc4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0025_6a30873d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | HBAcceptor     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                      
+protein       ASP122.A   ASP122.B           
+interaction VdWContact HBAcceptor VdWContact
+Frame                                       
+0                 True       True       True
+
+========================================================================
+molID 26
+SMILES: CN1CCC(Cc2cc(-c3n[nH]c4cc(-c5cnc(NC6CCOCC6NCCn6nccc6CNC(=O)NC6CC6)nc5)ncc34)ccn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0026_86ddab0f/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 5 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                    
+protein       ASP122.A ASP122.B           
+interaction VdWContact  HBDonor VdWContact
+Frame                                     
+0                 True     True       True
+
+========================================================================
+molID 27
+SMILES: Nc1nc(Cc2cc(-c3n[nH]c4cc(-c5cccnc5)ncc34)ccn2)ccc1CN1CCNC(CO)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0027_f59dd674/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        2
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        2
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  2
+  PiStacking:   0
+  VdW:          9
+  Cationic:     0
+  Other:        0
+  All contacts: 13
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 2 | ligand=UNL1
+  ASP122.A         | HBDonor        | n= 2 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 6 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                              
+protein        ASP122.A                      ASP122.B
+interaction Hydrophobic HBDonor VdWContact VdWContact
+Frame                                                
+0                  True    True       True       True
+
+========================================================================
+molID 28
+SMILES: CN1CCN(c2ccc(Cn3ccc(-c4cc5[nH]nc(-c6ccnc(CNc7ccccc7)c6)c5cn4)n3)cn2)C(=O)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol28_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 29
+SMILES: CN1CCN(Cc2ccc(CNc3ncc(-c4cc5[nH]nc(-c6ccnc(CN7CCN(C)CC7)c6)c5cn4)cn3)cc2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol29_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 30
+SMILES: O=C(CO)NC(CO)C(=O)NCCNc1cnccc1Nc1cc2[nH]nc(-c3ccnc(CN4CCCN(Cc5ccccc5)CC4)c3)c2cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0030_50e01ed5/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 31
+SMILES: NC1CCN(C(=O)N2CCN(c3ncc(Nc4cc5[nH]nc(-c6ccnc(CNCc7cccnc7)c6)c5cn4)cn3)CC2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol31_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 32
+SMILES: CC(c1cccc(-c2cc3[nH]nc(-c4ccnc(CN5CCOCC5)c4)c3cn2)c1)n1ccnc1CCN1CCNC(=O)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0032_2038d36b/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 33
+SMILES: COc1ccc(N2CCN(C(=O)CN)CC2)cc1C(=O)NCCNc1cncc(-c2cc3[nH]nc(-c4ccnc(CN(C)C)c4)c3cn2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol33_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 34
+SMILES: CC(Cc1cc(-c2n[nH]c3cc(-c4cncc(NC(=O)CN5CCC6CNCC65)c4)ncc23)ccn1)c1ccc(S(C)(=O)=O)cc1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0034_fcaf9733/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          9
+  Cationic:     0
+  Other:        0
+  All contacts: 10
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 6 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 35
+SMILES: COc1cc(C2CCCN2CCNCc2cc(-c3n[nH]c4cc(-c5cccnc5)ncc34)ccn2)ccc1OCCN1CCN(C)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0035_ebdb42e7/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 36
+SMILES: CNCc1cc(-c2n[nH]c3cc(-c4cnn(Cc5ccnc(C(=O)N6CCCN(C)CC6)c5)n4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol36_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 37
+SMILES: CN1CCNC(C(=O)NCC(=O)Nc2cccc(Nc3cc4[nH]nc(-c5ccnc(CC6CCOCC6)c5)c4cn3)c2)C1=O
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0037_a8ad440e/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 38
+SMILES: CN1CCN(Cc2cccc(Cc3cc(-c4n[nH]c5cc(-c6cncc(OCCN7CCNCC7)c6)ncc45)ccn3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol38_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 39
+SMILES: CC(CN1CCN(C)CC1)NCc1cc(-c2n[nH]c3cc(Nc4cnc(NC(=O)c5cccc(OCCN6CCN(C)CC6)c5)nc4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0039_776bd56f/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 40
+SMILES: Cc1cnc(CN2CCN(c3cc4[nH]nc(-c5ccnc(CC6CC6)c5)c4cn3)CC2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol40_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 41
+SMILES: CC(NC(=O)CN1CCN(C)CC1)c1ccc(Cc2cc(-c3n[nH]c4cc(-c5cnc(N)nc5)ncc34)ccn2)cc1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0041_ed1d2c48/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          7
+  Cationic:     0
+  Other:        0
+  All contacts: 8
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 5 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 42
+SMILES: CN(Cc1cc(Cl)n(Cc2cccc(C3NS(=O)(=O)Cn4c(-c5cc6[nH]nc(-c7ccnc(CN8CCOCC8)c7)c6cn5)ccc43)c2)n1)C(CO)CO
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0042_a588582e/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 43
+SMILES: OCCN1CCN(Cc2ccccc2Cc2cc(-c3n[nH]c4cc(-c5cnn(C6CCNCC6)c5)ncc34)ccn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol43_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 44
+SMILES: CC(=O)N1CCN(Cc2cc(-c3n[nH]c4cc(-c5ccnc(NC(=O)n6cccc6C(=O)NCCN6CCN(C)CC6)c5)ncc34)ccn2)CC1C
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0044_99d04728/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 45
+SMILES: CN1CCN(c2cccc(CNCc3cc(-c4n[nH]c5cc(-c6cncc(N7CCN(C)CC7)c6)ncc45)ccn3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol45_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 46
+SMILES: CN(C=C(N)N)Cc1cc(-c2n[nH]c3cc(NCCc4cccc(OCCN5CCN(C)CC5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol46_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 47
+SMILES: CC(CNC(=O)Nc1ccccc1)NCc1cc(-c2n[nH]c3cc(-c4nn(C)c5nc(C6CNCCN6C)ccc45)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0047_d3cfcb75/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 48
+SMILES: Cn1ccc(Cc2cc(-c3n[nH]c4cc(-c5cnc(CN6CCN(S(C)(=O)=O)CC6)cn5)ncc34)ccn2)n1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol48_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          1
+  Cationic:     0
+  Other:        0
+  All contacts: 1
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.A
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 49
+SMILES: CC(NCc1cc(-c2n[nH]c3cc(-c4cnncc4Cn4ccc5ccccc54)ncc23)ccn1)c1ncc(C2CC=CCNC2(C(N)=O)c2ccccc2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0049_54eafde1/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        2
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        2
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          16
+  Cationic:     0
+  Other:        0
+  All contacts: 18
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 5 | ligand=UNL1
+  ASP122.B         | HBDonor        | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n=11 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                    
+protein       ASP122.A ASP122.B           
+interaction VdWContact  HBDonor VdWContact
+Frame                                     
+0                 True     True       True
+
+========================================================================
+molID 50
+SMILES: CN(c1cncnc1Cn1ccc(-c2cc3[nH]nc(-c4ccnc(Cc5ccncc5)c4)c3cn2)cc1=O)C1CNCC1CCO
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0050_19467e21/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 5 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 51
+SMILES: CN1CCc2c(c[nH]c2-c2cc3[nH]nc(-c4ccnc(Cc5cccc(CN6CCNCC6)c5)c4)c3cn2)C1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol51_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 52
+SMILES: CS(=O)(=O)NCC(O)COc1ccc(Cc2cc(-c3n[nH]c4cc(-c5cnn(S(C)(=O)=O)c5)ncc34)ccn2)cc1N
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0052_77a1a42d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 53
+SMILES: CC1CNCCN1Cc1cc(-c2n[nH]c3cc(-c4ccn(Cc5ccc(S(=O)(=O)N6CCNCC6)cc5)c(=O)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0053_9f260746/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 5 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand          UNL1                      
+protein     ASP122.A              ASP122.B
+interaction  HBDonor VdWContact VdWContact
+Frame                                     
+0               True       True       True
+
+========================================================================
+molID 54
+SMILES: CNC(=O)Cc1cc2n(c1)CCN(CCNc1cc(-c3cc4[nH]nc(-c5ccnc(CNC6COC6)c5)c4cn3)nc(N)n1)C(=O)N2C
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol54_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 55
+SMILES: CC(Cn1cccc1)Nc1nccc(-c2cc3[nH]nc(-c4ccnc(CN5CCN(CCO)CC5)c4)c3cn2)n1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0055_e14ba32a/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 56
+SMILES: CN1CCN(Cc2cccc(Cc3cc(-c4n[nH]c5cc(-c6cccc(S(=O)(=O)N7CCCNCC7)c6)ncc45)ccn3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol56_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 5 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 57
+SMILES: CCN=C(NCCN)NCc1ccccc1Cc1cc(-c2n[nH]c3cc(Nc4cncc(N5CCNCC5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol57_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 58
+SMILES: CC1CNCCN1CC1CC2CN1C(C)CN2C(=O)c1cccc(CNC(=O)CCc2cc(-c3n[nH]c4cc(-c5cnn(C)c5)ncc34)ccn2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0058_e2b0dd54/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          7
+  Cationic:     0
+  Other:        0
+  All contacts: 8
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 4 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 59
+SMILES: CC(NCc1cc(-c2n[nH]c3cc(-c4ccnc(NC(=O)CN5CC6(CNC6=O)NCC5=O)c4)ncc23)ccn1)c1ccccc1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0059_9966a8ec/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 60
+SMILES: CN(C)CCN(C)Cc1ccccc1Cc1cc(-c2n[nH]c3cc(-c4cncc(NS(=O)(=O)N5CCN(C)CC5)n4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol60_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 61
+SMILES: CC1CN(Cc2ccccc2C(=O)NCCC2CN(Cc3cc(-c4n[nH]c5cc(-c6ccnc(CO)c6)ncc45)ccn3)CCN2C)CCC1C(N)=O
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0061_2fab4c49/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 62
+SMILES: COCCN(C)CCC1CNCCN1Cc1ccc(Cc2cc(-c3n[nH]c4cc(-c5c[nH]cc5C)ncc34)ccn2)cc1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0062_585e8a89/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                       
+protein       ASP122.A    ASP122.B           
+interaction VdWContact Hydrophobic VdWContact
+Frame                                        
+0                 True        True       True
+
+========================================================================
+molID 63
+SMILES: CNCc1cc(-c2n[nH]c3cc(-c4cnc(NC(=O)Nc5ccc(NC)c(C(N)=O)c5)nc4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol63_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 64
+SMILES: NCCCc1cc(-c2n[nH]c3cc(C4CCN(S(=O)(=O)Cc5ccccc5)CC4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol64_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 65
+SMILES: CN(C)CCCc1cc(-c2n[nH]c3cc(-c4ccnc(CNCC(N)Cc5ccc(C(=O)N6C=CCN6C)cc5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0065_8112c49b/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 66
+SMILES: O=C1NCCN1CCN1CCN(Cc2cc(-c3n[nH]c4cc(NCCNCc5ccccc5)ncc34)ccn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol66_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 4
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 67
+SMILES: CN1CCCN(c2cc(Nc3cncc(-c4cc5[nH]nc(-c6ccnc(CN7CCNCC7)c6)c5cn4)c3)cc(N3CCOCC3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol67_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          7
+  Cationic:     0
+  Other:        0
+  All contacts: 8
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 68
+SMILES: CC(CN(C)C)NC(=O)c1c(-c2cc3[nH]nc(-c4ccnc(CC5CCN(C)CC5)c4)c3cn2)ccnc1-c1cccc(NCC(=O)N2CCN(C)CC2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0068_6c16a3fe/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 69
+SMILES: CN1CCN(Cc2ccn(Cc3nccc(-c4cc5[nH]nc(-c6ccnc(CNCC7CCOC7)c6)c5cn4)n3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0069_47c45e6e/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 70
+SMILES: CN1CCN(c2ccc(-c3cc4[nH]nc(-c5ccnc(Cc6ccc(CN7CCOCC7CCO)cc6)c5)c4cn3)cn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0070_f638fdaa/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 71
+SMILES: CN1CCN(S(=O)(=O)Cc2cc(-c3cc4[nH]nc(-c5ccnc(CCc6cccc(S(N)(=O)=O)c6)c5)c4cn3)ccn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol71_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 72
+SMILES: CC(=O)n1cc(-c2cc3[nH]nc(-c4ccnc(Cc5cccc(CN6CCN(C)CC6)c5)c4)c3cn2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol72_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 73
+SMILES: CNC(=O)c1ccccc1CC1CN(c2cc3[nH]nc(-c4ccnc(CC5CCN(C(C)=O)CC5)c4)c3cn2)CCO1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0073_94a8f4a5/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          8
+  Cationic:     0
+  Other:        0
+  All contacts: 8
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 4 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 74
+SMILES: NC(=O)N1CCN(CCCNCC(=O)N2CCN(S(=O)(=O)c3ccc(-c4cc5[nH]nc(-c6ccnc(Cc7ccccc7)c6)c5cn4)cc3)CC2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol74_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 75
+SMILES: CN1CCN(c2ccncc2-c2cc3[nH]nc(-c4ccnc(CN5CCS(=O)(=O)CC5)c4)c3cn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol75_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | HBAcceptor     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                      
+protein       ASP122.A   ASP122.B           
+interaction VdWContact HBAcceptor VdWContact
+Frame                                       
+0                 True       True       True
+
+========================================================================
+molID 76
+SMILES: CCC1CN(C)CCN1c1cc(COC)c(-c2cc3[nH]nc(-c4ccnc(Cc5cnn(C6CCNCC6)c5)c4)c3cn2)cn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0076_2d1f633b/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 77
+SMILES: O=C(CN1CCN(Cc2cc(-c3n[nH]c4cc(Nc5ccc(Nc6ccncc6)nc5)ncc34)ccn2)CC1)N1CCN(CCN2CCOCC2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol77_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 78
+SMILES: CN1CCN(CCNC(=O)Nc2cccc(C(=O)NCCCc3cc(-c4n[nH]c5cc(-c6cccnc6)ncc45)ccn3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol78_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 79
+SMILES: CN1CCN(Cc2ccccc2CNCc2cc(-c3n[nH]c4cc(-c5ccc(N6CCN(C)CC6)nc5)ncc34)ccn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol79_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                       
+protein       ASP122.A    ASP122.B           
+interaction VdWContact Hydrophobic VdWContact
+Frame                                        
+0                 True        True       True
+
+========================================================================
+molID 80
+SMILES: NC(=O)c1cccc(C(=O)NCC(=O)NC2COCCN(Cc3cc(-c4n[nH]c5cc(-c6ccccn6)ncc45)ccn3)C2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0080_7ca9ed6c/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 81
+SMILES: CN1CCN(Cc2cnccc2CN(C)c2cc3[nH]nc(-c4ccnc(CN)c4)c3cn2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol81_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 82
+SMILES: CN(C)CCOc1cc(Nc2cc3[nH]nc(-c4ccnc(CCc5ccc(C6NCCN(C)C6=O)c(CO)c5)c4)c3cn2)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0082_83c7b916/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 83
+SMILES: CN1CCN(CCNC(=O)c2cccc(Cc3cc(-c4n[nH]c5cc(-c6cnccn6)ncc45)ccn3)c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol83_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True
+
+========================================================================
+molID 84
+SMILES: CC(CO)Cc1cc(-c2n[nH]c3cc(CCN4CCN(C(=O)c5ccc(N6CCCC6CO)nc5)CC4C)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0084_2d91071f/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          8
+  Cationic:     0
+  Other:        0
+  All contacts: 9
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 5 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                    
+protein       ASP122.A ASP122.B           
+interaction VdWContact  HBDonor VdWContact
+Frame                                     
+0                 True     True       True
+
+========================================================================
+molID 85
+SMILES: CN(C)CC=Nc1ncncc1Nc1nccc(-c2cc3[nH]nc(-c4ccnc(CCC5CN(C)CCN5C)c4)c3cn2)n1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0085_d162696b/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 86
+SMILES: CN(C)Cc1cc(-c2n[nH]c3cc(-c4cncc(OCc5cnccc5OCCNCc5ccc(OC6CNCC6CO)cc5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0086_26a1fa7d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand          UNL1                      
+protein     ASP122.A              ASP122.B
+interaction  HBDonor VdWContact VdWContact
+Frame                                     
+0               True       True       True
+
+========================================================================
+molID 87
+SMILES: CN1CCN(CCOc2ccc3nc(-c4cc5[nH]nc(-c6ccnc(CNCC7CN(C)C(=O)O7)c6)c5cn4)ccc3c2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0087_c75994c0/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  2
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | Hydrophobic    | n= 2 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand             UNL1                      
+protein        ASP122.A              ASP122.B
+interaction Hydrophobic VdWContact VdWContact
+Frame                                        
+0                  True       True       True
+
+========================================================================
+molID 88
+SMILES: CS(=O)(=O)NCc1cc(-c2n[nH]c3cc(-c4cncc(Cn5cc(NS(=O)(=O)C6CCOC6)cn5)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0088_669b811d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          3
+  Cationic:     0
+  Other:        0
+  All contacts: 3
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 89
+SMILES: CS(=O)(=O)Oc1cc(CNC2CCN(C3COC3)C2)cc(Cc2cc(-c3n[nH]c4cc(-c5ccncn5)ncc34)ccn2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0089_bd1f7d4d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 90
+SMILES: NC(CNC(=O)Nc1c(-c2cc3[nH]nc(-c4ccnc(Cc5ccccc5)c4)c3cn2)cnn1C1CNC1)C1CCNCC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0090_ca520885/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  1
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 4 | ligand=UNL1
+  ASP122.B         | Hydrophobic    | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                       
+protein       ASP122.A    ASP122.B           
+interaction VdWContact Hydrophobic VdWContact
+Frame                                        
+0                 True        True       True
+
+========================================================================
+molID 91
+SMILES: O=C(NC1CCC2OCCN2C1)c1cccc(Cc2cc(-c3n[nH]c4cc(-c5ccc(S(=O)(=O)N6CCNCC6)cc5)ncc34)ccn2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0091_709937d0/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 92
+SMILES: CNC(=O)CCc1cc(-c2n[nH]c3cc(-c4cncc(N5CC(Nc6cccc(OCCN7CCN(C)CC7)c6)C(=O)C5=O)c4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0092_3ce09feb/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 93
+SMILES: CNCC(NC(=O)CN1CCNCC1)c1cccc(C(C)NCc2cc(-c3n[nH]c4cc(-c5ccncc5)ncc34)ccn2)c1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0093_2a8e411d/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  2
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | Hydrophobic    | n= 2 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 2 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                       
+protein       ASP122.A    ASP122.B           
+interaction VdWContact Hydrophobic VdWContact
+Frame                                        
+0                 True        True       True
+
+========================================================================
+molID 94
+SMILES: CN(C)Cc1cc(-c2n[nH]c3cc(-c4ccc(CNCc5ccc(CNC(=O)c6cccc(CN7CCN(C)CC7)c6)cn5)nn4)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol94_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        1
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        1
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 7
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 2 | ligand=UNL1
+  ASP122.B         | HBDonor        | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 4 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1                    
+protein       ASP122.A ASP122.B           
+interaction VdWContact  HBDonor VdWContact
+Frame                                     
+0                 True     True       True
+
+========================================================================
+molID 95
+SMILES: CCn1nc(-c2cc3[nH]nc(-c4ccnc(CNC(CO)CO)c4)c3cn2)nc1OCCNCc1ccccc1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol95_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          6
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 3 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 96
+SMILES: CCCc1cc(-c2n[nH]c3cc(NCCNCc4cccn(-c5cccc(CNC(=O)NCCN)c5)c4=O)ncc23)ccn1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol96_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 97
+SMILES: CCNc1nc(NC2CCCC(Nc3cc4[nH]nc(-c5ccnc(CN(C)C)c5)c4cn3)C2)ncc1S(=O)(=O)N1CCNCC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/new_docking/batch_000001/mol_0097_14c14a44/mol0_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        2
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        2
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          4
+  Cationic:     0
+  Other:        0
+  All contacts: 6
+
+Detailed interactions:
+  ASP122.A         | HBDonor        | n= 2 | ligand=UNL1
+  ASP122.A         | VdWContact     | n= 3 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand          UNL1                      
+protein     ASP122.A              ASP122.B
+interaction  HBDonor VdWContact VdWContact
+Frame                                     
+0               True       True       True
+
+========================================================================
+molID 98
+SMILES: CN1CCN(CCN2CCC(n3ccc(COc4ccc(-c5cc6[nH]nc(-c7ccnc(CN8CCCC8)c7)c6cn5)cc4N)c3)CC2)CC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol98_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.A; ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          2
+  Cationic:     0
+  Other:        0
+  All contacts: 2
+
+Detailed interactions:
+  ASP122.A         | VdWContact     | n= 1 | ligand=UNL1
+  ASP122.B         | VdWContact     | n= 1 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1           
+protein       ASP122.A   ASP122.B
+interaction VdWContact VdWContact
+Frame                            
+0                 True       True
+
+========================================================================
+molID 99
+SMILES: O=S(=O)(c1cc(-c2cc3[nH]nc(-c4ccnc(Cc5ccccc5)c4)c3cn2)cnc1OCCN1CCNCC1)C1CNC1
+Pose SDF: /home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/run6/docking/mol99_out.sdf
+Target: ASP122 (homodimer chains A/B)
+Residues with contacts: ASP122.B
+
+ASP122 interaction counts:
+  HBond:        0
+  SaltBridge:   0
+  Anionic:      0
+  CationPi:     0
+  PiCation:     0
+  TOTAL:        0
+
+Other ProLIF contacts at ASP122:
+  Hydrophobic:  0
+  PiStacking:   0
+  VdW:          5
+  Cationic:     0
+  Other:        0
+  All contacts: 5
+
+Detailed interactions:
+  ASP122.B         | VdWContact     | n= 5 | ligand=UNL1
+
+ProLIF dataframe:
+ligand            UNL1
+protein       ASP122.B
+interaction VdWContact
+Frame                 
+0                 True

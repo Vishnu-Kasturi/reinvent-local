@@ -1,0 +1,19 @@
+category,molID,rank,MW,categories
+Composite,0,1,575.68,Composite
+Composite,1,2,591.68,Composite
+Composite,5,3,742.89,"Composite, Docking"
+Composite,6,5,616.73,"Composite, Solubility"
+Composite,7,4,676.79,Composite
+Solubility,8,2,646.8,Solubility
+Solubility,13,5,523.65,Solubility
+ASP,19,1,618.71,ASP
+ASP,22,2,603.78,ASP
+Solubility,23,1,525.64,Solubility
+Docking,24,4,505.59,Docking
+ASP,25,3,675.75,ASP
+ASP,26,4,705.87,ASP
+ASP,27,5,507.6,ASP
+Solubility,46,3,556.72,Solubility
+Docking,51,5,518.67,Docking
+Docking,56,3,636.83,Docking
+Docking,91,1,678.82,Docking

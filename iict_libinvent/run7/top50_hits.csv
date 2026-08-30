@@ -1,0 +1,51 @@
+rank,molID,SMILES,pIC50,Solubility,Docking_Score,Tyrosine_PiStacking,ASP122_HBond,ASP122_SaltBridge,ASP122_Anionic,ASP122_CationPi,ASP122_PiCation,ASP122_Interactions,ASP122_AllContacts,ASP122_Residues,pose_sdf,composite
+1,0,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6[nH]nc7c6ncn7C6CC(O)C(C(O)CO)C6O)cc5C4)[nH]c3c2)n1,7.6755,-3.7726,-14.6099997,3,1,0,0,0,0,1,5,ASP122.A; ASP122.B,top50_hits_docking/mol0_out.sdf,0.7303786962255793
+2,1,CNCC(C)(O)c1nc(-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)n(C)n1,7.8661,-3.955,-13.3500004,3,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top50_hits_docking/mol1_out.sdf,0.7095986500528547
+3,2,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6cn(C7OC(C(=O)NCC(O)CO)C(O)C7O)nn6)cc5C4)[nH]c3c2)n1,7.4102,-3.3903,-13.4499998,3,0,0,0,0,0,0,9,ASP122.A; ASP122.B,top50_hits_docking/mol2_out.sdf,0.7095839022677365
+4,3,NC(=O)CNC(=O)N1CCC(Nc2nccc(-c3ccc4nc(C5COc6ccc(-c7ncc[nH]c7=O)cc6C5)[nH]c4c3)n2)C1,7.6309,-3.7523,-13.5799999,3,1,0,0,0,0,1,10,ASP122.A; ASP122.B,top50_hits_docking/mol3_out.sdf,0.7001149134808725
+5,4,CN1CCC(O)(c2nc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)c[nH]2)CC1,7.7655,-4.249,-14.5100002,3,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top50_hits_docking/mol4_out.sdf,0.6718947432880096
+6,5,CC(=O)N1CCC(Nc2cnc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N7CCOCC7)n6)cc5[nH]3)CO4)cn2)CC1,7.7234,-3.9464,-11.7700005,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol5_out.sdf,0.6450252968904507
+7,6,CC(=O)N1CCC(n2cc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)C1,7.4346,-3.9334,-14.0,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol6_out.sdf,0.64335004113224
+8,7,CN1CCN(CC(O)CNc2nccc(-c3ccc4nc(C5COc6ccc(-c7ncc[nH]7)cc6C5)[nH]c4c3)n2)CC1,7.5131,-3.8386,-12.5200005,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol7_out.sdf,0.6381681805439147
+9,8,CC(=O)N1CCN(c2ncc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)CC1,7.5634,-4.1819,-13.8199997,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top50_hits_docking/mol8_out.sdf,0.6259375555762073
+10,9,CC(=O)N1CCC(NC(=O)c2cc(Nc3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)c[nH]2)CC1,7.5748,-4.1415,-13.3000002,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol9_out.sdf,0.62202398402705
+11,10,CC(=O)N1CCCC(Oc2cnc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)C1,7.6903,-4.3213,-13.5100002,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top50_hits_docking/mol10_out.sdf,0.6219562836425115
+12,11,CC(=O)N1CCN(Cc2cc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)on2)CC1,7.3556,-3.9203,-13.6700001,3,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top50_hits_docking/mol11_out.sdf,0.6219099203279809
+13,12,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6nnn(CC(=O)N7CCC(n8cncn8)CC7)n6)cc5C4)[nH]c3c2)n1,7.3374,-3.9979,-14.25,3,0,0,0,0,0,0,7,ASP122.A; ASP122.B,top50_hits_docking/mol12_out.sdf,0.6201490155739031
+14,13,CC(C)N1CC(CN(C)c2ncc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)N2CC2C1,7.7345,-4.2972,-12.9099998,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol13_out.sdf,0.6200752819664714
+15,14,COC1(C#Cc2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(NC6CNCC(O)(CO)C6)n5)cc4[nH]2)CO3)CN(C)C1,7.895,-3.2699,-13.2700005,2,0,0,0,0,0,0,9,ASP122.A; ASP122.B,top50_hits_docking/mol14_out.sdf,0.6195908454981554
+16,15,CC(=O)N1CCc2c(nc(N3CCNC(CO)C3)nc2-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)C1,7.814,-3.4054,-14.7600002,2,0,0,0,0,0,0,2,ASP122.B,top50_hits_docking/mol15_out.sdf,0.6182092489413734
+17,16,CC(=O)N1CCC(n2ncc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)n2)CC1,7.2945,-3.9406,-14.1499996,3,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top50_hits_docking/mol16_out.sdf,0.618178459603045
+18,17,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6c(Nc7cnccn7)c(C(=O)N7CCNCC7)n[nH]c6=O)cc5C4)[nH]c3c2)n1,7.8691,-4.6474,-13.3100004,3,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top50_hits_docking/mol17_out.sdf,0.601900851217706
+19,18,CC(=O)N1CCC(n2cc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)CC1,7.257,-3.982,-14.0100002,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol18_out.sdf,0.6010172832608892
+20,19,CC(C)(CS(=O)(=O)n1nc(-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)cc1CO)S(C)(=O)=O,7.5803,-4.3933,-13.3199997,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol19_out.sdf,0.5845536255950474
+21,20,COC(=O)N1CCN(CC(C(O)CN2CCCC2=O)n2cc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)CC1,7.7043,-4.5414,-13.2399998,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol20_out.sdf,0.5841473859514807
+22,21,CN(C)C1CCN(C(=O)c2c[nH]nc2-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)C1,7.7443,-4.6312,-13.4799995,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol21_out.sdf,0.5838530217300525
+23,22,CN1CCN(Cc2nocc2-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)CC1,7.3118,-4.0779,-13.3299999,3,0,0,0,0,0,0,7,ASP122.A; ASP122.B,top50_hits_docking/mol22_out.sdf,0.5807138641863113
+24,23,Cc1nccc(-c2ccc3nc(C4COc5ccc(-c6cnc(C(=O)N7CCC8(CO)CCCNC78)[nH]6)cc5C4)[nH]c3c2)n1,7.8027,-4.8392,-14.1000004,3,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top50_hits_docking/mol23_out.sdf,0.5779457597830063
+25,24,CS(=O)(=O)CC1(O)CC(O)C1n1ccc(-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)n1,7.6603,-3.9698,-9.5100002,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol24_out.sdf,0.5749467935998595
+26,25,Nc1nccc(-c2ccc3nc(C4COc5ccc(CCN6CCOC6CN6CCN(CCO)C(=O)C6)cc5C4)[nH]c3c2)n1,7.5506,-3.0399,-12.5799999,2,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol25_out.sdf,0.570812239966873
+27,26,C=CC(=O)N1CCC(N2CCOCC2)C(c2ccc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)nc2)C1,7.7358,-4.7923,-13.8299999,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol26_out.sdf,0.5655660481493565
+28,27,CNC(=O)C1CCCN(C(CO)c2cc(C(=O)N3CC(O)C3)c(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)C1,8.4083,-4.5395,-14.9499998,2,0,0,0,0,0,0,7,ASP122.A; ASP122.B,top50_hits_docking/mol27_out.sdf,0.5641910224399795
+29,28,Nc1nccc(-c2ccc3nc(C4COc5ccc(Nc6ncncc6C6COCCN6)cc5C4)[nH]c3c2)n1,7.4102,-4.3612,-13.6499996,3,1,0,0,0,0,1,11,ASP122.A; ASP122.B,top50_hits_docking/mol28_out.sdf,0.5638567390822044
+30,29,CC(=O)N1C2COC1CC(n1ncnc1Nc1ccc3c(c1)CC(c1nc4ccc(-c5ccnc(N)n5)cc4[nH]1)CO3)C2,7.6417,-4.7407,-14.1899996,3,1,0,0,0,0,1,10,ASP122.A; ASP122.B,top50_hits_docking/mol29_out.sdf,0.5636025236275236
+31,30,CC(=O)N1CCC(c2cc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)c[nH]2)C1,7.4086,-4.0965,-11.8699999,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top50_hits_docking/mol30_out.sdf,0.5620412683991991
+32,31,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6cnc7c(c6)C6CCC(O)(n8cncn8)C6C7c6ncc[nH]6)cc5C4)[nH]c3c2)n1,7.5393,-4.7613,-15.0900002,3,0,0,0,0,0,0,7,ASP122.A; ASP122.B,top50_hits_docking/mol31_out.sdf,0.5617125412410153
+33,32,CC(=O)N1CCN(CC2(O)COC2)CC1CN1CCN(c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)CC1,7.8095,-3.5545,-13.1899996,2,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol32_out.sdf,0.5566934622319528
+34,33,Nc1nccc(-c2ccc3nc(C4COc5ccc(Nc6ccn(C7CN(C8COC8)C7)n6)cc5C4)[nH]c3c2)n1,7.3741,-4.3011,-13.0900002,3,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top50_hits_docking/mol33_out.sdf,0.5526701585744607
+35,34,CS(=O)(=O)n1ncc(-c2nc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cnc2N)n1,7.4963,-4.5075,-13.3900003,3,0,0,0,0,0,0,5,ASP122.A; ASP122.B,top50_hits_docking/mol34_out.sdf,0.5519513544406555
+36,35,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6cc(C7(N)OC(CO)C(O)C7O)ncn6)cc5C4)[nH]c3c2)n1,7.3905,-3.2705,-14.5699997,2,0,0,0,0,0,0,3,ASP122.A,top50_hits_docking/mol35_out.sdf,0.5510306766319458
+37,36,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6cnn(C7OC(CO)C(O)C7n7nncc7CO)c6)cc5C4)[nH]c3c2)n1,7.4925,-3.3853,-14.3999996,2,0,0,0,0,0,0,10,ASP122.A; ASP122.B,top50_hits_docking/mol36_out.sdf,0.5492956872060005
+38,37,CN(C)C1CCN(c2ncc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)C1,7.5224,-4.4841,-12.7799997,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top50_hits_docking/mol37_out.sdf,0.5461520224700327
+39,38,CN(C)C1CCN(c2ncc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)cn2)C1,7.5224,-4.4841,-12.7799997,3,0,0,0,0,0,0,3,ASP122.A; ASP122.B,top50_hits_docking/mol38_out.sdf,0.5461520224700327
+40,39,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6cnc(N7CCN8CCC(C8)C7)nc6)cc5C4)[nH]c3c2)n1,7.4838,-4.6445,-14.1000004,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol39_out.sdf,0.54521329563336
+41,40,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6c[nH]c(C(=O)N7CCS(=O)(=O)CC7)c6)cc5C4)[nH]c3c2)n1,7.6363,-4.8844,-14.2299995,3,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top50_hits_docking/mol40_out.sdf,0.541217013339383
+42,41,NCCNCC1(O)CCN(c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)CCN1,7.6568,-3.2867,-12.0600004,2,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top50_hits_docking/mol41_out.sdf,0.5410804003712553
+43,42,CC(=O)N1CCC(n2cc(-c3ccc4c(c3)CC(c3nc5ccc(-c6ccnc(N)n6)cc5[nH]3)CO4)nn2)CC1,6.8409,-3.8834,-14.1400003,3,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol42_out.sdf,0.5373178711410351
+44,43,Nc1nccc(-c2ccc3nc(C4COc5ccc(NC6OC(O)C7C6CCN7C(=O)CO)cc5C4)[nH]c3c2)n1,7.7689,-3.6268,-13.1599998,2,0,0,0,0,0,0,7,ASP122.A; ASP122.B,top50_hits_docking/mol43_out.sdf,0.5367590973241545
+45,44,Nc1nccc(-c2ccc3nc(C4COc5ccc(Cn6cnc7c6CCNC(=O)C7=O)cc5C4)[nH]c3c2)n1,7.2244,-4.3288,-13.8299999,3,0,0,0,0,0,0,7,ASP122.A; ASP122.B,top50_hits_docking/mol44_out.sdf,0.5365247578249385
+46,45,CC(=O)N1CCN(CC2CN(c3nccc(-c4ccc5nc(C6COc7ccc(N)cc7C6)[nH]c5c4)n3)CCO2)CC1,7.6372,-3.5356,-13.6400003,2,0,0,0,0,0,0,4,ASP122.A; ASP122.B,top50_hits_docking/mol45_out.sdf,0.5363837244617821
+47,46,CC(=O)N1CCC(c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)C(C(=O)N2CCNCC2)C1,7.8991,-3.8578,-13.4899998,2,0,0,0,0,0,0,8,ASP122.A; ASP122.B,top50_hits_docking/mol46_out.sdf,0.5345219981242193
+48,47,CC(O)C(C)(O)c1cc(-c2ccc3c(c2)CC(c2nc4ccc(-c5ccnc(N)n5)cc4[nH]2)CO3)n[nH]c1=O,7.4046,-4.6211,-14.1199999,3,0,0,0,0,0,0,10,ASP122.A; ASP122.B,top50_hits_docking/mol47_out.sdf,0.5336935817658108
+49,48,Nc1nccc(-c2ccc3nc(C4COc5ccc(-c6cnn(CC7CCN(CCO)C7)c6)cc5C4)[nH]c3c2)n1,7.4916,-4.5053,-12.5600004,3,0,0,0,0,0,0,6,ASP122.A; ASP122.B,top50_hits_docking/mol48_out.sdf,0.5315324173914215
+50,49,CN1CCC(Nc2nccc(-c3ccc4nc(C5COc6ccc(N7CCC8CN(C(=O)OCC9CN(CCO)CCO9)CCC87)cc6C5)[nH]c4c3)n2)CC1,7.8459,-3.7232,-12.8999996,2,0,0,0,0,0,0,3,ASP122.A,top50_hits_docking/mol49_out.sdf,0.5307937492167581
