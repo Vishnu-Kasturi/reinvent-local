@@ -33,6 +33,7 @@ dependencies:
 
     # Cheminformatics extras
     - molvs==0.1.1
+    - git+https://github.com/PatWalters/rd_filters.git
 
     # ChEMBL API (used in 1_prepare_data.py)
     - requests==2.34.2
