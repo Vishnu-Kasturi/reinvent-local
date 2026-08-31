@@ -60,7 +60,8 @@ python-dotenv==1.2.2
 pytz==2026.2
 PyYAML==6.0.3
 rdkit==2026.3.2
-git+https://github.com/PatWalters/rd_filters.git
+docopt
+-e ./vendor/rd_filters
 -e ./REINVENT4-vishnu
 requests==2.34.2
 requests-mock==1.12.1

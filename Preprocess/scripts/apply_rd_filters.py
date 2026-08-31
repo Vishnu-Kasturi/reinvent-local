@@ -14,7 +14,11 @@ Usage:
       --input_csv results/top_10_hits.csv \\
       --output_prefix results/top_10_rd
 
-Requires: pip install git+https://github.com/PatWalters/rd_filters.git
+Install (offline / DGX — no git+ pip):
+  pip install -e ./vendor/rd_filters
+
+On laptop: git clone https://github.com/PatWalters/rd_filters
+Copy vendor/rd_filters/ folder to DGX via WinSCP, then pip install -e ./vendor/rd_filters
 """
 from __future__ import annotations
 
@@ -196,7 +200,8 @@ def main() -> None:
     except ImportError as exc:
         print(
             "rd_filters is not installed.\n"
-            "Install with: pip install git+https://github.com/PatWalters/rd_filters.git",
+            "Install from the bundled copy:\n"
+            "  pip install -e ./vendor/rd_filters",
             file=sys.stderr,
         )
         raise SystemExit(1) from exc
