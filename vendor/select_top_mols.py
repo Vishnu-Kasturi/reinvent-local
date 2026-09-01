@@ -279,7 +279,10 @@ def rank_run(df: pd.DataFrame, run_name: str) -> pd.DataFrame:
 
 
 def format_top(df: pd.DataFrame, n: int) -> pd.DataFrame:
-    cols = [
+    top = df.head(n).copy().reset_index(drop=True)
+    top["molID"] = np.arange(len(top), dtype=int)
+
+    base_cols = [
         "run", "rank", "molID", "SMILES",
         "alert_set_score", "pIC50", "Solubility", "composite",
     ]
@@ -287,17 +290,16 @@ def format_top(df: pd.DataFrame, n: int) -> pd.DataFrame:
         "alert_sets_passed", "alert_sets_failed", "property_pass",
         "MW", "LogP", "HBD", "HBA", "TPSA", "Rot",
     ]
-    out_cols = [c for c in cols + optional if c in df.columns]
-    top = df.head(n).copy()
-    top["molID"] = range(len(top))
+    out_cols = [c for c in base_cols if c in top.columns]
+    out_cols += [c for c in optional if c in top.columns and c not in out_cols]
     return top[out_cols]
 
 
 def write_smi(path: Path, df: pd.DataFrame) -> None:
     lines = []
-    for _, row in df.iterrows():
+    for i, row in df.iterrows():
         smi = str(row["SMILES"])
-        mol_id = int(row["molID"])
+        mol_id = int(row["molID"]) if "molID" in df.columns else int(i)
         if Chem.MolFromSmiles(smi) is None:
             continue
         lines.append(f"{smi}\tmol{mol_id}")
@@ -334,7 +336,15 @@ def process_runs(workdir: Path, out_dir: Path) -> None:
         passed_path = _resolve_path(workdir, spec["input"])
         print(f"--- {run_name} ← {passed_path.name} ---")
 
-        df = load_run_table(passed_path)
+        if not passed_path.is_file():
+            print(f"    SKIP: file not found → {passed_path}\n")
+            continue
+
+        try:
+            df = load_run_table(passed_path)
+        except FileNotFoundError as exc:
+            print(f"    SKIP: {exc}\n")
+            continue
         print(f"    Molecules: {len(df)}")
 
         pic50, sol = predict_pic50_sol(df["SMILES"].tolist(), compute_features, bst_pic50, bst_sol)
@@ -355,7 +365,7 @@ def process_runs(workdir: Path, out_dir: Path) -> None:
 
         csv_path = out_dir / f"{run_name}_top{TOP_N}.csv"
         top.to_csv(csv_path, index=False)
-        print(f"    → {csv_path}")
+        print(f"    → {csv_path}  (cols: {', '.join(top.columns)})")
 
         if WRITE_SMI:
             smi_path = out_dir / f"{run_name}_top{TOP_N}.smi"
@@ -384,6 +394,7 @@ def process_runs(workdir: Path, out_dir: Path) -> None:
         raise SystemExit("No runs produced output. Check RUNS paths in CONFIG.")
 
     combined = pd.concat(all_top, ignore_index=True)
+    combined["molID"] = np.arange(len(combined), dtype=int)
     combined_path = out_dir / f"all_runs_top{TOP_N}.csv"
     combined.to_csv(combined_path, index=False)
     print(f"\n[+] Combined → {combined_path}")
