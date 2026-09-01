@@ -22,6 +22,7 @@ Run (edit CONFIG below, then):
 Outputs (per run):
   {out_dir}/{run}_top10.csv
   {out_dir}/{run}_top10.smi          (mol2mol / REINVENT leads)
+  {out_dir}/{run}_top10.png          (RDKit 2x5 grid with scores)
   {out_dir}/all_runs_top10.csv
   {out_dir}/select_top_mols_summary.txt
 """
@@ -36,6 +37,7 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 from rdkit import Chem, RDLogger
+from rdkit.Chem import Draw
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -71,6 +73,10 @@ RUNS = [
 
 OUT_DIR = WORKDIR  # set to another path to write outputs elsewhere
 WRITE_SMI = True   # mol2mol-style .smi (SMILES<TAB>molID)
+WRITE_PNG = True   # RDKit grid PNG per run (2 rows x 5 cols for top 10)
+MOLS_PER_ROW = 5
+SUB_IMG_SIZE = (320, 280)
+LEGEND_FONT_SIZE = 20
 
 # If passed CSV has no alert_set_score, try sibling *_flagged.csv automatically
 FALLBACK_TO_FLAGGED = True
@@ -306,6 +312,49 @@ def write_smi(path: Path, df: pd.DataFrame) -> None:
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
+def _legend_for_row(row: pd.Series) -> str:
+    rank = int(row["rank"]) if "rank" in row.index and pd.notna(row["rank"]) else 0
+    mol_id = int(row["molID"]) if "molID" in row.index and pd.notna(row["molID"]) else 0
+    pic50 = float(row["pIC50"]) if pd.notna(row.get("pIC50")) else float("nan")
+    sol = float(row["Solubility"]) if pd.notna(row.get("Solubility")) else float("nan")
+    alert = float(row["alert_set_score"]) if pd.notna(row.get("alert_set_score")) else float("nan")
+    return (
+        f"Rank {rank} | mol{mol_id}\n"
+        f"pIC50: {pic50:.2f}\n"
+        f"Sol: {sol:.2f}\n"
+        f"Alert: {alert:.2f}"
+    )
+
+
+def write_mol_grid_png(path: Path, df: pd.DataFrame, title: str = "") -> bool:
+    """Save RDKit grid PNG for top molecules with score legends."""
+    mols: list[Chem.Mol] = []
+    legends: list[str] = []
+    for _, row in df.iterrows():
+        mol = Chem.MolFromSmiles(str(row["SMILES"]))
+        if mol is None:
+            continue
+        mols.append(mol)
+        legends.append(_legend_for_row(row))
+
+    if not mols:
+        return False
+
+    dopts = Draw.rdMolDraw2D.MolDrawOptions()
+    dopts.legendFontSize = LEGEND_FONT_SIZE
+
+    img = Draw.MolsToGridImage(
+        mols,
+        molsPerRow=MOLS_PER_ROW,
+        subImgSize=SUB_IMG_SIZE,
+        legends=legends,
+        useSVG=False,
+        drawOptions=dopts,
+    )
+    img.save(str(path))
+    return True
+
+
 def write_summary(path: Path, summaries: list[str]) -> None:
     header = [
         "SELECT TOP MOLECULES — SUMMARY",
@@ -371,6 +420,13 @@ def process_runs(workdir: Path, out_dir: Path) -> None:
             smi_path = out_dir / f"{run_name}_top{TOP_N}.smi"
             write_smi(smi_path, top)
             print(f"    → {smi_path}")
+
+        if WRITE_PNG:
+            png_path = out_dir / f"{run_name}_top{TOP_N}.png"
+            if write_mol_grid_png(png_path, top, title=run_name):
+                print(f"    → {png_path}")
+            else:
+                print(f"    WARNING: no valid SMILES for PNG → {png_path}")
 
         all_top.append(top)
 
