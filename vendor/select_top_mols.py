@@ -9,11 +9,11 @@ weighted composite (alert score + pIC50 + sol), writes top 10 per run.
 Setup (once):
   pip install rdkit pandas xgboost numpy
 
-Models (copy from repo if missing):
-  Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj
-  Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl
-  Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj
-  Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl
+Models live next to this script (vendor folder only):
+  vendor/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj
+  vendor/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl
+  vendor/Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj
+  vendor/Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl
 
 Run (edit CONFIG below, then):
   python3 select_top_mols.py
@@ -44,15 +44,12 @@ RDLogger.DisableLog("rdApp.*")
 # =============================================================================
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
+VENDOR_DIR = _SCRIPT_DIR  # Preprocess/ lives here (same folder as this script)
 
-# None = auto-detect. Checks script dir first (standalone ~/vendor layout),
-# then parent (full reinvent-local repo with vendor/ subfolder).
-REPO_ROOT_OVERRIDE: Path | None = None
-
-PIC50_MODEL_NAME = "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
-PIC50_SCALER_NAME = "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
-SOL_MODEL_NAME = "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
-SOL_SCALER_NAME = "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
+PIC50_MODEL = VENDOR_DIR / "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
+PIC50_SCALER = VENDOR_DIR / "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
+SOL_MODEL = VENDOR_DIR / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
+SOL_SCALER = VENDOR_DIR / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
 
 TOP_N = 10
 
@@ -82,26 +79,6 @@ FALLBACK_TO_FLAGGED = True
 
 SMILES_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
 ALERT_COLS = ("alert_set_score", "alert score", "alert_score")
-
-_MODEL_MARKER = Path(PIC50_MODEL_NAME)
-
-
-def _find_repo_root() -> Path:
-    if REPO_ROOT_OVERRIDE is not None:
-        return Path(REPO_ROOT_OVERRIDE).expanduser().resolve()
-    for candidate in (_SCRIPT_DIR, _SCRIPT_DIR.parent, _SCRIPT_DIR.parent.parent):
-        if (_MODEL_MARKER if _MODEL_MARKER.is_absolute() else candidate / _MODEL_MARKER).is_file():
-            return candidate.resolve()
-    return _SCRIPT_DIR.resolve()
-
-
-def _model_paths(repo_root: Path) -> tuple[Path, Path, Path, Path]:
-    return (
-        repo_root / PIC50_MODEL_NAME,
-        repo_root / PIC50_SCALER_NAME,
-        repo_root / SOL_MODEL_NAME,
-        repo_root / SOL_SCALER_NAME,
-    )
 
 
 def _resolve_path(base: Path, path: str | Path) -> Path:
@@ -224,58 +201,41 @@ def _weighted_mean(scores: list[float], weights: list[float]) -> float:
     return float(np.average(s_arr, weights=w_arr))
 
 
-def _import_compute_features(repo_root: Path):
+def _import_compute_features():
     sys.path.insert(0, str(_SCRIPT_DIR))
     try:
         from pd1_pdl1_features import compute_features  # noqa: WPS433
 
         return compute_features
-    except ImportError:
-        pass
-
-    reinvent4 = repo_root / "REINVENT4"
-    if reinvent4.is_dir():
-        sys.path.insert(0, str(reinvent4))
-        from reinvent_plugins.components.pd1_pdl1_features import compute_features  # noqa: WPS433
-
-        return compute_features
-
-    raise SystemExit(
-        "Could not import compute_features.\n"
-        f"  Expected vendored module: {_SCRIPT_DIR / 'pd1_pdl1_features.py'}\n"
-        f"  Or REINVENT4 at: {reinvent4}"
-    )
+    except ImportError as exc:
+        raise SystemExit(
+            f"Missing feature module: {_SCRIPT_DIR / 'pd1_pdl1_features.py'}\n"
+            "Copy pd1_pdl1_features.py into your vendor folder."
+        ) from exc
 
 
 def load_models():
-    repo_root = _find_repo_root()
-    pic50_model, pic50_scaler, sol_model, sol_scaler = _model_paths(repo_root)
-
     for label, path in (
-        ("pIC50 model", pic50_model),
-        ("pIC50 scaler", pic50_scaler),
-        ("Sol model", sol_model),
-        ("Sol scaler", sol_scaler),
+        ("pIC50 model", PIC50_MODEL),
+        ("pIC50 scaler", PIC50_SCALER),
+        ("Sol model", SOL_MODEL),
+        ("Sol scaler", SOL_SCALER),
     ):
         if not path.is_file():
             raise SystemExit(
                 f"Missing {label}:\n  {path}\n\n"
-                f"Place models under:\n"
-                f"  {_SCRIPT_DIR / 'Preprocess/final_acc/'}\n"
-                f"  (standalone vendor folder)\n"
-                f"or\n"
-                f"  <reinvent-local>/Preprocess/final_acc/\n"
-                f"Auto-detected repo root: {repo_root}"
+                f"Expected under vendor folder:\n"
+                f"  {VENDOR_DIR / 'Preprocess/final_acc/'}"
             )
 
-    compute_features = _import_compute_features(repo_root)
+    compute_features = _import_compute_features()
 
     bst_pic50 = xgb.Booster()
-    bst_pic50.load_model(str(pic50_model))
+    bst_pic50.load_model(str(PIC50_MODEL))
     bst_sol = xgb.Booster()
-    bst_sol.load_model(str(sol_model))
+    bst_sol.load_model(str(SOL_MODEL))
 
-    return compute_features, bst_pic50, bst_sol, pic50_scaler, sol_scaler, repo_root
+    return compute_features, bst_pic50, bst_sol
 
 
 def predict_pic50_sol(
@@ -283,14 +243,12 @@ def predict_pic50_sol(
     compute_features,
     bst_pic50: xgb.Booster,
     bst_sol: xgb.Booster,
-    pic50_scaler: Path,
-    sol_scaler: Path,
 ) -> tuple[list[float], list[float]]:
-    X_p, mask_p = compute_features(smiles, str(pic50_scaler))
+    X_p, mask_p = compute_features(smiles, str(PIC50_SCALER))
     X_p = X_p[:, :2415]
     preds_p = bst_pic50.predict(xgb.DMatrix(X_p))
 
-    X_s, mask_s = compute_features(smiles, str(sol_scaler))
+    X_s, mask_s = compute_features(smiles, str(SOL_SCALER))
     preds_s = bst_sol.predict(xgb.DMatrix(X_s))
 
     pic50 = [float(preds_p[i]) if mask_p[i] else float("nan") for i in range(len(smiles))]
@@ -351,7 +309,7 @@ def write_summary(path: Path, summaries: list[str]) -> None:
         "SELECT TOP MOLECULES — SUMMARY",
         "=" * 60,
         f"Generated : {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
-        f"Repo root : {_find_repo_root()}",
+        f"Vendor dir: {VENDOR_DIR}",
         f"Top N     : {TOP_N}",
         f"Weights   : alert={WEIGHT_ALERT}, pIC50={WEIGHT_PIC50}, sol={WEIGHT_SOL}",
         "",
@@ -360,13 +318,13 @@ def write_summary(path: Path, summaries: list[str]) -> None:
 
 
 def process_runs(workdir: Path, out_dir: Path) -> None:
-    compute_features, bst_pic50, bst_sol, pic50_scaler, sol_scaler, repo_root = load_models()
+    compute_features, bst_pic50, bst_sol = load_models()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     all_top: list[pd.DataFrame] = []
     summary_lines: list[str] = []
 
-    print(f"[*] Repo root : {repo_root}")
+    print(f"[*] Vendor dir: {VENDOR_DIR}")
     print(f"[*] Work dir  : {workdir}")
     print(f"[*] Output dir: {out_dir}")
     print(f"[*] Top N={TOP_N} | weights alert={WEIGHT_ALERT} pIC50={WEIGHT_PIC50} sol={WEIGHT_SOL}\n")
@@ -379,14 +337,7 @@ def process_runs(workdir: Path, out_dir: Path) -> None:
         df = load_run_table(passed_path)
         print(f"    Molecules: {len(df)}")
 
-        pic50, sol = predict_pic50_sol(
-            df["SMILES"].tolist(),
-            compute_features,
-            bst_pic50,
-            bst_sol,
-            pic50_scaler,
-            sol_scaler,
-        )
+        pic50, sol = predict_pic50_sol(df["SMILES"].tolist(), compute_features, bst_pic50, bst_sol)
         df["pIC50"] = pic50
         df["Solubility"] = sol
 
