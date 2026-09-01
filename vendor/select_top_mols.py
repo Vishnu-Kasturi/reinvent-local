@@ -75,8 +75,8 @@ OUT_DIR = WORKDIR  # set to another path to write outputs elsewhere
 WRITE_SMI = True   # mol2mol-style .smi (SMILES<TAB>molID)
 WRITE_PNG = True   # RDKit grid PNG per run (2 rows x 5 cols for top 10)
 MOLS_PER_ROW = 5
-SUB_IMG_SIZE = (320, 280)
-LEGEND_FONT_SIZE = 20
+SUB_IMG_SIZE = (480, 420)   # taller cells so large legends fit
+LEGEND_FONT_SIZE = 36       # pIC50 / Sol / Alert text under each structure
 
 # If passed CSV has no alert_set_score, try sibling *_flagged.csv automatically
 FALLBACK_TO_FLAGGED = True
