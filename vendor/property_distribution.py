@@ -9,8 +9,8 @@ Computes MW, LogP, HBD, HBA, TPSA, Rot for every valid SMILES and writes:
 Reference ranges (from filter_csv defaults) are shown for comparison only.
 
 Run:
-  python property_distribution.py my_molecules.csv
-  python property_distribution.py my_molecules.csv --out results/my_dist
+  python3 property_distribution.py my_molecules.csv
+  python3 property_distribution.py my_molecules.csv --out results/my_dist
 """
 from __future__ import annotations
 
@@ -20,11 +20,61 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem
+from rdkit.Chem.Descriptors import MolLogP, MolWt, NumHAcceptors, NumHDonors, TPSA
+from rdkit.Chem.rdMolDescriptors import CalcNumRotatableBonds
 
-from chem_utils import PROP_COLS, REFERENCE_RANGES, read_smiles, properties_for_smiles
+SMILES_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
+PROP_COLS = ("MW", "LogP", "HBD", "HBA", "TPSA", "Rot")
+REFERENCE_RANGES = {
+    "MW": [0, 500],
+    "LogP": [-5, 5],
+    "HBD": [0, 5],
+    "HBA": [0, 10],
+    "TPSA": [0, 200],
+    "Rot": [0, 10],
+}
 
 DEDUPE_SMILES = False
 HISTOGRAM_BINS = 10
+
+
+def read_smiles(csv_path: Path, dedupe: bool = False) -> list[str]:
+    text = csv_path.read_text(encoding="utf-8", errors="replace")
+    first = text.splitlines()[0] if text else ""
+    sep = ";" if first.count(";") > first.count(",") else ","
+    header = pd.read_csv(csv_path, sep=sep, nrows=0)
+    col = next((c for c in header.columns if c.strip().lower() in {n.lower() for n in SMILES_NAMES}), None)
+    if not col:
+        raise SystemExit(f"No SMILES column in {csv_path}. Columns: {list(header.columns)}")
+    s = pd.read_csv(csv_path, sep=sep, usecols=[col], dtype=str)[col]
+    smiles = s.dropna().astype(str).str.strip().loc[lambda x: x != ""].tolist()
+    if dedupe:
+        smiles = list(dict.fromkeys(smiles))
+    return smiles
+
+
+def properties_for_smiles(smiles: str) -> dict[str, float] | None:
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    return {
+        "MW": MolWt(mol),
+        "LogP": MolLogP(mol),
+        "HBD": float(NumHDonors(mol)),
+        "HBA": float(NumHAcceptors(mol)),
+        "TPSA": TPSA(mol),
+        "Rot": float(CalcNumRotatableBonds(mol)),
+    }
+
+
+def _resolve_input(path: str) -> Path:
+    p = Path(path).expanduser()
+    if p.exists():
+        return p.resolve()
+    if not p.suffix and Path(f"{p}.csv").exists():
+        return Path(f"{p}.csv").resolve()
+    raise SystemExit(f"File not found: {path}  (tried also {path}.csv)")
 
 
 def _percentiles(series: pd.Series) -> dict[str, float]:
@@ -107,7 +157,7 @@ def main() -> None:
     p.add_argument("--dedupe", action="store_true", help="Unique SMILES only")
     args = p.parse_args()
 
-    inp = Path(args.input_csv).expanduser().resolve()
+    inp = _resolve_input(args.input_csv)
     prefix = Path(args.out).resolve() if args.out else inp.with_suffix("").resolve().parent / f"{inp.stem}_dist"
     prefix.parent.mkdir(parents=True, exist_ok=True)
 

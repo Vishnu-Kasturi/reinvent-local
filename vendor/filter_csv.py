@@ -12,8 +12,8 @@ Setup (once):
   pip install -e ./rd_filters
 
 Run:
-  python filter_csv.py my_molecules.csv
-  python filter_csv.py my_molecules.csv --out results/my_run
+  python3 filter_csv.py my_molecules.csv
+  python3 filter_csv.py my_molecules.csv --out results/my_run
 
 Outputs:
   {prefix}_flagged.csv  — all molecules + scores
@@ -30,8 +30,46 @@ from pathlib import Path
 
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem.Descriptors import MolLogP, MolWt, NumHAcceptors, NumHDonors, TPSA
+from rdkit.Chem.rdMolDescriptors import CalcNumRotatableBonds
 
-from chem_utils import PROP_COLS, read_smiles, calc_properties
+SMILES_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
+PROP_COLS = ("MW", "LogP", "HBD", "HBA", "TPSA", "Rot")
+
+
+def read_smiles(csv_path: Path, dedupe: bool = False) -> list[str]:
+    text = csv_path.read_text(encoding="utf-8", errors="replace")
+    first = text.splitlines()[0] if text else ""
+    sep = ";" if first.count(";") > first.count(",") else ","
+    header = pd.read_csv(csv_path, sep=sep, nrows=0)
+    col = next((c for c in header.columns if c.strip().lower() in {n.lower() for n in SMILES_NAMES}), None)
+    if not col:
+        raise SystemExit(f"No SMILES column in {csv_path}. Columns: {list(header.columns)}")
+    s = pd.read_csv(csv_path, sep=sep, usecols=[col], dtype=str)[col]
+    smiles = s.dropna().astype(str).str.strip().loc[lambda x: x != ""].tolist()
+    if dedupe:
+        smiles = list(dict.fromkeys(smiles))
+    return smiles
+
+
+def calc_properties(mol: Chem.Mol) -> dict[str, float]:
+    return {
+        "MW": MolWt(mol),
+        "LogP": MolLogP(mol),
+        "HBD": float(NumHDonors(mol)),
+        "HBA": float(NumHAcceptors(mol)),
+        "TPSA": TPSA(mol),
+        "Rot": float(CalcNumRotatableBonds(mol)),
+    }
+
+
+def _resolve_input(path: str) -> Path:
+    p = Path(path).expanduser()
+    if p.exists():
+        return p.resolve()
+    if not p.suffix and Path(f"{p}.csv").exists():
+        return Path(f"{p}.csv").resolve()
+    raise SystemExit(f"File not found: {path}  (tried also {path}.csv")
 
 # =============================================================================
 # CONFIG — edit only this block, then run the script
@@ -258,7 +296,7 @@ def main() -> None:
             "  pip install -e ./rd_filters"
         ) from None
 
-    inp = Path(args.input_csv).expanduser().resolve()
+    inp = _resolve_input(args.input_csv)
     prefix = Path(args.out).resolve() if args.out else inp.with_suffix("").resolve()
     prefix.parent.mkdir(parents=True, exist_ok=True)
 
