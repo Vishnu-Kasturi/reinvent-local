@@ -7,7 +7,7 @@ predicts pIC50 and solubility (logS) with PD1-PDL1 XGBoost models, ranks by
 weighted composite (alert score + pIC50 + sol), writes top 10 per run.
 
 Setup (once):
-  pip install rdkit pandas xgboost numpy
+  pip install rdkit pandas xgboost numpy scikit-learn
 
 Models live next to this script (vendor folder only):
   vendor/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj
