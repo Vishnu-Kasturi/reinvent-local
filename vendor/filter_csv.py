@@ -2,6 +2,11 @@
 """
 filter_csv.py — RD Filters on CSV (SMILES column only). Edit CONFIG below, then run.
 
+Property limits: all must pass (hard filter).
+Alert sets: each enabled set must have zero SMARTS hits to count as "set passed".
+alert_set_score = (sets passed) / (enabled sets)  →  1.0, 0.75, 0.5, 0.25, 0.0, ...
+Overall pass: all properties OK  AND  alert_set_score >= ALERT_SET_PASS_FRACTION
+
 Setup (once):
   pip install rdkit pandas docopt
   pip install -e ./rd_filters
@@ -11,28 +16,27 @@ Run:
   python filter_csv.py my_molecules.csv --out results/my_run
 
 Outputs:
-  {prefix}_passed.csv   — passing SMILES + filters_passed
-  {prefix}_failed.csv   — failing SMILES + filters_failed
-  {prefix}_summary.txt  — settings used + run statistics
+  {prefix}_flagged.csv  — all molecules + scores
+  {prefix}_passed.csv — overall pass
+  {prefix}_failed.csv — overall fail
+  {prefix}_summary.txt
 """
 from __future__ import annotations
 
 import argparse
-import sys
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
 
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem.Descriptors import MolLogP, MolWt, NumHAcceptors, NumHDonors, TPSA
-from rdkit.Chem.rdMolDescriptors import CalcNumRotatableBonds
+
+from chem_utils import PROP_COLS, read_smiles, calc_properties
 
 # =============================================================================
 # CONFIG — edit only this block, then run the script
 # =============================================================================
 
-# Property limits [min, max] inclusive
 PROPERTY_LIMITS = {
     "MW": [0, 500],
     "LogP": [-5, 5],
@@ -42,38 +46,27 @@ PROPERTY_LIMITS = {
     "Rot": [0, 10],
 }
 
-# ChEMBL structural alert sets (True = enabled)
-# Sets: BMS, Dundee, Glaxo, Inpharmatica, LINT, MLSMR, PAINS, SureChEMBL
+# ChEMBL structural alert sets — set True to include in scoring
 ALERT_SETS = {
-    "BMS": False,
-    "Dundee": False,
-    "Glaxo": False,
+    "BMS": True,
+    "Dundee": True,
+    "Glaxo": True,
     "Inpharmatica": True,
-    "LINT": False,
-    "MLSMR": False,
-    "PAINS": False,
-    "SureChEMBL": False,
+    "LINT": True,
+    "MLSMR": True,
+    "PAINS": True,
+    "SureChEMBL": True,
 }
 
-# Path to alert SMARTS file (None = use rd_filters package default)
-ALERTS_CSV = None
+# Minimum fraction of alert sets that must pass (0.5 = at least half)
+ALERT_SET_PASS_FRACTION = 0.5
 
-# Deduplicate SMILES before filtering
+ALERTS_CSV = None
 DEDUPE_SMILES = False
 
 # =============================================================================
 # End CONFIG
 # =============================================================================
-
-SMILES_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
-PROP_COLS = ("MW", "LogP", "HBD", "HBA", "TPSA", "Rot")
-
-
-def _config_rule_dict() -> dict:
-    rules = {k: list(v) for k, v in PROPERTY_LIMITS.items()}
-    for name, enabled in ALERT_SETS.items():
-        rules[f"Rule_{name}"] = bool(enabled)
-    return rules
 
 
 def _enabled_alert_sets() -> list[str]:
@@ -89,99 +82,118 @@ def _resolve_alerts_path() -> str:
     return str(resources.files("rd_filters") / "data" / "alert_collection.csv")
 
 
-def read_smiles(csv_path: Path) -> list[str]:
-    text = csv_path.read_text(encoding="utf-8", errors="replace")
-    first = text.splitlines()[0] if text else ""
-    sep = ";" if first.count(";") > first.count(",") else ","
-    header = pd.read_csv(csv_path, sep=sep, nrows=0)
-    col = next((c for c in header.columns if c.strip().lower() in {n.lower() for n in SMILES_NAMES}), None)
-    if not col:
-        raise SystemExit(f"No SMILES column in {csv_path}. Columns: {list(header.columns)}")
-    s = pd.read_csv(csv_path, sep=sep, usecols=[col], dtype=str)[col]
-    smiles = s.dropna().astype(str).str.strip().loc[lambda x: x != ""].tolist()
-    if DEDUPE_SMILES:
-        smiles = list(dict.fromkeys(smiles))
-    return smiles
-
-
-def _calc_properties(mol: Chem.Mol) -> dict[str, float]:
-    return {
-        "MW": MolWt(mol),
-        "LogP": MolLogP(mol),
-        "HBD": float(NumHDonors(mol)),
-        "HBA": float(NumHAcceptors(mol)),
-        "TPSA": TPSA(mol),
-        "Rot": float(CalcNumRotatableBonds(mol)),
-    }
-
-
-def _build_alert_rules(alerts_path: str, enabled_sets: list[str]):
+def _build_rules_by_set(alerts_path: str, enabled_sets: list[str]) -> dict[str, list]:
     from rd_filters.rd_filters import RDFilters
 
-    rf = RDFilters(alerts_path)
-    rf.build_rule_list(enabled_sets)
-    return rf.rule_list
+    rules: dict[str, list] = {}
+    for name in enabled_sets:
+        rf = RDFilters(alerts_path)
+        rf.build_rule_list([name])
+        rules[name] = rf.rule_list
+    return rules
+
+
+def _check_property_limits(props: dict[str, float], limits: dict) -> tuple[bool, list[str], list[str]]:
+    passed, failed = [], []
+    for prop in PROP_COLS:
+        lo, hi = limits[prop]
+        val = props[prop]
+        if lo <= val <= hi:
+            passed.append(f"{prop}=[{lo},{hi}]")
+        else:
+            failed.append(f"{prop}={val:.3g} not in [{lo},{hi}]")
+    return len(failed) == 0, passed, failed
+
+
+def _check_alert_set(mol: Chem.Mol, rule_list: list) -> tuple[bool, str]:
+    """Set passes if no SMARTS alert fires."""
+    for smarts_mol, max_val, desc in rule_list:
+        if len(mol.GetSubstructMatches(smarts_mol)) > max_val:
+            return False, f"{desc} > {max_val}"
+    return True, ""
+
+
+def _alert_set_score(n_sets_passed: int, n_sets_total: int) -> float:
+    if n_sets_total == 0:
+        return 1.0
+    return round(n_sets_passed / n_sets_total, 4)
 
 
 def evaluate_molecule(
     smiles: str,
     name: str,
-    rule_list: list,
-    rule_dict: dict,
+    rules_by_set: dict[str, list],
+    limits: dict,
 ) -> dict:
-    mol = Chem.MolFromSmiles(smiles)
     row: dict = {"SMILES": smiles, "NAME": name}
+    enabled = list(rules_by_set.keys())
+    n_sets = len(enabled)
 
+    mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         row.update({p: float("nan") for p in PROP_COLS})
+        row["property_pass"] = False
+        row["alert_sets_passed"] = ""
+        row["alert_sets_failed"] = ""
+        row["alert_set_score"] = 0.0
         row["rd_filter_pass"] = False
         row["filters_passed"] = ""
         row["filters_failed"] = "INVALID_SMILES"
         return row
 
-    props = _calc_properties(mol)
+    props = calc_properties(mol)
     row.update(props)
 
-    passed: list[str] = []
-    failed: list[str] = []
+    prop_ok, prop_pass_list, prop_fail_list = _check_property_limits(props, limits)
+    row["property_pass"] = prop_ok
 
-    for prop in PROP_COLS:
-        lo, hi = rule_dict[prop]
-        val = props[prop]
-        label = f"{prop}=[{lo},{hi}]"
-        if lo <= val <= hi:
-            passed.append(label)
+    sets_ok: list[str] = []
+    sets_bad: list[str] = []
+    set_fail_reasons: list[str] = []
+
+    for set_name in enabled:
+        ok, reason = _check_alert_set(mol, rules_by_set[set_name])
+        if ok:
+            sets_ok.append(set_name)
         else:
-            failed.append(f"{prop}={val:.3g} not in [{lo},{hi}]")
+            sets_bad.append(set_name)
+            set_fail_reasons.append(f"{set_name}:{reason}")
 
-    alert_hits: list[str] = []
-    for smarts_mol, max_val, desc in rule_list:
-        if len(mol.GetSubstructMatches(smarts_mol)) > max_val:
-            alert_hits.append(f"{desc} > {max_val}")
+    n_ok = len(sets_ok)
+    score = _alert_set_score(n_ok, n_sets)
 
-    sets_label = "+".join(_enabled_alert_sets()) or "none"
-    if alert_hits:
-        failed.extend(alert_hits)
-    else:
-        passed.append(f"Structural({sets_label})")
+    row["alert_sets_passed"] = "; ".join(sets_ok)
+    row["alert_sets_failed"] = "; ".join(sets_bad)
+    row["alert_set_score"] = score
 
-    row["rd_filter_pass"] = len(failed) == 0
-    row["filters_passed"] = "; ".join(passed)
-    row["filters_failed"] = "; ".join(failed) if failed else ""
+    overall = prop_ok and (score >= ALERT_SET_PASS_FRACTION)
+    row["rd_filter_pass"] = overall
+
+    passed_parts = list(prop_pass_list)
+    if sets_ok:
+        passed_parts.append(f"AlertSets({','.join(sets_ok)})")
+    failed_parts = list(prop_fail_list) + set_fail_reasons
+    if n_sets > 0 and score < ALERT_SET_PASS_FRACTION:
+        failed_parts.append(
+            f"alert_set_score={score} < {ALERT_SET_PASS_FRACTION} "
+            f"({n_ok}/{n_sets} sets passed)"
+        )
+
+    row["filters_passed"] = "; ".join(passed_parts)
+    row["filters_failed"] = "; ".join(failed_parts)
     return row
 
 
 def write_summary(
     path: Path,
     inp: Path,
-    rule_dict: dict,
+    limits: dict,
     alerts_path: str,
     df: pd.DataFrame,
 ) -> None:
     enabled = _enabled_alert_sets()
     n = len(df)
     n_pass = int(df["rd_filter_pass"].sum())
-    n_fail = n - n_pass
 
     lines = [
         "RD FILTERS RUN SUMMARY",
@@ -190,49 +202,43 @@ def write_summary(
         f"Input CSV : {inp}",
         f"Alerts CSV: {alerts_path}",
         "",
-        "PROPERTY LIMITS (inclusive min, max)",
+        "PROPERTY LIMITS (all required — hard filter)",
         "-" * 40,
     ]
     for prop in PROP_COLS:
-        lo, hi = rule_dict[prop]
+        lo, hi = limits[prop]
         lines.append(f"  {prop:6s} : {lo} to {hi}")
 
     lines += [
         "",
-        "STRUCTURAL ALERT SETS (ChEMBL / rd_filters)",
+        "ALERT SET SCORING",
+        "-" * 40,
+        f"  Enabled sets           : {', '.join(enabled) if enabled else '(none)'}",
+        f"  Pass fraction required : {ALERT_SET_PASS_FRACTION} "
+        f"(>= {int(ALERT_SET_PASS_FRACTION * len(enabled))} of {len(enabled)} sets)" if enabled else "",
+        "  alert_set_score        : sets_passed / enabled_sets",
+        "                         (1.0=all, 0.5=half, 0.25=quarter, 0.0=none)",
+        "",
+        "ALERT SETS ON/OFF",
         "-" * 40,
     ]
     for name, on in ALERT_SETS.items():
-        mark = "ENABLED" if on else "disabled"
-        lines.append(f"  {name:14s} : {mark}")
+        lines.append(f"  {name:14s} : {'ENABLED' if on else 'disabled'}")
 
     lines += [
-        "",
-        "OTHER SETTINGS",
-        "-" * 40,
-        f"  DEDUPE_SMILES : {DEDUPE_SMILES}",
-        f"  Enabled sets  : {', '.join(enabled) if enabled else '(none)'}",
         "",
         "RESULTS",
         "-" * 40,
         f"  Total molecules : {n}",
-        f"  Passed          : {n_pass} ({100 * n_pass / n:.1f}%)" if n else "  Passed          : 0",
-        f"  Failed          : {n_fail} ({100 * n_fail / n:.1f}%)" if n else "  Failed          : 0",
+        f"  Overall pass    : {n_pass} ({100 * n_pass / n:.1f}%)" if n else "  Overall pass    : 0",
+        f"  Overall fail    : {n - n_pass}",
     ]
 
-    if n_fail > 0:
-        lines += ["", "TOP FAILURE REASONS", "-" * 40]
-        fail_df = df.loc[~df["rd_filter_pass"]]
-        reasons: dict[str, int] = {}
-        for txt in fail_df["filters_failed"]:
-            for part in str(txt).split("; "):
-                part = part.strip()
-                if not part:
-                    continue
-                key = part.split("=")[0] if "=" in part else part.split(" >")[0]
-                reasons[key] = reasons.get(key, 0) + 1
-        for reason, count in sorted(reasons.items(), key=lambda x: -x[1])[:15]:
-            lines.append(f"  {count:4d}  {reason}")
+    if n and enabled:
+        lines += ["", "ALERT SET SCORE DISTRIBUTION", "-" * 40]
+        for sc in sorted(df["alert_set_score"].unique(), reverse=True):
+            cnt = int((df["alert_set_score"] == sc).sum())
+            lines.append(f"  score {sc:5.2f} : {cnt} molecules")
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -256,41 +262,41 @@ def main() -> None:
     prefix = Path(args.out).resolve() if args.out else inp.with_suffix("").resolve()
     prefix.parent.mkdir(parents=True, exist_ok=True)
 
-    rule_dict = _config_rule_dict()
+    limits = {k: list(v) for k, v in PROPERTY_LIMITS.items()}
     alerts_path = _resolve_alerts_path()
     enabled_sets = _enabled_alert_sets()
 
-    if not enabled_sets:
-        print("[!] Warning: no structural alert sets enabled in CONFIG")
-
     print(f"[*] Alerts file : {alerts_path}")
     print(f"[*] Alert sets  : {', '.join(enabled_sets) or '(none)'}")
-    rule_list = _build_alert_rules(alerts_path, enabled_sets)
+    print(f"[*] Need score >= {ALERT_SET_PASS_FRACTION} ({int(ALERT_SET_PASS_FRACTION * max(len(enabled_sets), 1))}+ sets)")
 
-    smiles = read_smiles(inp)
+    rules_by_set = _build_rules_by_set(alerts_path, enabled_sets)
+    smiles = read_smiles(inp, dedupe=DEDUPE_SMILES)
     print(f"[*] Filtering {len(smiles)} molecules from {inp.name}")
 
-    rows = [
-        evaluate_molecule(smi, f"mol_{i}", rule_list, rule_dict)
-        for i, smi in enumerate(smiles)
-    ]
+    rows = [evaluate_molecule(smi, f"mol_{i}", rules_by_set, limits) for i, smi in enumerate(smiles)]
     df = pd.DataFrame(rows)
 
-    out_cols = ["SMILES", "rd_filter_pass", "filters_passed", "filters_failed", *PROP_COLS]
+    out_cols = [
+        "SMILES", "rd_filter_pass", "property_pass", "alert_set_score",
+        "alert_sets_passed", "alert_sets_failed",
+        "filters_passed", "filters_failed", *PROP_COLS,
+    ]
+
+    flagged_path = Path(f"{prefix}_flagged.csv")
     passed_path = Path(f"{prefix}_passed.csv")
     failed_path = Path(f"{prefix}_failed.csv")
     summary_path = Path(f"{prefix}_summary.txt")
 
-    df_pass = df.loc[df["rd_filter_pass"], ["SMILES", "filters_passed", *PROP_COLS]]
-    df_fail = df.loc[~df["rd_filter_pass"], ["SMILES", "filters_failed", *PROP_COLS]]
+    df[out_cols].to_csv(flagged_path, index=False)
+    df.loc[df["rd_filter_pass"], out_cols].to_csv(passed_path, index=False)
+    df.loc[~df["rd_filter_pass"], out_cols].to_csv(failed_path, index=False)
+    write_summary(summary_path, inp, limits, alerts_path, df)
 
-    df_pass.to_csv(passed_path, index=False)
-    df_fail.to_csv(failed_path, index=False)
-    write_summary(summary_path, inp, rule_dict, alerts_path, df)
-
-    n_pass = len(df_pass)
+    n_pass = int(df["rd_filter_pass"].sum())
+    print(f"[+] Flagged ({len(df)})     → {flagged_path}")
     print(f"[+] Passed  ({n_pass}/{len(df)}) → {passed_path}")
-    print(f"[+] Failed  ({len(df_fail)}/{len(df)}) → {failed_path}")
+    print(f"[+] Failed  ({len(df) - n_pass}/{len(df)}) → {failed_path}")
     print(f"[+] Summary              → {summary_path}")
 
 
