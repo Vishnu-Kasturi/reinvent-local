@@ -101,74 +101,66 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
     traj_probs_tensor = []
     top_indices_tensor = []
     reward_tensor = []
+    baseline_reward = 0
     molcount = 0
 
     #Make sure the DataLoader shuffle=True so that the batches are randomized for each run
     #for inputbatch, targetbatch, X_adj, X_features, Y_adj, Y_features, pos_weight, norm in train_data:
-    max_sampling_attempts = max(nmols * 50, 500)
-
-    for _ in range(nmols):
+    for i in range(nmols):
         reward = 0
-        attempts = 0
         while reward == 0:
-            attempts += 1
-            if attempts > max_sampling_attempts:
-                print("Warning: max sampling attempts reached without a valid reward")
-                break
             batch_gen_itercount = batch_gen_itercount + 1
             trajectory, traj_probs, top_indices = sampling(agent_svae_encoder, agent_svae_decoder, agent_gvae_encoder, X_adj, X_features, max_len, prime_str='!', end_token='E')
             #Try-except block to handle bad conformer exception from RDKit Mol2MolBlock function
             try:
                 mol = Chem.MolFromSmiles(trajectory)  #Check if molecule is valid
                 if mol:
+                    trajectory_tensor.append(trajectory)
+                    traj_probs_tensor.append(traj_probs)
+                    top_indices_tensor.append(top_indices)
+
                     docking_outfile = perform_docking(trajectory, batch_gen_itercount, output_path, filepath)
                     reward = get_reward(docking_outfile, trajectory, predictor)
-                    if reward > 0:
-                        trajectory_tensor.append(trajectory)
-                        traj_probs_tensor.append(traj_probs)
-                        top_indices_tensor.append(top_indices)
-                        print(trajectory, reward)
-                        reward_tensor.append(reward)
-                        graph_adj_tensor.append(X_adj)
-                        graph_feat_tensor.append(X_features)
-                    else:
-                        reward = 0
+                    print(trajectory, reward)
+                    reward_tensor.append(reward)
+                    graph_adj_tensor.append(X_adj)
+                    graph_feat_tensor.append(X_features)
                 else:
                     reward = 0  #Invalid molecules get a reward of 0
-            except Exception:
+            except:
                 reward = 0
                 continue
 
-    n_valid = len(reward_tensor)
-    if n_valid == 0:
-        print("Warning: no valid molecules collected in policy_gradient")
-        return 0.0, 0.0, batch_gen_itercount
+    for i, reward in enumerate(reward_tensor):
+        baseline_reward = baseline_reward + reward
+    baseline_reward = baseline_reward / nmols
 
-    baseline_reward = sum(reward_tensor) / n_valid
+    for i in range(nmols):
+        trajectory = trajectory_tensor[i]
+        traj_probs = traj_probs_tensor[i]
+        top_indices = top_indices_tensor[i]
+        reward = reward_tensor[i]
 
-    for mol_idx in range(n_valid):
-        trajectory = trajectory_tensor[mol_idx]
-        traj_probs = traj_probs_tensor[mol_idx]
-        top_indices = top_indices_tensor[mol_idx]
-        reward = reward_tensor[mol_idx]
+        trajectory_tokenized = tokenize(trajectory)
+        trajectory_chars = trajectory_tokenized.split("*")
 
         total_reward += reward
-        prior_llh = prior_likelihood(prior_svae_encoder, prior_svae_decoder, prior_gvae_encoder, graph_adj_tensor[mol_idx], graph_feat_tensor[mol_idx], trajectory)
+        prior_llh = prior_likelihood(prior_svae_encoder, prior_svae_decoder, prior_gvae_encoder, graph_adj_tensor[i], graph_feat_tensor[i], trajectory)
         augmented_llh = prior_llh + reward * sigma
 
         agent_llh = 0.0
-        for step_idx in range(len(traj_probs)):
-            output = traj_probs[step_idx]
+        for i in range(len(traj_probs)):
+            output = traj_probs[i]
             log_probs = F.log_softmax(output, dim=-1)
-            action_prob = log_probs[0, 0, top_indices[step_idx]]
+            action_prob = log_probs[0, 0, top_indices[i]]
             agent_llh = agent_llh + action_prob
 
         returns = 0.0
         returns = -((augmented_llh - agent_llh) ** 2)
         rl_loss = rl_loss + (-returns)
 
-    rl_loss = rl_loss / n_valid
-    avg_reward = total_reward / n_valid
+    rl_loss = rl_loss / nmols
+    avg_reward = total_reward / nmols
 
     agent_svae_encoder.train()
     agent_svae_decoder.train()
