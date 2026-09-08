@@ -1,7 +1,5 @@
 """
-PD1-PDL1 feature extraction (vendored copy for offline vendor/ scripts).
-
-Matches REINVENT4/reinvent_plugins/components/pd1_pdl1_features.py exactly.
+PD1-PDL1 feature extraction for pIC50 / solubility XGBoost models.
 """
 from __future__ import annotations
 

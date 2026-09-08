@@ -1,30 +1,39 @@
 import math
 import os.path as op
-import sys
 
 import xgboost as xgb
 
+from pd1_pdl1_features import compute_features
+
 _bst = None
 _scaler_path = None
-_compute_features = None
+_RL_INFER_DIR = op.dirname(op.abspath(__file__))
+_VENDOR_DIR = op.dirname(_RL_INFER_DIR)
 
 
-def readModel(
-    model_path=None,
-    scaler_path=None,
-):
-    global _bst, _scaler_path, _compute_features
-    base = op.dirname(__file__)
-    vendor = op.dirname(base)
+def _default_model_path():
+    for root in (_RL_INFER_DIR, _VENDOR_DIR):
+        p = op.join(root, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj")
+        if op.isfile(p):
+            return p
+    return op.join(_VENDOR_DIR, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj")
+
+
+def _default_scaler_path():
+    for root in (_RL_INFER_DIR, _VENDOR_DIR):
+        p = op.join(root, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl")
+        if op.isfile(p):
+            return p
+    return op.join(_VENDOR_DIR, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl")
+
+
+def readModel(model_path=None, scaler_path=None):
+    global _bst, _scaler_path
     if model_path is None:
-        model_path = op.join(vendor, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj")
+        model_path = _default_model_path()
     if scaler_path is None:
-        scaler_path = op.join(vendor, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl")
+        scaler_path = _default_scaler_path()
 
-    sys.path.insert(0, vendor)
-    from pd1_pdl1_features import compute_features
-
-    _compute_features = compute_features
     _scaler_path = scaler_path
     _bst = xgb.Booster()
     _bst.load_model(model_path)
@@ -34,7 +43,7 @@ def calculateScore(smiles):
     if _bst is None:
         readModel()
 
-    X, mask = _compute_features([smiles], _scaler_path)
+    X, mask = compute_features([smiles], _scaler_path)
     if not mask[0]:
         return float("nan")
     X = X[:, :2415]
