@@ -8,14 +8,18 @@ from pathlib import Path
 
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import Descriptors, QED
 
 _INFER_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_INFER_DIR))
 
-from RL import geometric_mean_rewards, init_scorers
+from RL import init_scorers
 from pic50_scorer import calculateScore as calculatePic50
-from sascorer import calculateScore as calculateSA
+from reinvent_transforms import (
+    REWARD_WEIGHTS,
+    transform_pic50,
+    transform_solubility,
+    weighted_geometric_mean,
+)
 from sol_scorer import calculateScore as calculateSolubility
 
 SMILES_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
@@ -36,33 +40,30 @@ def breakdown(smiles):
     if mol is None:
         return {"reward": 0.0, "SMILES": smiles}
 
-    sas = calculateSA(mol)
-    reward2 = math.exp(sas / 3.0)
-    clogp = Descriptors.MolLogP(mol)
-    reward3 = 11.0 if -1 <= clogp <= 3 else 1.0
-    mw = Descriptors.MolWt(mol)
-    reward4 = 11.0 if 380 <= mw <= 810 else 1.0
-    qed = QED.qed(mol)
-    reward5 = math.exp(qed / 0.3)
     pic50 = calculatePic50(smiles)
-    reward6 = math.exp(pic50 / 3.0) if math.isfinite(pic50) else 0.0
     sol = calculateSolubility(smiles)
-    reward7 = math.exp((sol - (-13.17)) / 3.0) if math.isfinite(sol) else 0.0
+    if not math.isfinite(pic50) or not math.isfinite(sol):
+        return {
+            "SMILES": smiles,
+            "reward": 0.0,
+            "reward_pic50": 0.0,
+            "reward_sol": 0.0,
+            "pic50": pic50,
+            "solubility": sol,
+        }
 
-    terms = [reward2, reward3, reward4, reward5, reward6, reward7]
+    reward_pic50 = transform_pic50(pic50)
+    reward_sol = transform_solubility(sol)
+    reward = weighted_geometric_mean([
+        (reward_pic50, REWARD_WEIGHTS["pic50"]),
+        (reward_sol, REWARD_WEIGHTS["solubility"]),
+    ])
+
     return {
         "SMILES": smiles,
-        "reward": geometric_mean_rewards(terms),
-        "reward_sa": reward2,
-        "reward_logp": reward3,
-        "reward_mw": reward4,
-        "reward_qed": reward5,
-        "reward_pic50": reward6,
-        "reward_sol": reward7,
-        "sa": sas,
-        "logp": clogp,
-        "mw": mw,
-        "qed": qed,
+        "reward": reward,
+        "reward_pic50": reward_pic50,
+        "reward_sol": reward_sol,
         "pic50": pic50,
         "solubility": sol,
     }

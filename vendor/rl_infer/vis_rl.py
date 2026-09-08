@@ -44,6 +44,13 @@ from io import open
 from sascorer import readFragmentScores, numBridgeheadsAndSpiro, calculateScore
 from pic50_scorer import readModel as readPic50Model, calculateScore as calculatePic50
 from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
+from reinvent_transforms import (
+    REWARD_WEIGHTS,
+    transform_docking,
+    transform_pic50,
+    transform_solubility,
+    weighted_geometric_mean,
+)
 from rdkit import rdBase
 rdBase.DisableLog('rdApp.error') #Suppresses error messages from rdkit when parsing SMILES strings to RDKit molecules
 
@@ -905,15 +912,6 @@ def extract_docking_score(docking_outfile):
 
 #--------------------------------------------------------RL REWARD FUNCTION----------------------------------------------------------
 
-def geometric_mean_rewards(rewards):
-    if not rewards:
-        return 0.0
-    vals = np.array(rewards, dtype=np.float64)
-    if not np.all(np.isfinite(vals)) or np.any(vals <= 0):
-        return 0.0
-    return float(np.exp(np.mean(np.log(vals))))
-
-
 def init_scorers():
     """Call once before RL training (same as readFragmentScores() in original script)."""
     readFragmentScores()
@@ -923,58 +921,31 @@ def init_scorers():
 
 #def get_reward(ecif_input, smiles, predictor): #Specific to logP - Based on Popova et al
 def get_reward(docking_outfile, smiles, predictor):
-    reward1 = 0
-    dockscore = extract_docking_score(docking_outfile)
-    reward1 = math.exp(-dockscore / 3.0)
-
     rdkitmol = Chem.MolFromSmiles(smiles)
     if rdkitmol is None:
         return 0.0
 
-    ##New Modification — SA (original)
-    reward2 = 0
-    sas = calculateScore(rdkitmol)
-    reward2 = math.exp(sas / 3.0)
+    try:
+        dockscore = extract_docking_score(docking_outfile)
+    except (FileNotFoundError, ValueError, OSError):
+        return 0.0
+    reward_docking = transform_docking(dockscore)
 
-    reward3 = 0
-    clogp = Descriptors.MolLogP(rdkitmol)
-    if clogp >= -1 and clogp <= 3:
-        reward3 = 11
-    else:
-        reward3 = 1
-
-    ##New Modification — MW band (same style as logP)
-    reward4 = 0
-    mw = Descriptors.MolWt(rdkitmol)
-    if mw >= 380 and mw <= 810:
-        reward4 = 11
-    else:
-        reward4 = 1
-
-    ##New Modification — QED (same exp style as SA)
-    reward5 = 0
-    qed = QED.qed(rdkitmol)
-    reward5 = math.exp(qed / 0.3)
-
-    ##New Modification — pIC50 (same exp style as SA; raw from pic50_scorer)
-    reward6 = 0
     pic50 = calculatePic50(smiles)
-    if math.isfinite(pic50):
-        reward6 = math.exp(pic50 / 3.0)
-    else:
-        reward6 = 0
+    if not math.isfinite(pic50):
+        return 0.0
+    reward_pic50 = transform_pic50(pic50)
 
-    ##New Modification — solubility logS (shifted exp, same pattern)
-    reward7 = 0
     sol = calculateSolubility(smiles)
-    if math.isfinite(sol):
-        reward7 = math.exp((sol - (-13.17)) / 3.0)
-    else:
-        reward7 = 0
+    if not math.isfinite(sol):
+        return 0.0
+    reward_sol = transform_solubility(sol)
 
-    reward = 0
-    reward = geometric_mean_rewards([reward1, reward2, reward3, reward4, reward5, reward6, reward7])
-    return reward
+    return weighted_geometric_mean([
+        (reward_docking, REWARD_WEIGHTS["docking"]),
+        (reward_pic50, REWARD_WEIGHTS["pic50"]),
+        (reward_sol, REWARD_WEIGHTS["solubility"]),
+    ])
 
 
 #-------------------------------------------------------RL POLICY GRADIENT UPDATE FUNCTION------------------------------------------
