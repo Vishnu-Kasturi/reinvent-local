@@ -76,8 +76,6 @@ if not docking_path.endswith("/"):
 	docking_path = docking_path + "/"
 if not savepath.endswith("/"):
 	savepath = savepath + "/"
-if not graphpath.endswith("/"):
-	graphpath = graphpath + "/"
 
 #--------------------------------------------------------------------------------------------------------------------------------------
 #--------------------------------------------------------GRAPH VAE FUNCTION DEFINITIONS------------------------------------------------
@@ -1097,24 +1095,76 @@ def rltrainingloop(prot_A, prot_X, prior_svae_encoder, prior_svae_decoder, prior
 #---------------------------------------------------------------------------------------------------------------------------------------
 # MAIN
 #---------------------------------------------------------------------------------------------------------------------------------------
+def _resolve_graphpath(graph_path):
+	"""Accept graph directory or a path ending in .graph / .x."""
+	path = graph_path.rstrip("/")
+	receptor_hint = None
+	base = os.path.basename(path)
+	if base.endswith(".graph"):
+		receptor_hint = base[: -len(".graph")]
+		path = os.path.dirname(path)
+	elif base.endswith(".x"):
+		receptor_hint = base[: -len(".x")]
+		path = os.path.dirname(path)
+	if path and not path.endswith("/"):
+		path = path + "/"
+	return path, receptor_hint
+
+
 def _load_index(index_path):
-	with open(index_path, "rb") as handle:
-		data = pickle.load(handle)
-	if isinstance(data, dict):
-		return data
-	if isinstance(data, (list, tuple)) and data:
-		return {"receptor": data[0]}
-	raise ValueError("indexfile must be a pickle dict or list with receptor name")
+	lower = index_path.lower()
+	if lower.endswith(".pkl") or lower.endswith(".pickle"):
+		with open(index_path, "rb") as handle:
+			data = pickle.load(handle)
+		if isinstance(data, dict):
+			return data
+		if isinstance(data, (list, tuple)) and data:
+			return {"receptor": data[0]}
+		raise ValueError("index pickle must be a dict or list")
+
+	config = {}
+	with open(index_path, "r", encoding="utf-8", errors="replace") as handle:
+		lines = [ln.strip() for ln in handle.readlines() if ln.strip() and not ln.strip().startswith("#")]
+
+	if not lines:
+		raise ValueError(f"index file is empty: {index_path}")
+
+	for line in lines:
+		if "=" in line:
+			key, value = line.split("=", 1)
+			config[key.strip()] = value.strip()
+			continue
+		if "\t" in line:
+			parts = [p.strip() for p in line.split("\t") if p.strip()]
+			if parts and "receptor" not in config:
+				config["receptor"] = parts[0]
+			continue
+		if "," in line:
+			parts = [p.strip() for p in line.split(",") if p.strip()]
+			if parts and "receptor" not in config:
+				config["receptor"] = parts[0]
+			continue
+		if "receptor" not in config:
+			config["receptor"] = line
+
+	if "receptor" not in config:
+		raise ValueError(f"could not parse receptor from index file: {index_path}")
+	return config
 
 
 def run_training():
-	global embed, char_to_int, int_to_char
+	global embed, char_to_int, int_to_char, graphpath
 
 	print("Loading index:", indexfile)
 	index_data = _load_index(indexfile)
+
+	graphpath, graph_receptor = _resolve_graphpath(graphpath)
+	if graph_receptor and not index_data.get("receptor"):
+		index_data["receptor"] = graph_receptor
+
 	receptor = index_data.get("receptor") or index_data.get("receptors", [None])[0]
 	if receptor is None:
-		raise ValueError("indexfile must contain 'receptor' or 'receptors'")
+		raise ValueError("indexfile must contain 'receptor' or pass graphpath like .../9iow.graph")
 
 	embed = int(index_data.get("embed", index_data.get("max_length", 120)))
 	max_length = int(index_data.get("max_length", embed))
