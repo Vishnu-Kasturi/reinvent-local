@@ -520,7 +520,7 @@ def extract_latent_vector_v1(smiles_encoder, gat_encoder, X_adj, X_feat, prefix)
 	#Preparing the graph latent vector
 	X_adj = X_adj.to(device)
 	X_feat = X_feat.to(device)
-	graph_mean, graph_logvar = gat_encoder(X_feat, X_adj)  #Both tensors are [No. of nodes, 256] dimension
+	graph_mean, graph_logvar = gat_encoder([X_feat], [X_adj])  #Both tensors are [No. of nodes, 256] dimension
 	graph_latent_z = reparameterization_trick_graph(graph_mean, graph_logvar)  #[No. of nodes, 256]
 	graph_latent_z = torch.mean(graph_latent_z, dim=0)  #[256] - Will average over the node embeddings to get a pooled vector
 	graph_latent_z = graph_latent_z.unsqueeze(0)  #[1, 256] - To add a batch_size dimension
