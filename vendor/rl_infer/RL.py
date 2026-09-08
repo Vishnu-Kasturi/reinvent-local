@@ -1,16 +1,13 @@
 """
-RL.py — combined reward for MW, QED, pIC50, solubility.
+RL.py — combined reward: docking + SA + logP + MW + QED + pIC50 + solubility.
 
-Mirrors the CVAE_RL pattern used with sascorer.py:
-  from mw_scorer import calculateScore as mw_score
-  from qed_scorer import calculateScore as qed_score
-  ...
+REINVENT-style geometric mean over all active terms.
 
 Usage:
     from RL import get_reward, get_predictor
 
-    predictor = get_predictor()          # load XGBoost models once
-    reward = get_reward(smiles, predictor)
+    predictor = get_predictor()
+    reward = get_reward(docking_outfile, smiles, predictor)
 """
 
 from __future__ import annotations
@@ -26,9 +23,12 @@ _INFER_DIR = Path(__file__).resolve().parent
 if str(_INFER_DIR) not in sys.path:
     sys.path.insert(0, str(_INFER_DIR))
 
-from mw_scorer import calculateScore as mw_score
+from docking_scorer import calculateScore as docking_score
+from logp_scorer import calculateLogP, calculateScore as logp_score
+from mw_scorer import calculateMW, calculateScore as mw_score
 from pic50_scorer import Pic50Predictor, predictPic50
-from qed_scorer import calculateScore as qed_score
+from qed_scorer import calculateQED, calculateScore as qed_score
+from sa_scorer import calculateSA, calculateScore as sa_score
 from sol_scorer import SolPredictor, predictSolubility
 
 
@@ -45,8 +45,7 @@ def geometric_mean_rewards(rewards: list[float]) -> float:
     """
     REINVENT-style aggregation: geometric mean of component rewards.
 
-    All terms must be finite and > 0; otherwise returns 0.0
-    (one weak component strongly penalizes the total, like REINVENT).
+    All terms must be finite and > 0; otherwise returns 0.0.
     """
     if not rewards:
         return 0.0
@@ -54,6 +53,29 @@ def geometric_mean_rewards(rewards: list[float]) -> float:
     if not np.all(np.isfinite(vals)) or np.any(vals <= 0):
         return 0.0
     return float(np.exp(np.mean(np.log(vals))))
+
+
+def _collect_reward_terms(
+    docking_outfile,
+    smiles: str,
+    predictor: RewardPredictor,
+    mol: Chem.Mol,
+) -> dict[str, float]:
+    """Compute all component rewards (original + new)."""
+    terms: dict[str, float] = {}
+
+    dock = docking_score(docking_outfile)
+    if dock is not None:
+        terms["reward_docking"] = dock
+
+    terms["reward_sa"] = sa_score(mol)
+    terms["reward_logp"] = logp_score(mol)
+    terms["reward_mw"] = mw_score(mol)
+    terms["reward_qed"] = qed_score(mol)
+    terms["reward_pic50"] = _pic50_reward(smiles, predictor.pic50)
+    terms["reward_sol"] = _sol_reward(smiles, predictor.sol)
+
+    return terms
 
 
 def get_predictor() -> RewardPredictor:
@@ -66,14 +88,12 @@ def get_predictor() -> RewardPredictor:
 
 def get_reward(docking_outfile, smiles, predictor=None) -> float:
     """
-    Combined reward from MW, QED, pIC50, and solubility.
+    Combined reward (geometric mean of all terms).
 
-    CVAE_RL signature: get_reward(docking_outfile, smiles, predictor)
-      docking_outfile — ignored (kept for backward compatibility)
-      smiles          — generated SMILES
-      predictor       — RewardPredictor from get_predictor()
+    Original terms: docking, SA, logP
+    New terms:      MW, QED, pIC50, solubility
 
-    Final reward = geometric mean of four terms (REINVENT style).
+    docking_outfile: path from perform_docking() — omit/None to skip docking term
     """
     if predictor is None:
         predictor = get_predictor()
@@ -82,58 +102,39 @@ def get_reward(docking_outfile, smiles, predictor=None) -> float:
     if mol is None:
         return 0.0
 
-    reward_mw = mw_score(mol)
-    reward_qed = qed_score(mol)
-    reward_pic50 = _pic50_reward(smiles, predictor.pic50)
-    reward_sol = _sol_reward(smiles, predictor.sol)
-
-    return geometric_mean_rewards([reward_mw, reward_qed, reward_pic50, reward_sol])
+    terms = _collect_reward_terms(docking_outfile, smiles, predictor, mol)
+    return geometric_mean_rewards(list(terms.values()))
 
 
-def get_reward_smiles_only(smiles: str, predictor: RewardPredictor | None = None) -> float:
-    """Shorthand: get_reward(None, smiles, predictor)."""
-    return get_reward(None, smiles, predictor)
-
-
-def get_reward_breakdown(smiles: str, predictor: RewardPredictor | None = None) -> dict:
-    """Return per-term rewards plus raw property values."""
+def get_reward_breakdown(docking_outfile, smiles: str, predictor: RewardPredictor | None = None) -> dict:
+    """Per-term rewards, raw values, and combined geometric mean."""
     if predictor is None:
         predictor = get_predictor()
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return {
-            "reward": 0.0,
-            "reward_mw": 0.0,
-            "reward_qed": 0.0,
-            "reward_pic50": 0.0,
-            "reward_sol": 0.0,
-            "mw": float("nan"),
-            "qed": float("nan"),
-            "pic50": float("nan"),
-            "solubility": float("nan"),
-        }
+        return {"reward": 0.0}
 
-    from mw_scorer import calculateMW
-    from qed_scorer import calculateQED
+    terms = _collect_reward_terms(docking_outfile, smiles, predictor, mol)
+    dock_raw = None
+    if docking_outfile:
+        try:
+            from docking_scorer import extract_docking_score
 
-    reward_mw = mw_score(mol)
-    reward_qed = qed_score(mol)
-    reward_pic50 = _pic50_reward(smiles, predictor.pic50)
-    reward_sol = _sol_reward(smiles, predictor.sol)
-    pic50 = predictPic50(smiles, predictor.pic50)
-    sol = predictSolubility(smiles, predictor.sol)
+            dock_raw = extract_docking_score(docking_outfile)
+        except Exception:
+            dock_raw = float("nan")
 
     return {
-        "reward": geometric_mean_rewards([reward_mw, reward_qed, reward_pic50, reward_sol]),
-        "reward_mw": reward_mw,
-        "reward_qed": reward_qed,
-        "reward_pic50": reward_pic50,
-        "reward_sol": reward_sol,
+        "reward": geometric_mean_rewards(list(terms.values())),
+        **terms,
+        "docking_score": dock_raw,
+        "sa": calculateSA(mol),
+        "logp": calculateLogP(mol),
         "mw": calculateMW(mol),
         "qed": calculateQED(mol),
-        "pic50": pic50,
-        "solubility": sol,
+        "pic50": predictPic50(smiles, predictor.pic50),
+        "solubility": predictSolubility(smiles, predictor.sol),
     }
 
 

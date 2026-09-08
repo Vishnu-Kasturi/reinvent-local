@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-infer.py — batch inference for MW, QED, pIC50, solubility rewards.
+infer.py — batch inference for all reward terms (no docking file).
 
 Run:
   cd ~/vendor/rl_infer
@@ -56,7 +56,7 @@ def main() -> None:
         smi = smi.strip()
         if not smi or smi.lower() == "nan":
             continue
-        row = get_reward_breakdown(smi, predictor)
+        row = get_reward_breakdown(None, smi, predictor)
         row["SMILES"] = smi
         rows.append(row)
 

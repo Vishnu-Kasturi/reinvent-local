@@ -6,8 +6,9 @@ Copy the functions below into your main RL training script, OR import:
     from cvae_rl_integration import get_reward, policy_gradient
 
 Changes vs original:
-  - Removed docking (perform_docking / extract_docking_score)
-  - Rewards: MW, QED, pIC50, solubility (geometric mean of 4 terms, REINVENT style)
+  - Keeps docking + SA + logP rewards (original)
+  - Adds MW, QED, pIC50, solubility rewards (new)
+  - Geometric mean of all terms (REINVENT style)
   - predictor = get_predictor()  instead of  GBT = "yes"
 
 Bottom-of-file change:
@@ -18,8 +19,7 @@ Bottom-of-file change:
     # NEW:
     from RL import get_predictor
     predictor = get_predictor()
-    rl_losses, avg_rewards = rltrainingloop(..., predictor, output_path, ...)
-    # (docking_path no longer needed in policy_gradient)
+    rl_losses, avg_rewards = rltrainingloop(..., predictor, docking_path, ...)
 """
 
 from __future__ import annotations
@@ -40,40 +40,7 @@ _INFER_DIR = Path(__file__).resolve().parent
 if str(_INFER_DIR) not in sys.path:
     sys.path.insert(0, str(_INFER_DIR))
 
-from mw_scorer import calculateScore as mw_score
-from pic50_scorer import calculateScore as pic50_score
-from qed_scorer import calculateScore as qed_score
-from RL import RewardPredictor, geometric_mean_rewards, get_predictor
-from sol_scorer import calculateScore as sol_score
-
-
-# ---------------------------------------------------------------------------
-# REWARD — replaces docking + SA + logP version
-# ---------------------------------------------------------------------------
-
-def get_reward(docking_outfile, smiles, predictor):
-    """
-    Combined reward: MW, QED, pIC50, solubility.
-
-    docking_outfile: kept for CVAE_RL call signature — NOT USED.
-    smiles:          generated SMILES string
-    predictor:       RewardPredictor from get_predictor()
-    """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return 0.0
-
-    reward_mw = mw_score(mol)
-    reward_qed = qed_score(mol)
-    reward_pic50 = pic50_score(smiles, predictor.pic50)
-    reward_sol = sol_score(smiles, predictor.sol)
-
-    return geometric_mean_rewards([reward_mw, reward_qed, reward_pic50, reward_sol])
-
-
-# ---------------------------------------------------------------------------
-# POLICY GRADIENT — docking step removed
-# ---------------------------------------------------------------------------
+from RL import RewardPredictor, get_predictor, get_reward
 
 def policy_gradient(
     X_adj,
@@ -93,20 +60,23 @@ def policy_gradient(
     max_len,
     nmols=256,
     sigma=3,
+    perform_docking=None,
     sampling=None,
     tokenize=None,
     prior_likelihood=None,
 ):
     """
-    Same as original policy_gradient but:
-      - no perform_docking()
-      - get_reward(None, trajectory, predictor) uses MW/QED/pIC50/sol
+    Same as original policy_gradient with extended get_reward():
+      - perform_docking() → docking_outfile (required for docking term)
+      - get_reward(docking_outfile, trajectory, predictor)
+        combines docking + SA + logP + MW + QED + pIC50 + sol
 
-    Pass sampling, tokenize, prior_likelihood from your main script
-    (they are defined in your CVAE_RL codebase).
+    Pass perform_docking, sampling, tokenize, prior_likelihood from your main script.
     """
-    if sampling is None or tokenize is None or prior_likelihood is None:
-        raise ValueError("Pass sampling, tokenize, prior_likelihood from your main script")
+    if perform_docking is None or sampling is None or tokenize is None or prior_likelihood is None:
+        raise ValueError(
+            "Pass perform_docking, sampling, tokenize, prior_likelihood from your main script"
+        )
 
     rl_loss = 0
     optimizer.zero_grad()
@@ -142,8 +112,10 @@ def policy_gradient(
                     traj_probs_tensor.append(traj_probs)
                     top_indices_tensor.append(top_indices)
 
-                    # --- NEW: no docking; property-based reward only ---
-                    reward = get_reward(None, trajectory, predictor)
+                    docking_outfile = perform_docking(
+                        trajectory, batch_gen_itercount, output_path, filepath
+                    )
+                    reward = get_reward(docking_outfile, trajectory, predictor)
                     print(trajectory, reward)
                     reward_tensor.append(reward)
                     graph_adj_tensor.append(X_adj)
@@ -247,6 +219,7 @@ def rltrainingloop(
     avg_rl_reward = []
 
     pg_kwargs = {
+        "perform_docking": perform_docking,
         "sampling": sampling,
         "tokenize": tokenize,
         "prior_likelihood": prior_likelihood,
