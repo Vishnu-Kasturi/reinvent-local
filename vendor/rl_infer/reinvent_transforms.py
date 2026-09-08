@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-# Stage 1 defaults from iict_mol2mol_high_test_similarity TOML (+ docking).
+# Scoring defaults from iict_mol2mol_high_test_similarity TOML (+ docking).
 DOCKING_REVERSE_SIGMOID = {"low": -12.0, "high": -7.0, "k": 0.4}
 PIC50_SIGMOID = {"low": 5.0, "high": 8.0, "k": 0.4}
 SOL_DOUBLE_SIGMOID = {
