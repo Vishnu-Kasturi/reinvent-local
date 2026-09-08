@@ -1152,6 +1152,34 @@ def _load_index(index_path):
 	return config
 
 
+def _infer_svae_encoder_hparams(encoder_sd):
+	hidden_size = int(encoder_sd["forward_stackgru.embedding.weight"].shape[1])
+	stack_width = int(encoder_sd["forward_stackgru.stack_input_layer.weight"].shape[0])
+	z_dim = int(encoder_sd["mean.weight"].shape[0])
+	bidir = "backward_stackgru.embedding.weight" in encoder_sd
+	n_layers = sum(1 for k in encoder_sd if k.startswith("forward_stackgru.gru.weight_ih_l"))
+	return hidden_size, stack_width, z_dim, bidir, n_layers
+
+
+def _infer_gat_hparams(graph_sd):
+	inp_feature_dim = int(graph_sd["attention_0.W"].shape[0])
+	hidden_size = int(graph_sd["attention_0.W"].shape[1])
+	z_dim = int(graph_sd["mean.W"].shape[1])
+	return inp_feature_dim, hidden_size, z_dim
+
+
+def _cfg_int(index_data, key, default):
+	if key in index_data:
+		return int(index_data[key])
+	return default
+
+
+def _cfg_float(index_data, key, default):
+	if key in index_data:
+		return float(index_data[key])
+	return default
+
+
 def run_training():
 	global embed, char_to_int, int_to_char, graphpath
 
@@ -1166,50 +1194,68 @@ def run_training():
 	if receptor is None:
 		raise ValueError("indexfile must contain 'receptor' or pass graphpath like .../9iow.graph")
 
-	embed = int(index_data.get("embed", index_data.get("max_length", 120)))
-	max_length = int(index_data.get("max_length", embed))
-	batch_size = int(index_data.get("batch_size", 32))
-	n_iters = int(index_data.get("n_iters", 100))
-	sigma_val = float(index_data.get("sigma_val", 3))
-	savecpt = int(index_data.get("savecpt", 1))
-	hidden_size = int(index_data.get("hidden_size", 512))
-	z_dim = int(index_data.get("z_dim", 256))
-	stack_depth = int(index_data.get("stack_depth", 50))
-	stack_width = int(index_data.get("stack_width", 20))
-	n_layers = int(index_data.get("n_layers", 1))
-	dropout = float(index_data.get("dropout", 0.2))
-	train_batch_size = int(index_data.get("train_batch_size", 1))
-
 	charset, char_to_int, int_to_char = prepare_dicts_and_dictfiles(char_to_int_file, int_to_char_file)
 	input_size = len(char_to_int)
 	output_size = len(char_to_int)
 
-	print("Loading graph for receptor:", receptor)
+	print("Loading graph for receptor:", receptor, "from", graphpath)
 	prot_A, prot_X = load_data(receptor, graphpath)
 	prot_A = preprocess_graph(prot_A)
 	inp_feature_dim = prot_X.shape[1]
 
-	print("Building models...")
-	prior_svae_encoder = VAE_Encoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
-		stack_depth, stack_width, dropout=dropout, n_layers=n_layers).to(device)
-	prior_svae_decoder = VAE_Decoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
-		stack_depth, stack_width, dropout=dropout, n_layers=n_layers).to(device)
-	prior_gvae_encoder = GAT_VAE_Encoder(inp_feature_dim, hidden_size, z_dim, dropout=dropout).to(device)
-
-	agent_svae_encoder = VAE_Encoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
-		stack_depth, stack_width, dropout=dropout, n_layers=n_layers).to(device)
-	agent_svae_decoder = VAE_Decoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
-		stack_depth, stack_width, dropout=dropout, n_layers=n_layers).to(device)
-	agent_gvae_encoder = GAT_VAE_Encoder(inp_feature_dim, hidden_size, z_dim, dropout=dropout).to(device)
-
 	print("Loading checkpoint:", svae_gvae_combined_cptfile)
 	combined_state = torch.load(svae_gvae_combined_cptfile, map_location=device)
-	prior_svae_encoder.load_state_dict(combined_state["encoder_state_dict"])
+	encoder_sd = combined_state["encoder_state_dict"]
+	graph_sd = combined_state["graph_encoder_state_dict"]
+
+	hidden_size, stack_width, z_dim, bidir, n_layers = _infer_svae_encoder_hparams(encoder_sd)
+	ckpt_inp_dim, gat_hidden, gat_z = _infer_gat_hparams(graph_sd)
+	if ckpt_inp_dim != inp_feature_dim:
+		print(f"WARNING: graph feature dim {inp_feature_dim} != checkpoint {ckpt_inp_dim}")
+	hidden_size = _cfg_int(index_data, "hidden_size", hidden_size)
+	stack_width = _cfg_int(index_data, "stack_width", stack_width)
+	z_dim = _cfg_int(index_data, "z_dim", z_dim)
+	n_layers = _cfg_int(index_data, "n_layers", n_layers)
+	if "bidir" in index_data:
+		bidir = str(index_data["bidir"]).lower() in ("1", "true", "yes")
+
+	embed = _cfg_int(index_data, "embed", _cfg_int(index_data, "max_length", 120))
+	max_length = _cfg_int(index_data, "max_length", embed)
+	batch_size = _cfg_int(index_data, "batch_size", 32)
+	n_iters = _cfg_int(index_data, "n_iters", 100)
+	sigma_val = _cfg_float(index_data, "sigma_val", 3)
+	savecpt = _cfg_int(index_data, "savecpt", 1)
+	stack_depth = _cfg_int(index_data, "stack_depth", 50)
+	dropout = _cfg_float(index_data, "dropout", 0.2)
+	train_batch_size = _cfg_int(index_data, "train_batch_size", 1)
+
+	print(
+		"Model architecture (from checkpoint): "
+		f"hidden={hidden_size}, z={z_dim}, stack_width={stack_width}, "
+		f"stack_depth={stack_depth}, n_layers={n_layers}, bidir={bidir}, "
+		f"vocab={input_size}, graph_feat={inp_feature_dim}"
+	)
+	print("Single-pocket RL on receptor:", receptor)
+
+	print("Building models...")
+	prior_svae_encoder = VAE_Encoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
+		stack_depth, stack_width, dropout=dropout, n_layers=n_layers, bidir=bidir).to(device)
+	prior_svae_decoder = VAE_Decoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
+		stack_depth, stack_width, dropout=dropout, n_layers=n_layers, bidir=bidir).to(device)
+	prior_gvae_encoder = GAT_VAE_Encoder(inp_feature_dim, gat_hidden, gat_z, dropout=dropout).to(device)
+
+	agent_svae_encoder = VAE_Encoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
+		stack_depth, stack_width, dropout=dropout, n_layers=n_layers, bidir=bidir).to(device)
+	agent_svae_decoder = VAE_Decoder(input_size, hidden_size, z_dim, output_size, train_batch_size,
+		stack_depth, stack_width, dropout=dropout, n_layers=n_layers, bidir=bidir).to(device)
+	agent_gvae_encoder = GAT_VAE_Encoder(inp_feature_dim, gat_hidden, gat_z, dropout=dropout).to(device)
+
+	prior_svae_encoder.load_state_dict(encoder_sd)
 	prior_svae_decoder.load_state_dict(combined_state["decoder_state_dict"])
-	prior_gvae_encoder.load_state_dict(combined_state["graph_encoder_state_dict"])
-	agent_svae_encoder.load_state_dict(combined_state["encoder_state_dict"])
+	prior_gvae_encoder.load_state_dict(graph_sd)
+	agent_svae_encoder.load_state_dict(encoder_sd)
 	agent_svae_decoder.load_state_dict(combined_state["decoder_state_dict"])
-	agent_gvae_encoder.load_state_dict(combined_state["graph_encoder_state_dict"])
+	agent_gvae_encoder.load_state_dict(graph_sd)
 
 	predictor = None
 	if os.path.isfile(predictor_cptfile):
