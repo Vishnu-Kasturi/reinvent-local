@@ -1,59 +1,21 @@
-"""
-RL.py — get_reward, policy_gradient, rltrainingloop
-
-Same 3-function structure as CVAE_RL. Only get_reward extended with
-MW, QED, pIC50, solubility (geometric mean of all 7 terms).
-
-Requires in your main script (globals used by policy_gradient / rltrainingloop):
-  perform_docking, sampling, tokenize, prior_likelihood, savepath,
-  svae_gvae_combined_cptfile, device, prior_smiles_encoder, ...
-"""
-
-from __future__ import annotations
-
 import math
 import os
 import shutil
-import sys
-from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from rdkit import Chem
-from rdkit.Chem import Descriptors
+from rdkit.Chem import Descriptors, QED
 
-_INFER_DIR = Path(__file__).resolve().parent
-if str(_INFER_DIR) not in sys.path:
-    sys.path.insert(0, str(_INFER_DIR))
-
+from sascorer import readFragmentScores, numBridgeheadsAndSpiro, calculateScore
+from pic50_scorer import readModel as readPic50Model, calculateScore as calculatePic50
+from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
 from docking_scorer import extract_docking_score
-from mw_scorer import calculateScore as mw_score
-from pic50_scorer import Pic50Predictor, calculateScore as pic50_score
-from qed_scorer import calculateScore as qed_score
-from sascorer import calculateScore as sa_raw_score
-from sol_scorer import SolPredictor, calculateScore as sol_score
 
 
-@dataclass
-class RewardPredictor:
-    pic50: Pic50Predictor
-    sol: SolPredictor
-
-
-_predictor: RewardPredictor | None = None
-
-
-def get_predictor() -> RewardPredictor:
-    global _predictor
-    if _predictor is None:
-        _predictor = RewardPredictor(pic50=Pic50Predictor(), sol=SolPredictor())
-    return _predictor
-
-
-def geometric_mean_rewards(rewards: list[float]) -> float:
+def geometric_mean_rewards(rewards):
     if not rewards:
         return 0.0
     vals = np.array(rewards, dtype=np.float64)
@@ -62,10 +24,14 @@ def geometric_mean_rewards(rewards: list[float]) -> float:
     return float(np.exp(np.mean(np.log(vals))))
 
 
-# ---------------------------------------------------------------------------
-# get_reward — same signature; original + new terms; geometric mean
-# ---------------------------------------------------------------------------
+def init_scorers():
+    """Call once before RL training (same as readFragmentScores() in original script)."""
+    readFragmentScores()
+    readPic50Model()
+    readSolModel()
 
+
+#def get_reward(ecif_input, smiles, predictor): #Specific to logP - Based on Popova et al
 def get_reward(docking_outfile, smiles, predictor):
     reward1 = 0
     dockscore = extract_docking_score(docking_outfile)
@@ -75,8 +41,9 @@ def get_reward(docking_outfile, smiles, predictor):
     if rdkitmol is None:
         return 0.0
 
+    ##New Modification — SA (original)
     reward2 = 0
-    sas = sa_raw_score(rdkitmol)
+    sas = calculateScore(rdkitmol)
     reward2 = math.exp(sas / 3.0)
 
     reward3 = 0
@@ -86,19 +53,41 @@ def get_reward(docking_outfile, smiles, predictor):
     else:
         reward3 = 1
 
-    reward4 = mw_score(rdkitmol)
-    reward5 = qed_score(rdkitmol)
-    reward6 = pic50_score(smiles, predictor.pic50)
-    reward7 = sol_score(smiles, predictor.sol)
+    ##New Modification — MW band (same style as logP)
+    reward4 = 0
+    mw = Descriptors.MolWt(rdkitmol)
+    if mw >= 380 and mw <= 810:
+        reward4 = 11
+    else:
+        reward4 = 1
 
+    ##New Modification — QED (same exp style as SA)
+    reward5 = 0
+    qed = QED.qed(rdkitmol)
+    reward5 = math.exp(qed / 0.3)
+
+    ##New Modification — pIC50 (same exp style as SA; raw from pic50_scorer)
+    reward6 = 0
+    pic50 = calculatePic50(smiles)
+    if math.isfinite(pic50):
+        reward6 = math.exp(pic50 / 3.0)
+    else:
+        reward6 = 0
+
+    ##New Modification — solubility logS (shifted exp, same pattern)
+    reward7 = 0
+    sol = calculateSolubility(smiles)
+    if math.isfinite(sol):
+        reward7 = math.exp((sol - (-13.17)) / 3.0)
+    else:
+        reward7 = 0
+
+    reward = 0
     reward = geometric_mean_rewards([reward1, reward2, reward3, reward4, reward5, reward6, reward7])
     return reward
 
 
-# ---------------------------------------------------------------------------
-# policy_gradient — unchanged structure
-# ---------------------------------------------------------------------------
-
+#-------------------------------------------------------RL POLICY GRADIENT UPDATE FUNCTION------------------------------------------
 def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, prior_gvae_encoder, agent_svae_encoder, agent_svae_decoder, agent_gvae_encoder, optimizer, predictor, output_path, filepath, char_to_int, int_to_char, max_len, nmols=256, sigma=3):
     rl_loss = 0
     optimizer.zero_grad()
@@ -115,13 +104,16 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
     baseline_reward = 0
     molcount = 0
 
+    #Make sure the DataLoader shuffle=True so that the batches are randomized for each run
+    #for inputbatch, targetbatch, X_adj, X_features, Y_adj, Y_features, pos_weight, norm in train_data:
     for i in range(nmols):
         reward = 0
         while reward == 0:
             batch_gen_itercount = batch_gen_itercount + 1
             trajectory, traj_probs, top_indices = sampling(agent_svae_encoder, agent_svae_decoder, agent_gvae_encoder, X_adj, X_features, max_len, prime_str='!', end_token='E')
+            #Try-except block to handle bad conformer exception from RDKit Mol2MolBlock function
             try:
-                mol = Chem.MolFromSmiles(trajectory)
+                mol = Chem.MolFromSmiles(trajectory)  #Check if molecule is valid
                 if mol:
                     trajectory_tensor.append(trajectory)
                     traj_probs_tensor.append(traj_probs)
@@ -134,7 +126,7 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
                     graph_adj_tensor.append(X_adj)
                     graph_feat_tensor.append(X_features)
                 else:
-                    reward = 0
+                    reward = 0  #Invalid molecules get a reward of 0
             except:
                 reward = 0
                 continue
@@ -184,10 +176,7 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
     return avg_reward, rl_loss.item(), batch_gen_itercount
 
 
-# ---------------------------------------------------------------------------
-# rltrainingloop — unchanged structure
-# ---------------------------------------------------------------------------
-
+#-------------------------------------------------RL POLICY GRADIENT TRAINING FUNCTION------------------------------------------------
 def rltrainingloop(prot_A, prot_X, prior_svae_encoder, prior_svae_decoder, prior_gvae_encoder, agent_svae_encoder, agent_svae_decoder, agent_gvae_encoder, optimizer, predictor, output_path, char_to_int, int_to_char, max_length, batch_size, n_iters=100, savecpt=1, sigma_val=3, cp=0):
     total_rl_loss = []
     avg_rl_reward = []
@@ -247,53 +236,3 @@ def rltrainingloop(prot_A, prot_X, prior_svae_encoder, prior_svae_decoder, prior
                 output_path = filepath
 
     return total_rl_loss, avg_rl_reward
-
-
-# ---------------------------------------------------------------------------
-# Optional: batch breakdown (used by infer.py only)
-# ---------------------------------------------------------------------------
-
-def get_reward_breakdown(docking_outfile, smiles, predictor=None):
-    if predictor is None:
-        predictor = get_predictor()
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return {"reward": 0.0}
-
-    dockscore = float("nan")
-    reward1 = 0.0
-    if docking_outfile:
-        try:
-            dockscore = extract_docking_score(docking_outfile)
-            reward1 = math.exp(-dockscore / 3.0)
-        except Exception:
-            reward1 = 0.0
-
-    sas = sa_raw_score(mol)
-    reward2 = math.exp(sas / 3.0)
-    clogp = Descriptors.MolLogP(mol)
-    reward3 = 11.0 if -1 <= clogp <= 3 else 1.0
-    reward4 = mw_score(mol)
-    reward5 = qed_score(mol)
-    reward6 = pic50_score(smiles, predictor.pic50)
-    reward7 = sol_score(smiles, predictor.sol)
-
-    terms = [reward1, reward2, reward3, reward4, reward5, reward6, reward7]
-    if not docking_outfile:
-        terms = terms[1:]
-
-    return {
-        "reward": geometric_mean_rewards(terms),
-        "reward_docking": reward1,
-        "reward_sa": reward2,
-        "reward_logp": reward3,
-        "reward_mw": reward4,
-        "reward_qed": reward5,
-        "reward_pic50": reward6,
-        "reward_sol": reward7,
-        "docking_score": dockscore,
-        "sa": sas,
-        "logp": clogp,
-        "pic50": predictor.pic50.predict(smiles),
-        "solubility": predictor.sol.predict(smiles),
-    }

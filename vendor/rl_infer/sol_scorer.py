@@ -1,73 +1,45 @@
-"""PD1-PDL1 solubility (logS) XGBoost scorer for CVAE_RL-style rewards."""
-
-from __future__ import annotations
-
 import math
+import os.path as op
 import sys
-from pathlib import Path
 
 import xgboost as xgb
 
-_INFER_DIR = Path(__file__).resolve().parent
-if str(_INFER_DIR) not in sys.path:
-    sys.path.insert(0, str(_INFER_DIR))
-
-from qsar_features import get_compute_features
-
-_VENDOR_DIR = _INFER_DIR.parent
-SOL_MODEL = _VENDOR_DIR / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
-SOL_SCALER = _VENDOR_DIR / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
+_bst = None
+_scaler_path = None
+_compute_features = None
 
 SOL_MIN = -13.17
-SOL_MAX = 2.14
-SOL_SCALE = 3.0
 
 
-class SolPredictor:
-    """Load once, predict many (pass instance to get_reward)."""
+def readModel(
+    model_path=None,
+    scaler_path=None,
+):
+    global _bst, _scaler_path, _compute_features
+    base = op.dirname(__file__)
+    vendor = op.dirname(base)
+    if model_path is None:
+        model_path = op.join(vendor, "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj")
+    if scaler_path is None:
+        scaler_path = op.join(vendor, "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl")
 
-    def __init__(
-        self,
-        model_path: str | Path = SOL_MODEL,
-        scaler_path: str | Path = SOL_SCALER,
-    ):
-        self.model_path = Path(model_path)
-        self.scaler_path = Path(scaler_path)
-        if not self.model_path.is_file():
-            raise FileNotFoundError(f"Sol model not found: {self.model_path}")
-        if not self.scaler_path.is_file():
-            raise FileNotFoundError(f"Sol scaler not found: {self.scaler_path}")
+    sys.path.insert(0, vendor)
+    from pd1_pdl1_features import compute_features
 
-        self._compute_features = get_compute_features()
-        self._model = xgb.Booster()
-        self._model.load_model(str(self.model_path))
-
-    def predict(self, smiles: str) -> float:
-        X, mask = self._compute_features([smiles], str(self.scaler_path))
-        if not mask[0]:
-            return float("nan")
-        pred = float(self._model.predict(xgb.DMatrix(X))[0])
-        return pred if math.isfinite(pred) else float("nan")
+    _compute_features = compute_features
+    _scaler_path = scaler_path
+    _bst = xgb.Booster()
+    _bst.load_model(model_path)
 
 
-def predictSolubility(smiles: str, predictor: SolPredictor) -> float:
-    return predictor.predict(smiles)
+def calculateScore(smiles):
+    if _bst is None:
+        readModel()
 
-
-def calculateScore(smiles: str, predictor: SolPredictor) -> float:
-    """
-    Solubility reward on shifted scale so exp() behaves like SA:
-      exp((logS - SOL_MIN) / SOL_SCALE)
-    """
-    logs = predictSolubility(smiles, predictor)
-    if not math.isfinite(logs):
-        return 0.0
-    shifted = logs - SOL_MIN
-    return float(math.exp(shifted / SOL_SCALE))
-
-
-def normalizeSolubility(logs: float) -> float:
-    """Map raw logS to [0, 1] using training-set calibration."""
-    if not math.isfinite(logs):
-        return 0.0
-    return float(max(0.0, min(1.0, (logs - SOL_MIN) / (SOL_MAX - SOL_MIN))))
+    X, mask = _compute_features([smiles], _scaler_path)
+    if not mask[0]:
+        return float("nan")
+    pred = float(_bst.predict(xgb.DMatrix(X))[0])
+    if not math.isfinite(pred):
+        return float("nan")
+    return pred
