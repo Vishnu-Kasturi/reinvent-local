@@ -7,7 +7,7 @@ Copy the functions below into your main RL training script, OR import:
 
 Changes vs original:
   - Removed docking (perform_docking / extract_docking_score)
-  - Rewards: MW, QED, pIC50, solubility (mean of 4 terms)
+  - Rewards: MW, QED, pIC50, solubility (geometric mean of 4 terms, REINVENT style)
   - predictor = get_predictor()  instead of  GBT = "yes"
 
 Bottom-of-file change:
@@ -43,7 +43,7 @@ if str(_INFER_DIR) not in sys.path:
 from mw_scorer import calculateScore as mw_score
 from pic50_scorer import calculateScore as pic50_score
 from qed_scorer import calculateScore as qed_score
-from RL import RewardPredictor, get_predictor
+from RL import RewardPredictor, geometric_mean_rewards, get_predictor
 from sol_scorer import calculateScore as sol_score
 
 
@@ -68,7 +68,7 @@ def get_reward(docking_outfile, smiles, predictor):
     reward_pic50 = pic50_score(smiles, predictor.pic50)
     reward_sol = sol_score(smiles, predictor.sol)
 
-    return float(np.mean([reward_mw, reward_qed, reward_pic50, reward_sol]))
+    return geometric_mean_rewards([reward_mw, reward_qed, reward_pic50, reward_sol])
 
 
 # ---------------------------------------------------------------------------

@@ -41,6 +41,21 @@ class RewardPredictor:
 _predictor: RewardPredictor | None = None
 
 
+def geometric_mean_rewards(rewards: list[float]) -> float:
+    """
+    REINVENT-style aggregation: geometric mean of component rewards.
+
+    All terms must be finite and > 0; otherwise returns 0.0
+    (one weak component strongly penalizes the total, like REINVENT).
+    """
+    if not rewards:
+        return 0.0
+    vals = np.array(rewards, dtype=np.float64)
+    if not np.all(np.isfinite(vals)) or np.any(vals <= 0):
+        return 0.0
+    return float(np.exp(np.mean(np.log(vals))))
+
+
 def get_predictor() -> RewardPredictor:
     """Lazy-load pIC50 and solubility models (call once per RL run)."""
     global _predictor
@@ -58,7 +73,7 @@ def get_reward(docking_outfile, smiles, predictor=None) -> float:
       smiles          — generated SMILES
       predictor       — RewardPredictor from get_predictor()
 
-    Final reward = mean of four terms.
+    Final reward = geometric mean of four terms (REINVENT style).
     """
     if predictor is None:
         predictor = get_predictor()
@@ -72,7 +87,7 @@ def get_reward(docking_outfile, smiles, predictor=None) -> float:
     reward_pic50 = _pic50_reward(smiles, predictor.pic50)
     reward_sol = _sol_reward(smiles, predictor.sol)
 
-    return float(np.mean([reward_mw, reward_qed, reward_pic50, reward_sol]))
+    return geometric_mean_rewards([reward_mw, reward_qed, reward_pic50, reward_sol])
 
 
 def get_reward_smiles_only(smiles: str, predictor: RewardPredictor | None = None) -> float:
@@ -110,7 +125,7 @@ def get_reward_breakdown(smiles: str, predictor: RewardPredictor | None = None) 
     sol = predictSolubility(smiles, predictor.sol)
 
     return {
-        "reward": float(np.mean([reward_mw, reward_qed, reward_pic50, reward_sol])),
+        "reward": geometric_mean_rewards([reward_mw, reward_qed, reward_pic50, reward_sol]),
         "reward_mw": reward_mw,
         "reward_qed": reward_qed,
         "reward_pic50": reward_pic50,
