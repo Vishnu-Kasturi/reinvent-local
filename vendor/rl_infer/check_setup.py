@@ -50,6 +50,37 @@ def main():
           "svae_gvae_combined_cptfile predictor_cptfile docking_path savepath retraining_flag")
     if len(sys.argv) > 1:
         print("argv:", sys.argv[1:])
+    if len(sys.argv) > 7:
+        dock = Path(sys.argv[7])
+        if not dock.is_dir():
+            print(f"{FAIL} docking_path not a directory: {dock}")
+            ok = False
+        else:
+            ok &= _check("smina.static", dock / "smina.static")
+            receptor_names = ("receptor.pdbqt", "receptor.pdb", "protein.pdbqt", "protein.pdb")
+            if not any((dock / n).is_file() for n in receptor_names):
+                print(f"{FAIL} receptor: missing one of {receptor_names} in {dock}")
+                ok = False
+            else:
+                for n in receptor_names:
+                    if (dock / n).is_file():
+                        print(f"{OK} receptor: {dock / n}")
+                        break
+            ligand_names = (
+                "autobox_ligand.sdf",
+                "crystal_ligand.sdf",
+                "ligand.sdf",
+                "ref_ligand.sdf",
+                "docked_ligand.sdf",
+            )
+            if not any((dock / n).is_file() for n in ligand_names):
+                print(f"{FAIL} autobox_ligand: missing one of {ligand_names} in {dock}")
+                ok = False
+            else:
+                for n in ligand_names:
+                    if (dock / n).is_file():
+                        print(f"{OK} autobox_ligand: {dock / n}")
+                        break
 
     if not ok:
         sys.exit(1)

@@ -838,23 +838,59 @@ def generate_complex_structure_and_descriptors(smiles, molcount, output_path, fi
 
 
 #----------------------------------------------------DOCKING AND SCORE EXTRACTION-------------------------------------------------------
+def _find_docking_file(candidates):
+	for name in candidates:
+		path = docking_path + name
+		if os.path.isfile(path):
+			return path
+	return None
+
+
 def perform_docking(smiles, molcount, output_path, filepath):
-	config = docking_path+"config.txt"
-	smina = docking_path+"smina.static"
-	fname = "mol"+str(molcount)
+	smina = docking_path + "smina.static"
+	receptor = _find_docking_file(
+		("receptor.pdbqt", "receptor.pdb", "protein.pdbqt", "protein.pdb")
+	)
+	autobox_ligand = _find_docking_file(
+		(
+			"autobox_ligand.sdf",
+			"crystal_ligand.sdf",
+			"ligand.sdf",
+			"ref_ligand.sdf",
+			"docked_ligand.sdf",
+		)
+	)
+	if not os.path.isfile(smina):
+		raise FileNotFoundError("smina not found: " + smina)
+	if receptor is None:
+		raise FileNotFoundError(
+			"receptor not found in docking_path; expected receptor.pdb or receptor.pdbqt"
+		)
+	if autobox_ligand is None:
+		raise FileNotFoundError(
+			"autobox reference ligand not found in docking_path; "
+			"add autobox_ligand.sdf (or crystal_ligand.sdf / ligand.sdf)"
+		)
+
+	fname = "mol" + str(molcount)
 	print(smiles)
 	rdkitmol = Chem.MolFromSmiles(smiles)
 	mol2 = Chem.AddHs(rdkitmol)
 	AllChem.EmbedMolecule(mol2, randomSeed=0xf00d)
 	AllChem.MMFFOptimizeMolecule(mol2)
-	# print(Chem.MolToMolBlock(mol2), file=open(output_path+fname+".mol",'w+'))
-	with Chem.SDWriter(output_path+fname+".sdf") as out:
+	with Chem.SDWriter(output_path + fname + ".sdf") as out:
 		out.write(mol2)
 
-	# os.system("obabel -imol "+output_path+fname+".mol -osdf -O "+output_path+fname+".sdf")
-	os.system(smina+" --config "+config+" --ligand "+output_path+fname+".sdf --out "+output_path+fname+"_out.sdf --log "+output_path+fname+"_log.txt")
-	
-	return output_path+fname+"_log.txt"
+	ligand_sdf = output_path + fname + ".sdf"
+	out_sdf = output_path + fname + "_out.sdf"
+	log_file = output_path + fname + "_log.txt"
+	cmd = (
+		f"{smina} --receptor {receptor} --ligand {ligand_sdf} "
+		f"--autobox_ligand {autobox_ligand} --out {out_sdf} --log {log_file}"
+	)
+	os.system(cmd)
+
+	return log_file
 	
 def extract_docking_score(docking_outfile):
 	with open(docking_outfile) as dfile:
@@ -1270,6 +1306,13 @@ def run_training():
 
 	init_scorers()
 	os.makedirs(savepath, exist_ok=True)
+
+	smina_bin = docking_path + "smina.static"
+	receptor = _find_docking_file(("receptor.pdbqt", "receptor.pdb", "protein.pdbqt", "protein.pdb"))
+	autobox_ligand = _find_docking_file(
+		("autobox_ligand.sdf", "crystal_ligand.sdf", "ligand.sdf", "ref_ligand.sdf", "docked_ligand.sdf")
+	)
+	print("Docking (autobox): smina=", smina_bin, "receptor=", receptor, "autobox_ligand=", autobox_ligand)
 
 	cp = int(retraining_flag)
 	print("Starting RL training: n_iters=", n_iters, "batch_size=", batch_size, "cp=", cp)
