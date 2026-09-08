@@ -49,12 +49,16 @@ def get_predictor() -> RewardPredictor:
     return _predictor
 
 
-def get_reward(smiles: str, predictor: RewardPredictor | None = None) -> float:
+def get_reward(docking_outfile, smiles, predictor=None) -> float:
     """
     Combined reward from MW, QED, pIC50, and solubility.
 
-    Each term uses the same exp / band style as the SA example in RL.py.
-    Final reward = mean of the four terms.
+    CVAE_RL signature: get_reward(docking_outfile, smiles, predictor)
+      docking_outfile — ignored (kept for backward compatibility)
+      smiles          — generated SMILES
+      predictor       — RewardPredictor from get_predictor()
+
+    Final reward = mean of four terms.
     """
     if predictor is None:
         predictor = get_predictor()
@@ -69,6 +73,11 @@ def get_reward(smiles: str, predictor: RewardPredictor | None = None) -> float:
     reward_sol = _sol_reward(smiles, predictor.sol)
 
     return float(np.mean([reward_mw, reward_qed, reward_pic50, reward_sol]))
+
+
+def get_reward_smiles_only(smiles: str, predictor: RewardPredictor | None = None) -> float:
+    """Shorthand: get_reward(None, smiles, predictor)."""
+    return get_reward(None, smiles, predictor)
 
 
 def get_reward_breakdown(smiles: str, predictor: RewardPredictor | None = None) -> dict:
