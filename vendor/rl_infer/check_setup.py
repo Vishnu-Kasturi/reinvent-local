@@ -71,8 +71,16 @@ def main():
                 "crystal_ligand.sdf",
                 "ligand.sdf",
                 "ref_ligand.sdf",
+                "ref_ligand.pdb",
                 "docked_ligand.sdf",
             )
+            try:
+                import prolif  # noqa: F401
+                import MDAnalysis  # noqa: F401
+                print(f"{OK} prolif + MDAnalysis (tyrosine reward)")
+            except ImportError as exc:
+                print(f"{FAIL} prolif/MDAnalysis required for tyrosine reward: {exc}")
+                ok = False
             if not any((dock / n).is_file() for n in ligand_names):
                 print(f"{FAIL} autobox_ligand: missing one of {ligand_names} in {dock}")
                 ok = False

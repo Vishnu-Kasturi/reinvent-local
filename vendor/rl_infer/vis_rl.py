@@ -46,10 +46,13 @@ from pic50_scorer import readModel as readPic50Model, calculateScore as calculat
 from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
 from reinvent_transforms import (
     REWARD_WEIGHTS,
-    transform_docking,
     transform_pic50,
     transform_solubility,
     weighted_geometric_mean,
+)
+from dock_prolif_backend import (
+    SingleMoleculeCache,
+    build_config_from_docking_path,
 )
 from rdkit import rdBase
 rdBase.DisableLog('rdApp.error') #Suppresses error messages from rdkit when parsing SMILES strings to RDKit molecules
@@ -864,6 +867,7 @@ def perform_docking(smiles, molcount, output_path, filepath):
 			"crystal_ligand.sdf",
 			"ligand.sdf",
 			"ref_ligand.sdf",
+			"ref_ligand.pdb",
 			"docked_ligand.sdf",
 		)
 	)
@@ -920,16 +924,13 @@ def init_scorers():
 
 
 #def get_reward(ecif_input, smiles, predictor): #Specific to logP - Based on Popova et al
-def get_reward(docking_outfile, smiles, predictor):
+def get_reward(dock_result, smiles, predictor):
     rdkitmol = Chem.MolFromSmiles(smiles)
-    if rdkitmol is None:
+    if rdkitmol is None or dock_result is None or not dock_result.docking_ok:
         return 0.0
 
-    try:
-        dockscore = extract_docking_score(docking_outfile)
-    except (FileNotFoundError, ValueError, OSError):
-        return 0.0
-    reward_docking = transform_docking(dockscore)
+    reward_docking = dock_result.docking_reward
+    reward_tyr = dock_result.tyr_interaction_reward
 
     pic50 = calculatePic50(smiles)
     if not math.isfinite(pic50):
@@ -942,9 +943,10 @@ def get_reward(docking_outfile, smiles, predictor):
     reward_sol = transform_solubility(sol)
 
     return weighted_geometric_mean([
-        (reward_docking, REWARD_WEIGHTS["docking"]),
-        (reward_pic50, REWARD_WEIGHTS["pic50"]),
         (reward_sol, REWARD_WEIGHTS["solubility"]),
+        (reward_pic50, REWARD_WEIGHTS["pic50"]),
+        (reward_tyr, REWARD_WEIGHTS["tyrosine"]),
+        (reward_docking, REWARD_WEIGHTS["docking"]),
     ])
 
 
@@ -955,6 +957,7 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
     total_reward = 0
     avg_reward = 0
     batch_gen_itercount = 0
+    SingleMoleculeCache.clear()
 
     trajectory_tensor = []
     graph_adj_tensor = []
@@ -980,9 +983,18 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
                     traj_probs_tensor.append(traj_probs)
                     top_indices_tensor.append(top_indices)
 
-                    docking_outfile = perform_docking(trajectory, batch_gen_itercount, output_path, filepath)
-                    reward = get_reward(docking_outfile, trajectory, predictor)
-                    print(trajectory, reward)
+                    print(trajectory)
+                    dock_result = SingleMoleculeCache.get_or_run(
+                        trajectory, batch_gen_itercount, output_path
+                    )
+                    reward = get_reward(dock_result, trajectory, predictor)
+                    print(
+                        "reward=", reward,
+                        "dock=", dock_result.docking_reward,
+                        "tyr=", dock_result.tyr_interaction_reward,
+                        "aff=", dock_result.affinity,
+                        "tyr_cnt=", dock_result.tyr_pi_stacking_count,
+                    )
                     reward_tensor.append(reward)
                     graph_adj_tensor.append(X_adj)
                     graph_feat_tensor.append(X_features)
@@ -1278,12 +1290,16 @@ def run_training():
 	init_scorers()
 	os.makedirs(savepath, exist_ok=True)
 
-	smina_bin = docking_path + "smina.static"
-	receptor = _find_docking_file(("receptor.pdbqt", "receptor.pdb", "protein.pdbqt", "protein.pdb"))
-	autobox_ligand = _find_docking_file(
-		("autobox_ligand.sdf", "crystal_ligand.sdf", "ligand.sdf", "ref_ligand.sdf", "docked_ligand.sdf")
+	dock_cfg = build_config_from_docking_path(docking_path)
+	dock_cfg.validate()
+	SingleMoleculeCache.configure(dock_cfg)
+	print(
+		"Dock+ProLIF (once per mol): receptor=", dock_cfg.receptor_path,
+		"autobox=", dock_cfg.autobox_ligand,
+		"smina=", dock_cfg.smina_executable,
+		"gnina=", dock_cfg.gnina_executable,
+		"tyr_residue=", dock_cfg.tyr_residue,
 	)
-	print("Docking (autobox): smina=", smina_bin, "receptor=", receptor, "autobox_ligand=", autobox_ligand)
 
 	cp = int(retraining_flag)
 	print("Starting RL training: n_iters=", n_iters, "batch_size=", batch_size, "cp=", cp)

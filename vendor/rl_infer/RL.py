@@ -11,14 +11,13 @@ from rdkit import Chem
 from sascorer import readFragmentScores
 from pic50_scorer import readModel as readPic50Model, calculateScore as calculatePic50
 from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
-from docking_scorer import extract_docking_score
 from reinvent_transforms import (
     REWARD_WEIGHTS,
-    transform_docking,
     transform_pic50,
     transform_solubility,
     weighted_geometric_mean,
 )
+from dock_prolif_backend import SingleMoleculeCache
 
 
 def init_scorers():
@@ -29,16 +28,13 @@ def init_scorers():
 
 
 #def get_reward(ecif_input, smiles, predictor): #Specific to logP - Based on Popova et al
-def get_reward(docking_outfile, smiles, predictor):
+def get_reward(dock_result, smiles, predictor):
     rdkitmol = Chem.MolFromSmiles(smiles)
-    if rdkitmol is None:
+    if rdkitmol is None or dock_result is None or not dock_result.docking_ok:
         return 0.0
 
-    try:
-        dockscore = extract_docking_score(docking_outfile)
-    except (FileNotFoundError, ValueError):
-        return 0.0
-    reward_docking = transform_docking(dockscore)
+    reward_docking = dock_result.docking_reward
+    reward_tyr = dock_result.tyr_interaction_reward
 
     pic50 = calculatePic50(smiles)
     if not math.isfinite(pic50):
@@ -51,9 +47,10 @@ def get_reward(docking_outfile, smiles, predictor):
     reward_sol = transform_solubility(sol)
 
     return weighted_geometric_mean([
-        (reward_docking, REWARD_WEIGHTS["docking"]),
-        (reward_pic50, REWARD_WEIGHTS["pic50"]),
         (reward_sol, REWARD_WEIGHTS["solubility"]),
+        (reward_pic50, REWARD_WEIGHTS["pic50"]),
+        (reward_tyr, REWARD_WEIGHTS["tyrosine"]),
+        (reward_docking, REWARD_WEIGHTS["docking"]),
     ])
 
 
@@ -64,6 +61,7 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
     total_reward = 0
     avg_reward = 0
     batch_gen_itercount = 0
+    SingleMoleculeCache.clear()
 
     trajectory_tensor = []
     graph_adj_tensor = []
@@ -89,8 +87,8 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
                     traj_probs_tensor.append(traj_probs)
                     top_indices_tensor.append(top_indices)
 
-                    docking_outfile = perform_docking(trajectory, batch_gen_itercount, output_path, filepath)
-                    reward = get_reward(docking_outfile, trajectory, predictor)
+                    dock_result = SingleMoleculeCache.get_or_run(trajectory, batch_gen_itercount, output_path)
+                    reward = get_reward(dock_result, trajectory, predictor)
                     print(trajectory, reward)
                     reward_tensor.append(reward)
                     graph_adj_tensor.append(X_adj)

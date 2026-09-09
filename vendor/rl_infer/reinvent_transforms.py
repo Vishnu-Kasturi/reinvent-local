@@ -4,21 +4,22 @@ import math
 
 import numpy as np
 
-# Scoring defaults from iict_mol2mol_high_test_similarity TOML (+ docking).
-DOCKING_REVERSE_SIGMOID = {"low": -12.0, "high": -7.0, "k": 0.4}
-PIC50_SIGMOID = {"low": 5.0, "high": 8.0, "k": 0.4}
+# iict_new_reward.toml stage scoring (QSAR sigmoid transforms).
+PIC50_SIGMOID = {"low": 5.0, "high": 12.0, "k": 0.4}
 SOL_DOUBLE_SIGMOID = {
-    "low": -5.0,
-    "high": -1.0,
+    "low": -4.0,
+    "high": 2.0,
     "coef_div": 100.0,
     "coef_si": 10.0,
     "coef_se": 10.0,
 }
 
+# Tiered docking / tyrosine weights from iict_new_reward.toml.
 REWARD_WEIGHTS = {
-    "docking": 4.0,
+    "solubility": 5.0,
     "pic50": 4.0,
-    "solubility": 3.0,
+    "tyrosine": 3.0,
+    "docking": 2.0,
 }
 
 
@@ -44,10 +45,6 @@ def sigmoid_transform(value, low, high, k):
     return _stable_sigmoid(x, k_eff)
 
 
-def reverse_sigmoid_transform(value, low, high, k):
-    return 1.0 - sigmoid_transform(value, low, high, k)
-
-
 def double_sigmoid_transform(value, low, high, coef_div, coef_si, coef_se):
     x = float(value)
     x_center = (high - low) / 2.0 + low
@@ -66,11 +63,6 @@ def double_sigmoid_transform(value, low, high, coef_div, coef_si, coef_se):
     else:
         right = 1.0 - _stable_sigmoid(xr, coef_se / coef_div)
     return right
-
-
-def transform_docking(dockscore):
-    p = DOCKING_REVERSE_SIGMOID
-    return reverse_sigmoid_transform(dockscore, p["low"], p["high"], p["k"])
 
 
 def transform_pic50(pic50):
