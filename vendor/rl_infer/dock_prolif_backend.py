@@ -31,6 +31,7 @@ from prolif_compat import (
     run_fingerprint,
     tyr56_residue_ids,
 )
+from reinvent_transforms import transform_docking, transform_tyrosine
 
 RDLogger.DisableLog("rdApp.*")
 logger = logging.getLogger("reinvent")
@@ -156,30 +157,6 @@ class MoleculeResult:
     docking_ok: bool = False
     prolif_ok: bool = False
     error: str = ""
-
-
-# ---------------------------------------------------------------------------
-# Reward tier functions
-# ---------------------------------------------------------------------------
-
-def affinity_to_reward(affinity: float) -> float:
-    """Map GNINA affinity (kcal/mol) to tiered reward in [0, 1]."""
-    if not np.isfinite(affinity):
-        return 0.0
-    if affinity <= -12.0:
-        return 1.0
-    if affinity <= -10.0:
-        return 0.5
-    return 0.0
-
-
-def tyr_count_to_reward(count: int) -> float:
-    """Map TYR interaction count to tiered reward in [0, 1]."""
-    if count >= 2:
-        return 1.0
-    if count == 1:
-        return 0.5
-    return 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -849,7 +826,7 @@ def run_molecule_pipeline(
     affinity = parse_affinity_from_log(log_txt)
     result.affinity = affinity
     result.docking_ok = np.isfinite(affinity)
-    result.docking_reward = affinity_to_reward(affinity)
+    result.docking_reward = transform_docking(affinity)
 
     try:
         tyr_count, pi_count, details = analyze_tyr_interactions(
@@ -858,7 +835,7 @@ def run_molecule_pipeline(
         result.tyr_interaction_count = tyr_count
         result.tyr_pi_stacking_count = pi_count
         result.tyr_interactions = details
-        result.tyr_interaction_reward = tyr_count_to_reward(tyr_count)
+        result.tyr_interaction_reward = transform_tyrosine(tyr_count)
         result.prolif_ok = True
     except Exception as exc:
         logger.warning(f"[GninaBackend] ProLIF failed for {can[:40]}: {exc}")

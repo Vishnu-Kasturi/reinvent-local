@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-# iict_new_reward.toml stage scoring (QSAR sigmoid transforms).
+# QSAR transforms (iict_new_reward.toml).
 PIC50_SIGMOID = {"low": 5.0, "high": 12.0, "k": 0.4}
 SOL_DOUBLE_SIGMOID = {
     "low": -4.0,
@@ -14,11 +14,17 @@ SOL_DOUBLE_SIGMOID = {
     "coef_se": 10.0,
 }
 
-# Tiered docking / tyrosine weights from iict_new_reward.toml.
+# Docking: more negative affinity is better (reverse sigmoid).
+DOCKING_REVERSE_SIGMOID = {"low": -9.0, "high": -16.0, "k": 0.4}
+
+# Tyrosine: higher pi-pi count is better; reward range 1–3 interactions.
+TYR_SIGMOID = {"low": 1.0, "high": 3.0, "k": 0.4}
+
+# Geometric-mean weights (tyrosine > docking).
 REWARD_WEIGHTS = {
     "solubility": 5.0,
     "pic50": 4.0,
-    "tyrosine": 3.0,
+    "tyrosine": 4.0,
     "docking": 2.0,
 }
 
@@ -45,6 +51,10 @@ def sigmoid_transform(value, low, high, k):
     return _stable_sigmoid(x, k_eff)
 
 
+def reverse_sigmoid_transform(value, low, high, k):
+    return 1.0 - sigmoid_transform(value, low, high, k)
+
+
 def double_sigmoid_transform(value, low, high, coef_div, coef_si, coef_se):
     x = float(value)
     x_center = (high - low) / 2.0 + low
@@ -63,6 +73,23 @@ def double_sigmoid_transform(value, low, high, coef_div, coef_si, coef_se):
     else:
         right = 1.0 - _stable_sigmoid(xr, coef_se / coef_div)
     return right
+
+
+def transform_docking(affinity_kcal_mol):
+    """More negative docking score → higher reward."""
+    if not math.isfinite(affinity_kcal_mol):
+        return 0.0
+    p = DOCKING_REVERSE_SIGMOID
+    return reverse_sigmoid_transform(affinity_kcal_mol, p["low"], p["high"], p["k"])
+
+
+def transform_tyrosine(interaction_count):
+    """TYR56 pi-pi count: 0 → 0; 1–3 mapped by sigmoid (higher is better)."""
+    count = int(interaction_count)
+    if count < 1:
+        return 0.0
+    p = TYR_SIGMOID
+    return sigmoid_transform(float(count), p["low"], p["high"], p["k"])
 
 
 def transform_pic50(pic50):

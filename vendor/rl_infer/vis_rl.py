@@ -46,8 +46,10 @@ from pic50_scorer import readModel as readPic50Model, calculateScore as calculat
 from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
 from reinvent_transforms import (
     REWARD_WEIGHTS,
+    transform_docking,
     transform_pic50,
     transform_solubility,
+    transform_tyrosine,
     weighted_geometric_mean,
 )
 from dock_prolif_backend import (
@@ -929,8 +931,8 @@ def get_reward(dock_result, smiles, predictor):
     if rdkitmol is None or dock_result is None or not dock_result.docking_ok:
         return 0.0
 
-    reward_docking = dock_result.docking_reward
-    reward_tyr = dock_result.tyr_interaction_reward
+    reward_docking = transform_docking(dock_result.affinity)
+    reward_tyr = transform_tyrosine(dock_result.tyr_pi_stacking_count)
 
     pic50 = calculatePic50(smiles)
     if not math.isfinite(pic50):
