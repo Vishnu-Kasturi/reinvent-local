@@ -15,7 +15,8 @@ import subprocess
 import tempfile
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+import inspect
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import MDAnalysis as mda
 import numpy as np
@@ -23,15 +24,111 @@ import prolif as plf
 from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem
 
-from prolif_compat import (
-    count_interactions,
-    iter_ifp_pairs,
-    make_fingerprint,
-    residue_ids,
-    run_fingerprint,
-    tyr56_residue_ids,
-)
 from reinvent_transforms import transform_docking, transform_tyrosine
+
+
+# --- prolif_compat (inlined so only this file is needed beside vis_rl.py) ---
+
+def make_fingerprint(plf_mod, count: bool = True):
+    try:
+        return plf_mod.Fingerprint(count=count)
+    except TypeError:
+        return plf_mod.Fingerprint()
+
+
+def _generate_v2(fp, ligand, protein, residues: Optional[List[str]]):
+    sig = inspect.signature(fp.generate)
+    kwargs: dict[str, Any] = {}
+    if residues is not None and "residues" in sig.parameters:
+        kwargs["residues"] = residues
+    if "metadata" in sig.parameters:
+        kwargs["metadata"] = True
+    return fp.generate(ligand, protein, **kwargs)
+
+
+def _run_from_iterable_v2(fp, ligand, protein, residues: Optional[List[str]], frame: int = 0):
+    if residues is not None:
+        fp.run_from_iterable([ligand], protein, residues=residues)
+    else:
+        fp.run_from_iterable([ligand], protein)
+    return get_ifp_from_fingerprint(fp, frame=frame)
+
+
+def get_ifp_from_fingerprint(fp, frame: int = 0):
+    ifp = fp.ifp
+    if isinstance(ifp, dict) and ifp and all(isinstance(k, int) for k in ifp):
+        return ifp[frame]
+    return ifp
+
+
+def run_fingerprint(fp, ligand, protein, residues: Optional[List[str]] = None, frame: int = 0):
+    if hasattr(fp, "generate"):
+        try:
+            return _generate_v2(fp, ligand, protein, residues)
+        except TypeError:
+            pass
+    if hasattr(fp, "run_from_iterable"):
+        try:
+            return _run_from_iterable_v2(fp, ligand, protein, residues, frame=frame)
+        except TypeError:
+            return _run_from_iterable_v2(fp, ligand, protein, None, frame=frame)
+    if residues is not None:
+        try:
+            fp.run(ligand, protein, residues=residues)
+        except TypeError:
+            fp.run(ligand, protein)
+    else:
+        fp.run(ligand, protein)
+    return fp.ifp
+
+
+def iter_ifp_pairs(ifp) -> Iterator[Tuple[Any, Any, dict]]:
+    for key, ix_dict in ifp.items():
+        if isinstance(key, tuple) and len(key) == 2:
+            lig_res, prot_res = key
+            yield lig_res, prot_res, ix_dict
+
+
+def ifp_to_dataframe(plf_mod, fp, ifp):
+    if hasattr(plf_mod, "to_dataframe"):
+        try:
+            interactions = getattr(fp, "interactions", None)
+            if interactions is not None:
+                return plf_mod.to_dataframe({0: ifp}, interactions)
+            return plf_mod.to_dataframe({0: ifp})
+        except TypeError:
+            pass
+        try:
+            return plf_mod.to_dataframe(ifp)
+        except TypeError:
+            pass
+    if hasattr(fp, "to_dataframe"):
+        return fp.to_dataframe(ifp)
+    raise TypeError("No compatible to_dataframe API found")
+
+
+def count_interactions(ix_dict, predicate) -> int:
+    total = 0
+    for name, metadata in ix_dict.items():
+        if not predicate(name):
+            continue
+        if metadata is None:
+            continue
+        if isinstance(metadata, (list, tuple)):
+            total += len(metadata)
+        elif isinstance(metadata, dict):
+            total += max(len(metadata), 1) if metadata else 0
+        else:
+            total += 1
+    return total
+
+
+def residue_ids(resname: str, resid: int, chains: str = "AB") -> List[str]:
+    return [f"{resname.upper()}{resid}.{c}" for c in chains]
+
+
+def tyr56_residue_ids(tyr_resid: int, chains: str = "AB") -> List[str]:
+    return residue_ids("TYR", tyr_resid, chains=chains)
 
 RDLogger.DisableLog("rdApp.*")
 logger = logging.getLogger("reinvent")
@@ -679,7 +776,6 @@ def format_asp_prolif_summary(
 
 
 def _prolif_ifp_to_text(plf, fp, ifp) -> str:
-    from prolif_compat import ifp_to_dataframe
     try:
         df = ifp_to_dataframe(plf, fp, ifp)
         return df.to_string()

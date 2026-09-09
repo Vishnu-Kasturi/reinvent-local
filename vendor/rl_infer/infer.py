@@ -2,7 +2,6 @@
 """Batch reward inference (no docking). Call init_scorers() first."""
 
 import argparse
-import math
 import sys
 from pathlib import Path
 
@@ -13,14 +12,7 @@ _INFER_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_INFER_DIR))
 
 from RL import init_scorers
-from pic50_scorer import calculateScore as calculatePic50
-from reinvent_transforms import (
-    REWARD_WEIGHTS,
-    transform_pic50,
-    transform_solubility,
-    weighted_geometric_mean,
-)
-from sol_scorer import calculateScore as calculateSolubility
+from reward_config import apply_reward_config, compute_reward, describe_active_rewards
 
 SMILES_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
 
@@ -40,33 +32,11 @@ def breakdown(smiles):
     if mol is None:
         return {"reward": 0.0, "SMILES": smiles}
 
-    pic50 = calculatePic50(smiles)
-    sol = calculateSolubility(smiles)
-    if not math.isfinite(pic50) or not math.isfinite(sol):
-        return {
-            "SMILES": smiles,
-            "reward": 0.0,
-            "reward_pic50": 0.0,
-            "reward_sol": 0.0,
-            "pic50": pic50,
-            "solubility": sol,
-        }
-
-    reward_pic50 = transform_pic50(pic50)
-    reward_sol = transform_solubility(sol)
-    reward = weighted_geometric_mean([
-        (reward_pic50, REWARD_WEIGHTS["pic50"]),
-        (reward_sol, REWARD_WEIGHTS["solubility"]),
-    ])
-
-    return {
-        "SMILES": smiles,
-        "reward": reward,
-        "reward_pic50": reward_pic50,
-        "reward_sol": reward_sol,
-        "pic50": pic50,
-        "solubility": sol,
-    }
+    reward, terms = compute_reward(None, smiles)
+    row = {"SMILES": smiles, "reward": reward}
+    for key, val in terms.items():
+        row[f"reward_{key}"] = val
+    return row
 
 
 def main():
@@ -76,6 +46,8 @@ def main():
     args = p.parse_args()
 
     init_scorers()
+    apply_reward_config()
+    print("Reward components:", describe_active_rewards())
     inp = Path(args.input_csv).expanduser().resolve()
     df = pd.read_csv(inp)
     col = _find_smiles_col(df)

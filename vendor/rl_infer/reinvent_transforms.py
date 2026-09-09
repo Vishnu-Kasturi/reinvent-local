@@ -22,15 +22,6 @@ DOCKING_REVERSE_SIGMOID = {"low": -16.0, "high": -9.0, "k": 0.4}
 # Tyrosine: higher pi-pi count is better; reward range 1–3 interactions.
 TYR_SIGMOID = {"low": 1.0, "high": 3.0, "k": 0.4}
 
-# Geometric-mean weights (tyrosine > docking).
-REWARD_WEIGHTS = {
-    "solubility": 5.0,
-    "pic50": 4.0,
-    "tyrosine": 4.0,
-    "docking": 2.0,
-}
-
-
 def _hard_sigmoid(x, k):
     return float((k * x > 0))
 

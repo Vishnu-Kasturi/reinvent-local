@@ -9,16 +9,9 @@ import torch.nn.functional as F
 from rdkit import Chem
 
 from sascorer import readFragmentScores
-from pic50_scorer import readModel as readPic50Model, calculateScore as calculatePic50
-from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
-from reinvent_transforms import (
-    REWARD_WEIGHTS,
-    transform_docking,
-    transform_pic50,
-    transform_solubility,
-    transform_tyrosine,
-    weighted_geometric_mean,
-)
+from pic50_scorer import readModel as readPic50Model
+from sol_scorer import readModel as readSolModel
+from reward_config import compute_reward, needs_dock_prolif
 from dock_prolif_backend import SingleMoleculeCache
 
 
@@ -31,29 +24,10 @@ def init_scorers():
 
 #def get_reward(ecif_input, smiles, predictor): #Specific to logP - Based on Popova et al
 def get_reward(dock_result, smiles, predictor):
-    rdkitmol = Chem.MolFromSmiles(smiles)
-    if rdkitmol is None or dock_result is None or not dock_result.docking_ok:
+    if Chem.MolFromSmiles(smiles) is None:
         return 0.0
-
-    reward_docking = transform_docking(dock_result.affinity)
-    reward_tyr = transform_tyrosine(dock_result.tyr_pi_stacking_count)
-
-    pic50 = calculatePic50(smiles)
-    if not math.isfinite(pic50):
-        return 0.0
-    reward_pic50 = transform_pic50(pic50)
-
-    sol = calculateSolubility(smiles)
-    if not math.isfinite(sol):
-        return 0.0
-    reward_sol = transform_solubility(sol)
-
-    return weighted_geometric_mean([
-        (reward_sol, REWARD_WEIGHTS["solubility"]),
-        (reward_pic50, REWARD_WEIGHTS["pic50"]),
-        (reward_tyr, REWARD_WEIGHTS["tyrosine"]),
-        (reward_docking, REWARD_WEIGHTS["docking"]),
-    ])
+    total, _breakdown = compute_reward(dock_result, smiles)
+    return total
 
 
 #-------------------------------------------------------RL POLICY GRADIENT UPDATE FUNCTION------------------------------------------
@@ -89,7 +63,11 @@ def policy_gradient(X_adj, X_features, prior_svae_encoder, prior_svae_decoder, p
                     traj_probs_tensor.append(traj_probs)
                     top_indices_tensor.append(top_indices)
 
-                    dock_result = SingleMoleculeCache.get_or_run(trajectory, batch_gen_itercount, output_path)
+                    dock_result = None
+                    if needs_dock_prolif():
+                        dock_result = SingleMoleculeCache.get_or_run(
+                            trajectory, batch_gen_itercount, output_path
+                        )
                     reward = get_reward(dock_result, trajectory, predictor)
                     print(trajectory, reward)
                     reward_tensor.append(reward)
