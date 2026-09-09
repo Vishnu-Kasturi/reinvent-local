@@ -15,7 +15,9 @@ SOL_DOUBLE_SIGMOID = {
 }
 
 # Docking: more negative affinity is better (reverse sigmoid).
-DOCKING_REVERSE_SIGMOID = {"low": -9.0, "high": -16.0, "k": 0.4}
+# REINVENT low/high: low = favourable (more negative), high = weak binders.
+# Range -16 (best) to -9 (worst) kcal/mol.
+DOCKING_REVERSE_SIGMOID = {"low": -16.0, "high": -9.0, "k": 0.4}
 
 # Tyrosine: higher pi-pi count is better; reward range 1–3 interactions.
 TYR_SIGMOID = {"low": 1.0, "high": 3.0, "k": 0.4}
