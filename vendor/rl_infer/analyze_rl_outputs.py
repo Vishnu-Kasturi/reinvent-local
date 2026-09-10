@@ -37,9 +37,11 @@ from rdkit.Chem import AllChem, DataStructs, Draw
 _SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPT_DIR))
 
-from docking_scorer import extract_docking_score
 from pic50_scorer import readModel as readPic50Model, calculateScore as calculatePic50
 from sol_scorer import readModel as readSolModel, calculateScore as calculateSolubility
+
+# smina / vina log: first data row is pose rank 1
+_FIRST_POSE_RE = re.compile(r"^\s*1\s+(-?\d+(?:\.\d+)?)")
 
 # Composite ranking weights (pic50 + sol + docking).
 WEIGHT_PIC50 = 5.0
