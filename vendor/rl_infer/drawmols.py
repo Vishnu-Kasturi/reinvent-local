@@ -32,8 +32,9 @@ from typing import Dict, List, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from rdkit import Chem
-from rdkit.Chem import AllChem, DataStructs, Draw
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, Draw
+from rdkit.ML.Cluster import Butina
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPT_DIR))
@@ -52,6 +53,7 @@ WEIGHT_DOCK = 2.0
 TOP_BALANCED_N = 100
 TOP_MOLS_N = 10
 DIVERSITY_MAX_TANIMOTO = 0.85  # skip if too similar to an already picked mol
+BUTINA_CUTOFF = 0.4  # Tanimoto distance (1 - sim); 0.4 => cluster if sim >= 0.6
 
 
 def _parse_rl_iter(path: Path) -> Optional[int]:
@@ -197,6 +199,62 @@ def _morgan_fp(smiles: str):
     return AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
 
 
+def butina_cluster_ids(smiles_list: List[str], cutoff: float = BUTINA_CUTOFF) -> List[int]:
+    """RDKit Butina clustering on Morgan fingerprints; returns cluster id per SMILES."""
+    fps = []
+    valid_idx: List[int] = []
+    for i, smi in enumerate(smiles_list):
+        fp = _morgan_fp(smi)
+        if fp is not None:
+            fps.append(fp)
+            valid_idx.append(i)
+
+    cluster_ids = [-1] * len(smiles_list)
+    if not fps:
+        return cluster_ids
+
+    dists = []
+    for i in range(1, len(fps)):
+        sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[:i])
+        dists.append([1.0 - s for s in sims])
+
+    clusters = Butina.ClusterData(dists, len(fps), cutoff, isDistData=True)
+    fp_to_cluster = {}
+    for cid, members in enumerate(clusters):
+        for m in members:
+            fp_to_cluster[m] = cid
+
+    for fp_i, orig_i in enumerate(valid_idx):
+        cluster_ids[orig_i] = fp_to_cluster[fp_i]
+    return cluster_ids
+
+
+def add_butina_clusters(df: pd.DataFrame, cutoff: float = BUTINA_CUTOFF) -> pd.DataFrame:
+    out = df.copy()
+    out["butina_cluster"] = butina_cluster_ids(out["canonical_smiles"].tolist(), cutoff=cutoff)
+    return out
+
+
+def butina_cluster_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per Butina cluster: size and best-composite representative."""
+    rows = []
+    for cid, grp in df.groupby("butina_cluster", sort=True):
+        if cid < 0:
+            continue
+        best = grp.sort_values("composite", ascending=False).iloc[0]
+        rows.append({
+            "butina_cluster": int(cid),
+            "size": len(grp),
+            "rep_mol_name": best.get("mol_name", ""),
+            "rep_smiles": best["canonical_smiles"],
+            "rep_composite": float(best["composite"]),
+            "rep_pIC50": float(best["pIC50"]),
+            "rep_Solubility": float(best["Solubility"]),
+            "rep_Docking_Score": float(best["Docking_Score"]),
+        })
+    return pd.DataFrame(rows).sort_values("size", ascending=False).reset_index(drop=True)
+
+
 def select_balanced(
     df: pd.DataFrame,
     n: int = TOP_BALANCED_N,
@@ -236,17 +294,36 @@ def select_balanced(
     return out.reset_index(drop=True)
 
 
-def plot_clusters(df: pd.DataFrame, out_png: Path, title: str = "pIC50 vs Solubility") -> None:
+def plot_butina_clusters(
+    df: pd.DataFrame,
+    out_png: Path,
+    title: str = "Butina clusters (pIC50 vs Solubility)",
+) -> None:
+    work = df[df["butina_cluster"] >= 0].copy()
+    if work.empty:
+        return
+
     fig, ax = plt.subplots(figsize=(10, 8))
-    x = df["pIC50"].astype(float)
-    y = df["Solubility"].astype(float)
-    c = df["Docking_Score"].astype(float)
-    sc = ax.scatter(x, y, c=c, cmap="viridis_r", alpha=0.75, s=40, edgecolors="k", linewidths=0.3)
-    cb = fig.colorbar(sc, ax=ax)
-    cb.set_label("Docking score (kcal/mol)")
+    x = work["pIC50"].astype(float)
+    y = work["Solubility"].astype(float)
+    clusters = work["butina_cluster"].astype(int)
+    n_clusters = clusters.nunique()
+    cmap = plt.cm.get_cmap("tab20", max(n_clusters, 1))
+    sc = ax.scatter(
+        x,
+        y,
+        c=clusters,
+        cmap=cmap,
+        alpha=0.8,
+        s=40,
+        edgecolors="k",
+        linewidths=0.3,
+    )
+    cb = fig.colorbar(sc, ax=ax, ticks=sorted(clusters.unique()))
+    cb.set_label("Butina cluster id")
     ax.set_xlabel("pIC50 (predicted)")
     ax.set_ylabel("Solubility logS (predicted)")
-    ax.set_title(title)
+    ax.set_title(f"{title} (n={n_clusters} clusters)")
     fig.tight_layout()
     fig.savefig(out_png, dpi=200)
     plt.close(fig)
@@ -284,6 +361,12 @@ def main():
     p.add_argument("--out-dir", default=None, help="Output directory (default: <root>/analysis)")
     p.add_argument("--top-n", type=int, default=TOP_BALANCED_N)
     p.add_argument("--diversity", type=float, default=DIVERSITY_MAX_TANIMOTO)
+    p.add_argument(
+        "--butina-cutoff",
+        type=float,
+        default=BUTINA_CUTOFF,
+        help="Butina Tanimoto distance cutoff (default 0.4 => sim>=0.6)",
+    )
     args = p.parse_args()
 
     root = Path(args.root).expanduser().resolve()
@@ -307,26 +390,33 @@ def main():
     print(f"[+] {len(df)} rows -> {all_path}")
 
     deduped = dedupe_best_composite(df)
+    deduped = add_butina_clusters(deduped, cutoff=args.butina_cutoff)
     dedup_path = out_dir / "all_molecules_deduped.csv"
     deduped.to_csv(dedup_path, index=False)
-    print(f"[+] {len(deduped)} unique SMILES -> {dedup_path}")
+    n_butina = deduped["butina_cluster"].nunique()
+    print(f"[+] {len(deduped)} unique SMILES, {n_butina} Butina clusters -> {dedup_path}")
+
+    summary = butina_cluster_summary(deduped)
+    summary_path = out_dir / "butina_cluster_summary.csv"
+    summary.to_csv(summary_path, index=False)
+    print(f"[+] Butina cluster summary -> {summary_path}")
 
     balanced = select_balanced(deduped, n=args.top_n, max_tanimoto=args.diversity)
     bal_path = out_dir / f"top{args.top_n}_balanced.csv"
     balanced.to_csv(bal_path, index=False)
     print(f"[+] top {len(balanced)} balanced -> {bal_path}")
 
-    cluster_png = out_dir / "top_clusters.png"
-    plot_clusters(
+    cluster_png = out_dir / "butina_clusters.png"
+    plot_butina_clusters(
         deduped,
         cluster_png,
-        title=f"All unique mols (n={len(deduped)}) — color = docking score",
+        title=f"All unique mols (n={len(deduped)})",
     )
-    print(f"[+] cluster plot -> {cluster_png}")
+    print(f"[+] Butina cluster plot -> {cluster_png}")
 
     if len(balanced) > 0:
-        bal_cluster_png = out_dir / f"top{args.top_n}_clusters.png"
-        plot_clusters(balanced, bal_cluster_png, title=f"Top {len(balanced)} balanced")
+        bal_cluster_png = out_dir / f"top{args.top_n}_butina_clusters.png"
+        plot_butina_clusters(balanced, bal_cluster_png, title=f"Top {len(balanced)} balanced")
 
     top10_png = out_dir / "top10_molecules.png"
     plot_top_molecules(deduped, top10_png, n=TOP_MOLS_N)
