@@ -15,10 +15,12 @@ Usage:
 
 Outputs (in --out-dir, default <root>/analysis/):
   all_molecules.csv
-  all_molecules_deduped.csv  (includes butina_cluster column)
-  butina_cluster_summary.csv
+  all_molecules_deduped.csv       (butina_cluster, is_butina_centroid)
+  butina_cluster_summary.csv      (centroid = first member in each RDKit cluster)
+  butina_cluster_centroids.png    (2D structures, one per cluster)
+  butina_clusters/cluster_*.sdf   (one SDF per cluster)
   top100_balanced.csv
-  butina_clusters.png
+  butina_clusters.png             (scatter colored by cluster id)
   top10_molecules.png
 """
 
@@ -29,7 +31,7 @@ import math
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -203,8 +205,16 @@ def _morgan_fp(smiles: str):
     return _MORGAN_GEN.GetFingerprint(mol)
 
 
-def butina_cluster_ids(smiles_list: List[str], cutoff: float = BUTINA_CUTOFF) -> List[int]:
-    """RDKit Butina clustering on Morgan fingerprints; returns cluster id per SMILES."""
+def butina_cluster_smiles(
+    smiles_list: List[str],
+    cutoff: float = BUTINA_CUTOFF,
+) -> Tuple[List[int], List[bool]]:
+    """
+    RDKit Butina clustering on Morgan fingerprints (ECFP-like, radius=2).
+
+    Returns (cluster_id per input SMILES, is_centroid per input SMILES).
+    In RDKit Butina output the first member of each cluster tuple is the centroid.
+    """
     fps = []
     valid_idx: List[int] = []
     for i, smi in enumerate(smiles_list):
@@ -214,12 +224,14 @@ def butina_cluster_ids(smiles_list: List[str], cutoff: float = BUTINA_CUTOFF) ->
             valid_idx.append(i)
 
     cluster_ids = [-1] * len(smiles_list)
+    is_centroid = [False] * len(smiles_list)
     n_fps = len(fps)
     if n_fps == 0:
-        return cluster_ids
+        return cluster_ids, is_centroid
     if n_fps == 1:
         cluster_ids[valid_idx[0]] = 0
-        return cluster_ids
+        is_centroid[valid_idx[0]] = True
+        return cluster_ids, is_centroid
 
     # Flat lower-triangle distance matrix (required when isDistData=True).
     dists: List[float] = []
@@ -228,40 +240,111 @@ def butina_cluster_ids(smiles_list: List[str], cutoff: float = BUTINA_CUTOFF) ->
         dists.extend(1.0 - s for s in sims)
 
     clusters = Butina.ClusterData(dists, n_fps, cutoff, isDistData=True)
-    fp_to_cluster = {}
+    fp_to_cluster: Dict[int, int] = {}
+    centroid_fp_idxs = set()
     for cid, members in enumerate(clusters):
+        centroid_fp_idxs.add(members[0])
         for m in members:
             fp_to_cluster[m] = cid
 
     for fp_i, orig_i in enumerate(valid_idx):
         cluster_ids[orig_i] = fp_to_cluster[fp_i]
-    return cluster_ids
+        is_centroid[orig_i] = fp_i in centroid_fp_idxs
+    return cluster_ids, is_centroid
 
 
 def add_butina_clusters(df: pd.DataFrame, cutoff: float = BUTINA_CUTOFF) -> pd.DataFrame:
     out = df.copy()
-    out["butina_cluster"] = butina_cluster_ids(out["canonical_smiles"].tolist(), cutoff=cutoff)
+    cids, centroids = butina_cluster_smiles(out["canonical_smiles"].tolist(), cutoff=cutoff)
+    out["butina_cluster"] = cids
+    out["is_butina_centroid"] = centroids
     return out
 
 
 def butina_cluster_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """One row per Butina cluster: size and best-composite representative."""
+    """One row per Butina cluster: size + RDKit centroid molecule."""
     rows = []
     for cid, grp in df.groupby("butina_cluster", sort=True):
         if cid < 0:
             continue
-        best = grp.sort_values("composite", ascending=False).iloc[0]
+        centroids = grp[grp["is_butina_centroid"]]
+        rep = centroids.iloc[0] if len(centroids) else grp.iloc[0]
         rows.append({
             "butina_cluster": int(cid),
             "size": len(grp),
-            "rep_mol_name": best.get("mol_name", ""),
-            "rep_smiles": best["canonical_smiles"],
-            "rep_composite": float(best["composite"]),
-            "rep_pIC50": float(best["pIC50"]),
-            "rep_Solubility": float(best["Solubility"]),
-            "rep_Docking_Score": float(best["Docking_Score"]),
+            "centroid_mol_name": rep.get("mol_name", ""),
+            "centroid_smiles": rep["canonical_smiles"],
+            "centroid_composite": float(rep["composite"]),
+            "centroid_pIC50": float(rep["pIC50"]),
+            "centroid_Solubility": float(rep["Solubility"]),
+            "centroid_Docking_Score": float(rep["Docking_Score"]),
         })
     return pd.DataFrame(rows).sort_values("size", ascending=False).reset_index(drop=True)
+
+
+def write_butina_cluster_sdfs(df: pd.DataFrame, out_dir: Path) -> int:
+    """Write one SDF per Butina cluster (RDKit-style grouped output)."""
+    cluster_dir = out_dir / "butina_clusters"
+    cluster_dir.mkdir(parents=True, exist_ok=True)
+    n_written = 0
+    for cid, grp in df.groupby("butina_cluster", sort=True):
+        if cid < 0:
+            continue
+        mols = []
+        for _, row in grp.iterrows():
+            mol = Chem.MolFromSmiles(row["canonical_smiles"])
+            if mol is None:
+                continue
+            mol.SetProp("_Name", str(row.get("mol_name", "")))
+            mol.SetProp("butina_cluster", str(int(cid)))
+            mol.SetProp("is_butina_centroid", "1" if row.get("is_butina_centroid") else "0")
+            mol.SetProp("composite", f"{float(row['composite']):.4f}")
+            mol.SetProp("pIC50", f"{float(row['pIC50']):.3f}")
+            mol.SetProp("Solubility", f"{float(row['Solubility']):.3f}")
+            mol.SetProp("Docking_Score", f"{float(row['Docking_Score']):.3f}")
+            mols.append(mol)
+        if not mols:
+            continue
+        out_path = cluster_dir / f"cluster_{int(cid):04d}_n{len(mols)}.sdf"
+        writer = Chem.SDWriter(str(out_path))
+        for mol in mols:
+            writer.write(mol)
+        writer.close()
+        n_written += 1
+    return n_written
+
+
+def plot_butina_centroids(
+    df: pd.DataFrame,
+    summary: pd.DataFrame,
+    out_png: Path,
+    max_clusters: int = 20,
+) -> None:
+    """Grid of 2D structures: one RDKit Butina centroid per cluster."""
+    top = summary.head(max_clusters)
+    mols = []
+    legends = []
+    for _, row in top.iterrows():
+        cid = int(row["butina_cluster"])
+        mol = Chem.MolFromSmiles(row["centroid_smiles"])
+        if mol is None:
+            continue
+        AllChem.Compute2DCoords(mol)
+        mols.append(mol)
+        legends.append(
+            f"C{cid} (n={int(row['size'])})\n"
+            f"pIC50={row['centroid_pIC50']:.2f} logS={row['centroid_Solubility']:.2f}\n"
+            f"Dock={row['centroid_Docking_Score']:.2f}"
+        )
+    if not mols:
+        return
+    img = Draw.MolsToGridImage(
+        mols,
+        molsPerRow=min(5, len(mols)),
+        subImgSize=(350, 350),
+        legends=legends,
+    )
+    img.save(str(out_png))
 
 
 def select_balanced(
@@ -376,6 +459,12 @@ def main():
         default=BUTINA_CUTOFF,
         help="Butina Tanimoto distance cutoff (default 0.4 => sim>=0.6)",
     )
+    p.add_argument(
+        "--max-centroid-plots",
+        type=int,
+        default=20,
+        help="Max Butina cluster centroids to draw (largest clusters first)",
+    )
     args = p.parse_args()
 
     root = Path(args.root).expanduser().resolve()
@@ -409,6 +498,13 @@ def main():
     summary_path = out_dir / "butina_cluster_summary.csv"
     summary.to_csv(summary_path, index=False)
     print(f"[+] Butina cluster summary -> {summary_path}")
+
+    n_sdfs = write_butina_cluster_sdfs(deduped, out_dir)
+    print(f"[+] {n_sdfs} Butina cluster SDFs -> {out_dir / 'butina_clusters'}/")
+
+    centroid_png = out_dir / "butina_cluster_centroids.png"
+    plot_butina_centroids(deduped, summary, centroid_png, max_clusters=args.max_centroid_plots)
+    print(f"[+] Butina centroid structures -> {centroid_png}")
 
     balanced = select_balanced(deduped, n=args.top_n, max_tanimoto=args.diversity)
     bal_path = out_dir / f"top{args.top_n}_balanced.csv"
