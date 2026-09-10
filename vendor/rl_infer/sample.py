@@ -49,6 +49,7 @@ int_to_char_file = sys.argv[3]
 graphpath = sys.argv[4]
 combined_cptfile = sys.argv[5]
 outfile = sys.argv[6]
+nmol = int(sys.argv[7]) if len(sys.argv) > 7 else 1000
 
 #--------------------------------------------------------------------------------------------------------------------------------------
 #--------------------------------------------------------GRAPH VAE FUNCTION DEFINITIONS------------------------------------------------
@@ -664,7 +665,6 @@ prot_X = prot_X.unsqueeze(0)
 
 
 #-----------------------------------------------------SAMPLING BEGINS HERE--------------------------------------------------------------
-nmol = 1000
 correctmol=[]
 rdkitmols=[]
 wrong = 0
@@ -692,10 +692,12 @@ for i in range(nmol):
 
 print(protein_index,"protein: ",(wrong/float(correct+wrong)*100)," % wrongly formatted smiles!")
 
-#outfile = savepath+prot+"_sampling_test.smi"
-#Write the correct molecules to an outfile
-with open(outfile, 'w') as f:
-	for molecule in correctmol:
+#Write the correct molecules to an outfile (.csv or .smi)
+if str(outfile).lower().endswith(".csv"):
+	pd.DataFrame({"SMILES": correctmol}).to_csv(outfile, index=False)
+else:
+	with open(outfile, 'w') as f:
+		for molecule in correctmol:
 			print(molecule, file=f)
 
 
