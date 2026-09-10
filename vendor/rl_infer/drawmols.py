@@ -15,8 +15,10 @@ Usage:
 
 Outputs (in --out-dir, default <root>/analysis/):
   all_molecules.csv
+  all_molecules_deduped.csv  (includes butina_cluster column)
+  butina_cluster_summary.csv
   top100_balanced.csv
-  top_clusters.png
+  butina_clusters.png
   top10_molecules.png
 """
 
@@ -33,8 +35,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from rdkit import Chem, DataStructs
-from rdkit.Chem import AllChem, Draw
+from rdkit.Chem import AllChem, Draw, rdFingerprintGenerator
 from rdkit.ML.Cluster import Butina
+
+_MORGAN_GEN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPT_DIR))
@@ -196,7 +200,7 @@ def _morgan_fp(smiles: str):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
-    return AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+    return _MORGAN_GEN.GetFingerprint(mol)
 
 
 def butina_cluster_ids(smiles_list: List[str], cutoff: float = BUTINA_CUTOFF) -> List[int]:
@@ -210,15 +214,20 @@ def butina_cluster_ids(smiles_list: List[str], cutoff: float = BUTINA_CUTOFF) ->
             valid_idx.append(i)
 
     cluster_ids = [-1] * len(smiles_list)
-    if not fps:
+    n_fps = len(fps)
+    if n_fps == 0:
+        return cluster_ids
+    if n_fps == 1:
+        cluster_ids[valid_idx[0]] = 0
         return cluster_ids
 
-    dists = []
-    for i in range(1, len(fps)):
+    # Flat lower-triangle distance matrix (required when isDistData=True).
+    dists: List[float] = []
+    for i in range(1, n_fps):
         sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[:i])
-        dists.append([1.0 - s for s in sims])
+        dists.extend(1.0 - s for s in sims)
 
-    clusters = Butina.ClusterData(dists, len(fps), cutoff, isDistData=True)
+    clusters = Butina.ClusterData(dists, n_fps, cutoff, isDistData=True)
     fp_to_cluster = {}
     for cid, members in enumerate(clusters):
         for m in members:
