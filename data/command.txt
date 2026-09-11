@@ -1,0 +1,5 @@
+be in root reinvent-local-main 
+
+*run after replacing the lib8 with lib9*
+
+reinvent REINVENT4/configs/iict_new_reward_2.toml
