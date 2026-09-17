@@ -3,9 +3,9 @@
 LinkInvent balanced top-N selection + Butina clustering.
 
 From a LinkInvent / REINVENT results CSV (enriched or raw RL summary):
-  1. Select top N molecules by weighted composite score (per-metric toggles in TOML)
+  1. Select top N "balanced" molecules by weighted composite score
   2. Cluster them by ECFP4 Butina clustering
-  3. Output (each toggled in TOML):
+  3. Output:
        - top{N}_balanced.csv
        - top_clusters.csv
        - top{N}_molecules.png
@@ -13,18 +13,15 @@ From a LinkInvent / REINVENT results CSV (enriched or raw RL summary):
 
 For reinvent-local-main pipeline (NOT RBDD).
 
-Run from repo root:
+Edit CONFIG below, then from repo root:
   python Preprocess/scripts/select_balanced_linkinvent.py
-  python Preprocess/scripts/select_balanced_linkinvent.py --config Preprocess/configs/linkinvent_balanced_analysis.toml
 """
 
 from __future__ import annotations
 
-import argparse
 import math
-import sys
+import os
 from pathlib import Path
-from typing import Any
 
 import matplotlib
 matplotlib.use("Agg")
@@ -38,21 +35,61 @@ from rdkit.Chem import Draw
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
 from rdkit.ML.Cluster import Butina
 
-try:
-    import tomllib
-except ImportError:  # pragma: no cover
-    import tomli as tomllib
-
 RDLogger.DisableLog("rdApp.*")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_DEFAULT_CONFIG = _REPO_ROOT / "Preprocess/configs/linkinvent_balanced_analysis.toml"
 _FP_GEN = GetMorganGenerator(radius=2, fpSize=2048)
 
+# ── paths ────────────────────────────────────────────────────────────────────
+INPUT_PATH  = "results/linkinvent_2_1_enriched.csv"
+OUTPUT_DIR  = "results/linkinvent_2_1_analysis"
+SMILES_COL  = "SMILES"
 
-def _resolve(path: str | Path, base: Path) -> Path:
+# ── tuneable knobs ───────────────────────────────────────────────────────────
+TOP_N            = 100
+CLUSTER_CUTOFF   = 0.4
+TOP_CLUSTERS     = 20
+GRID_COLS        = 10
+CLUSTER_GRID_COLS = 5
+COLOR_BY         = "pIC50"   # column for colourbar in molecule grid PNG
+
+# ── module toggles (True / False) ───────────────────────────────────────────
+RUN_CLUSTERING       = True
+WRITE_TOP_CSV        = True
+WRITE_CLUSTER_CSV    = True
+WRITE_MOLECULE_PNG   = True
+WRITE_CLUSTER_PNG    = True
+
+# ── composite score: enable + weight per property ────────────────────────────
+# Weights are renormalized over enabled rows only.
+USE_TYR   = False   # Tyrosine_PiStacking — off for typical LinkInvent enriched CSV
+W_TYR     = 0.40
+
+USE_SOL   = True
+W_SOL     = 0.30
+
+USE_PIC50 = True
+W_PIC50   = 0.20
+
+USE_DOCK  = True
+W_DOCK    = 0.10
+# ─────────────────────────────────────────────────────────────────────────────
+
+_METRICS = (
+    ("tyrosine", USE_TYR, W_TYR, "Tyrosine_PiStacking",
+     ["TyrInteractionCount_raw", "TyrInteractionCount_raw (raw)"], True),
+    ("solubility", USE_SOL, W_SOL, "Solubility",
+     ["PD1PDL1Sol", "PD1PDL1Sol_raw", "PD1PDL1Sol (raw)", "logS"], True),
+    ("pic50", USE_PIC50, W_PIC50, "pIC50",
+     ["PD1PDL1pIC50", "PD1PDL1pIC50_raw", "PD1PDL1pIC50 (raw)"], True),
+    ("docking", USE_DOCK, W_DOCK, "Docking_Score",
+     ["DockingAffinity_raw", "DockingAffinity_raw (raw)", "DockingReward"], False),
+)
+
+
+def _resolve(path: str | Path) -> Path:
     p = Path(path).expanduser()
-    return p.resolve() if p.is_absolute() else (base / p).resolve()
+    return p.resolve() if p.is_absolute() else (_REPO_ROOT / p).resolve()
 
 
 def _find_column(df: pd.DataFrame, primary: str, aliases: list[str]) -> str | None:
@@ -70,21 +107,12 @@ def _find_column(df: pd.DataFrame, primary: str, aliases: list[str]) -> str | No
     return None
 
 
-def load_config(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        raise SystemExit(f"Config not found: {path}")
-    with path.open("rb") as fh:
-        return tomllib.load(fh)
-
-
-def _active_components(cfg: dict[str, Any]) -> list[dict[str, Any]]:
-    comps = cfg.get("composite", [])
-    active = [c for c in comps if c.get("enabled", False)]
+def _active_metrics() -> list[tuple]:
+    active = [m for m in _METRICS if m[1]]
     if not active:
-        raise SystemExit("No composite components enabled in TOML (set enabled = true on at least one [[composite]] row).")
-    total_w = sum(float(c.get("weight", 0.0)) for c in active)
-    if total_w <= 0:
-        raise SystemExit("Enabled composite weights must sum to > 0.")
+        raise SystemExit("No metrics enabled — set at least one USE_* = True in CONFIG.")
+    if sum(m[2] for m in active) <= 0:
+        raise SystemExit("Enabled metric weights must sum to > 0.")
     return active
 
 
@@ -96,19 +124,14 @@ def _normalize(series: pd.Series) -> pd.Series:
     return (vals - lo) / (hi - lo)
 
 
-def composite_score(df: pd.DataFrame, active: list[dict[str, Any]], col_map: dict[str, str]) -> pd.Series:
+def composite_score(df: pd.DataFrame, active: list[tuple], col_map: dict[str, str]) -> pd.Series:
     score = pd.Series(0.0, index=df.index, dtype=float)
-    total_w = sum(float(c.get("weight", 0.0)) for c in active)
-
-    for comp in active:
-        name = comp["name"]
-        col = col_map[name]
-        w = float(comp.get("weight", 0.0)) / total_w
-        normed = _normalize(df[col])
-        if not comp.get("higher_is_better", True):
+    total_w = sum(m[2] for m in active)
+    for name, _, weight, _, _, higher_better in active:
+        normed = _normalize(df[col_map[name]])
+        if not higher_better:
             normed = 1.0 - normed
-        score = score + w * normed
-
+        score = score + (weight / total_w) * normed
     return score
 
 
@@ -125,53 +148,30 @@ def butina_cluster(fps, cutoff: float):
     return Butina.ClusterData(dists, n, cutoff, isDistData=True)
 
 
-def _legend_line(label: str, value: float) -> str:
-    if pd.isna(value):
-        return f"{label}=NA"
-    return f"{label}={value:.2f}" if abs(value) < 100 else f"{label}={value:.1f}"
-
-
-def mol_grid_png(
-    df: pd.DataFrame,
-    outpath: Path,
-    title: str,
-    color_col: str,
-    active: list[dict[str, Any]],
-    col_map: dict[str, str],
-    cols: int,
-) -> None:
-    mols: list[Chem.Mol] = []
-    legends: list[str] = []
-
+def mol_grid_png(df, outpath, title, color_col, active, col_map, cols):
+    mols, legends = [], []
     color_vals = pd.to_numeric(df[color_col], errors="coerce")
     norm = Normalize(vmin=color_vals.min(), vmax=color_vals.max())
-    cmap = plt.cm.RdYlGn
 
     for _, row in df.iterrows():
         m = Chem.MolFromSmiles(str(row["SMILES"]))
         mols.append(m if m else Chem.MolFromSmiles("C"))
-        parts = [_legend_line(comp["name"], row[col_map[comp["name"]]]) for comp in active]
+        parts = []
+        for name, _, _, _, _, _ in active:
+            val = row[col_map[name]]
+            parts.append(f"{name}={val:.2f}" if pd.notna(val) else f"{name}=NA")
         legends.append("\n".join(parts))
 
     rows = math.ceil(len(mols) / cols)
     img = Draw.MolsToGridImage(
-        mols,
-        molsPerRow=cols,
-        subImgSize=(300, 270),
-        legends=legends,
-        returnPNG=False,
+        mols, molsPerRow=cols, subImgSize=(300, 270), legends=legends, returnPNG=False,
     )
-
-    fig, axes = plt.subplots(
-        1, 2,
-        figsize=(18, rows * 2.8 + 1.5),
-        gridspec_kw={"width_ratios": [1, 0.02]},
-    )
+    fig, axes = plt.subplots(1, 2, figsize=(18, rows * 2.8 + 1.5),
+                             gridspec_kw={"width_ratios": [1, 0.02]})
     axes[0].imshow(img)
     axes[0].axis("off")
     axes[0].set_title(title, fontsize=14, fontweight="bold", pad=10)
-
-    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm = ScalarMappable(cmap=plt.cm.RdYlGn, norm=norm)
     sm.set_array([])
     plt.colorbar(sm, cax=axes[1], label=color_col)
     plt.tight_layout()
@@ -180,29 +180,20 @@ def mol_grid_png(
     print(f"saved -> {outpath}")
 
 
-def cluster_grid_png(cluster_df: pd.DataFrame, outpath: Path, active: list[dict[str, Any]], cols: int) -> None:
-    mols: list[Chem.Mol] = []
-    legends: list[str] = []
-
+def cluster_grid_png(cluster_df, outpath, active, cols):
+    mols, legends = [], []
     for _, row in cluster_df.iterrows():
         m = Chem.MolFromSmiles(str(row["centroid_SMILES"]))
         mols.append(m if m else Chem.MolFromSmiles("C"))
         parts = [f"Cluster {int(row['cluster_id'])} (n={int(row['size'])})"]
-        for comp in active:
-            mean_col = f"mean_{comp['name']}"
-            if mean_col in row.index:
-                parts.append(_legend_line(comp["name"], row[mean_col]))
+        for name, _, _, _, _, _ in active:
+            parts.append(f"{name}={row[f'mean_{name}']:.2f}")
         legends.append("\n".join(parts))
 
     rows = math.ceil(len(mols) / cols)
     img = Draw.MolsToGridImage(
-        mols,
-        molsPerRow=cols,
-        subImgSize=(320, 290),
-        legends=legends,
-        returnPNG=False,
+        mols, molsPerRow=cols, subImgSize=(320, 290), legends=legends, returnPNG=False,
     )
-
     fig, ax = plt.subplots(figsize=(cols * 3.5, rows * 3.2 + 1))
     ax.imshow(img)
     ax.axis("off")
@@ -213,67 +204,37 @@ def cluster_grid_png(cluster_df: pd.DataFrame, outpath: Path, active: list[dict[
     print(f"saved -> {outpath}")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="LinkInvent balanced selection + Butina clustering")
-    parser.add_argument(
-        "--config",
-        default=str(_DEFAULT_CONFIG),
-        help="TOML config path (default: Preprocess/configs/linkinvent_balanced_analysis.toml)",
-    )
-    args = parser.parse_args()
+def main():
+    active = _active_metrics()
+    input_path = _resolve(INPUT_PATH)
+    output_dir = _resolve(OUTPUT_DIR)
+    os.makedirs(output_dir, exist_ok=True)
 
-    cfg_path = _resolve(args.config, _REPO_ROOT)
-    cfg = load_config(cfg_path)
+    if not input_path.is_file():
+        raise SystemExit(f"Input not found: {input_path}")
 
-    paths = cfg.get("paths", {})
-    selection = cfg.get("selection", {})
-    clustering = cfg.get("clustering", {})
-    outputs = cfg.get("outputs", {})
-    plot_cfg = cfg.get("plot", {})
+    df = pd.read_csv(input_path)
+    print(f"loaded {len(df)} molecules from {input_path}")
 
-    input_csv = _resolve(paths.get("input_csv", ""), _REPO_ROOT)
-    output_dir = _resolve(paths.get("output_dir", "results/linkinvent_analysis"), _REPO_ROOT)
-    smiles_col = paths.get("smiles_col", "SMILES")
-
-    top_n = int(selection.get("top_n", 100))
-    cluster_enabled = bool(clustering.get("enabled", True))
-    cluster_cutoff = float(clustering.get("cutoff", 0.4))
-    top_clusters = int(clustering.get("top_clusters", 20))
-
-    grid_cols = int(plot_cfg.get("grid_cols", 10))
-    cluster_grid_cols = int(plot_cfg.get("cluster_grid_cols", 5))
-    color_by = plot_cfg.get("color_by", "pIC50")
-
-    active = _active_components(cfg)
-
-    if not input_csv.is_file():
-        raise SystemExit(f"Input not found: {input_csv}")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    df = pd.read_csv(input_csv)
-    print(f"loaded {len(df)} rows from {input_csv}")
-
-    smi_col = _find_column(df, smiles_col, ["smiles", "canonical_smiles"])
+    smi_col = _find_column(df, SMILES_COL, ["smiles", "canonical_smiles"])
     if not smi_col:
         raise SystemExit(f"SMILES column not found. Columns: {list(df.columns)}")
 
     col_map: dict[str, str] = {}
-    for comp in active:
-        col = _find_column(df, comp.get("column", ""), comp.get("column_aliases", []))
+    for name, _, _, primary, aliases, _ in active:
+        col = _find_column(df, primary, aliases)
         if not col:
             raise SystemExit(
-                f"Enabled component '{comp['name']}' column not found "
-                f"(tried {comp.get('column')} / {comp.get('column_aliases', [])}). "
+                f"Enabled metric '{name}' column not found (tried {primary} / {aliases}). "
                 f"Columns: {list(df.columns)}"
             )
-        col_map[comp["name"]] = col
+        col_map[name] = col
 
-    work = pd.DataFrame()
-    work["SMILES"] = df[smi_col].astype(str)
-    for comp in active:
-        work[col_map[comp["name"]]] = pd.to_numeric(df[col_map[comp["name"]]], errors="coerce")
+    work = pd.DataFrame({"SMILES": df[smi_col].astype(str)})
+    for name, _, _, _, _, _ in active:
+        work[col_map[name]] = pd.to_numeric(df[col_map[name]], errors="coerce")
 
-    metric_cols = [col_map[c["name"]] for c in active]
+    metric_cols = [col_map[m[0]] for m in active]
     before = len(work)
     work = work.dropna(subset=metric_cols).reset_index(drop=True)
     if before - len(work):
@@ -286,24 +247,21 @@ def main() -> None:
     work = work[work["mol"].notna()].copy().reset_index(drop=True)
 
     if work.empty:
-        raise SystemExit("No valid molecules left after filtering. Check SMILES and enabled metric columns.")
+        raise SystemExit("No valid molecules left after filtering.")
 
     work["composite"] = composite_score(work, active, col_map)
-    df_top = work.nlargest(min(top_n, len(work)), "composite").reset_index(drop=True)
+    df_top = work.nlargest(min(TOP_N, len(work)), "composite").reset_index(drop=True)
     df_top.index = df_top.index + 1
 
-    enabled_names = ", ".join(c["name"] for c in active)
-    top_csv_name = f"top{top_n}_balanced.csv"
-
-    if outputs.get("write_top_csv", True):
-        top_csv = output_dir / top_csv_name
+    if WRITE_TOP_CSV:
+        top_csv = output_dir / f"top{TOP_N}_balanced.csv"
         df_top.drop(columns=["mol"]).to_csv(top_csv, index_label="rank")
         print(f"saved -> {top_csv}")
 
     cluster_df = pd.DataFrame()
-    if cluster_enabled and len(df_top) > 1:
+    if RUN_CLUSTERING and len(df_top) > 1:
         fps = [get_fp(m) for m in df_top["mol"]]
-        clusters = butina_cluster(fps, cluster_cutoff)
+        clusters = butina_cluster(fps, CLUSTER_CUTOFF)
 
         mol_cluster: dict[int, int] = {}
         for cid, cluster in enumerate(clusters):
@@ -321,48 +279,46 @@ def main() -> None:
                 "centroid_SMILES": df_top.iloc[centroid_idx]["SMILES"],
                 "mean_composite": sub["composite"].mean(),
             }
-            for comp in active:
-                row[f"mean_{comp['name']}"] = sub[col_map[comp["name"]]].mean()
+            for name, _, _, _, _, _ in active:
+                row[f"mean_{name}"] = sub[col_map[name]].mean()
             rows.append(row)
 
-        sort_key = f"mean_{active[0]['name']}"
+        sort_key = f"mean_{active[0][0]}"
         cluster_df = pd.DataFrame(rows).sort_values(sort_key, ascending=False).reset_index(drop=True)
 
-        if outputs.get("write_cluster_csv", True):
+        if WRITE_CLUSTER_CSV:
             cluster_csv = output_dir / "top_clusters.csv"
             cluster_df.to_csv(cluster_csv, index=False)
             print(f"saved -> {cluster_csv}  ({len(cluster_df)} clusters)")
 
-    color_col = col_map.get(color_by) or _find_column(df_top, color_by, [])
+    color_col = col_map.get(COLOR_BY) or _find_column(df_top, COLOR_BY, [])
     if not color_col:
-        color_col = col_map[active[0]["name"]]
+        color_col = col_map[active[0][0]]
 
-    title = f"Top {top_n} Balanced Molecules ({enabled_names})"
-    if outputs.get("write_molecule_png", True):
+    enabled = ", ".join(m[0] for m in active)
+    if WRITE_MOLECULE_PNG:
         mol_grid_png(
             df_top,
-            output_dir / f"top{top_n}_molecules.png",
-            title=title,
+            output_dir / f"top{TOP_N}_molecules.png",
+            title=f"Top {TOP_N} Balanced Molecules ({enabled})",
             color_col=color_col,
             active=active,
             col_map=col_map,
-            cols=grid_cols,
+            cols=GRID_COLS,
         )
 
-    if cluster_enabled and outputs.get("write_cluster_png", True) and not cluster_df.empty:
+    if RUN_CLUSTERING and WRITE_CLUSTER_PNG and not cluster_df.empty:
         cluster_grid_png(
-            cluster_df.head(top_clusters),
+            cluster_df.head(TOP_CLUSTERS),
             output_dir / "top_clusters.png",
             active=active,
-            cols=cluster_grid_cols,
+            cols=CLUSTER_GRID_COLS,
         )
 
-    print(f"\n── config: {cfg_path} ──")
-    print(f"── enabled components: {enabled_names} ──")
-    preview_cols = ["SMILES"] + metric_cols + ["composite"]
-    print(df_top[preview_cols].head(10).to_string())
+    print(f"\n── top {TOP_N} molecules (enabled: {enabled}) ──")
+    print(df_top[["SMILES"] + metric_cols + ["composite"]].head(10).to_string())
     if not cluster_df.empty:
-        mean_cols = ["cluster_id", "size"] + [f"mean_{c['name']}" for c in active]
+        mean_cols = ["cluster_id", "size"] + [f"mean_{m[0]}" for m in active]
         print(f"\n── top clusters (sorted by {mean_cols[2]}) ──")
         print(cluster_df[mean_cols].head(10).to_string())
 
