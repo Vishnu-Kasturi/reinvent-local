@@ -1,0 +1,70 @@
+##############################################################################
+# linkinvent_balanced_analysis.toml
+# Balanced top-N selection + Butina clustering for LinkInvent / REINVENT CSVs.
+#
+# Run from reinvent-local-main repo root:
+#   python Preprocess/scripts/select_balanced_linkinvent.py
+#   python Preprocess/scripts/select_balanced_linkinvent.py --config Preprocess/configs/linkinvent_balanced_analysis.toml
+##############################################################################
+
+[paths]
+# Enriched CSV from enrich_csv_scores.py (or raw RL summary CSV)
+input_csv  = "results/linkinvent_2_1_enriched.csv"
+output_dir = "results/linkinvent_2_1_analysis"
+smiles_col = "SMILES"
+
+[selection]
+top_n = 100
+
+[clustering]
+enabled      = true
+cutoff       = 0.4    # Butina Tanimoto distance (0.4 = moderate diversity)
+top_clusters = 20     # clusters shown in top_clusters.png
+
+[outputs]
+write_top_csv      = true
+write_cluster_csv  = true
+write_molecule_png = true
+write_cluster_png  = true
+
+[plot]
+grid_cols        = 10
+cluster_grid_cols = 5
+color_by         = "pIC50"   # column used for colourbar in molecule grid
+
+# ── Composite score components ───────────────────────────────────────────────
+# Set enabled = true/false per row. Weights are renormalized over enabled rows.
+# higher_is_better: true = larger raw value is better; false = smaller is better
+#   (e.g. docking affinity: more negative = better → higher_is_better = false)
+
+[[composite]]
+name             = "tyrosine"
+enabled          = false
+weight           = 0.40
+column           = "Tyrosine_PiStacking"
+column_aliases   = ["TyrInteractionCount_raw", "TyrInteractionCount_raw (raw)"]
+higher_is_better = true
+
+[[composite]]
+name             = "solubility"
+enabled          = true
+weight           = 0.30
+column           = "Solubility"
+column_aliases   = ["PD1PDL1Sol", "PD1PDL1Sol_raw", "PD1PDL1Sol (raw)", "logS"]
+higher_is_better = true
+
+[[composite]]
+name             = "pic50"
+enabled          = true
+weight           = 0.20
+column           = "pIC50"
+column_aliases   = ["PD1PDL1pIC50", "PD1PDL1pIC50_raw", "PD1PDL1pIC50 (raw)"]
+higher_is_better = true
+
+[[composite]]
+name             = "docking"
+enabled          = true
+weight           = 0.10
+column           = "Docking_Score"
+column_aliases   = ["DockingAffinity_raw", "DockingAffinity_raw (raw)", "DockingReward"]
+higher_is_better = false
