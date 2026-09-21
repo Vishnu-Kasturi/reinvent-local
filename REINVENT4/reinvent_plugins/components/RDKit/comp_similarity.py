@@ -9,6 +9,7 @@ import warnings
 from typing import List, Optional
 
 import numpy as np
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 from reinvent.chemistry import conversions
@@ -45,11 +46,11 @@ class Parameters:
     endpoint.
     """
 
-    smiles: Optional[List[Optional[List[str]]]] = None
-    smiles_file: Optional[List[Optional[str]]] = None
     radius: List[int]
     use_counts: List[bool]
     use_features: List[bool]
+    smiles: Optional[List[Optional[List[str]]]] = Field(default=None)
+    smiles_file: Optional[List[Optional[str]]] = Field(default=None)
 
 
 @add_tag("__component")
