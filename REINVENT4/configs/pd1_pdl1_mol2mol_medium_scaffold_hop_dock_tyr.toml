@@ -1,23 +1,27 @@
 ##############################################################################
-# Same as scaffold_hop_dock_tyr but MEDIUM similarity prior (less aggressive hop)
-# Run: reinvent configs/pd1_pdl1_mol2mol_medium_scaffold_hop_dock_tyr.toml
+# pd1_pdl1_mol2mol_medium_scaffold_hop_dock_tyr.toml
+# Mol2Mol RL — MEDIUM similarity prior + dock/tyr + physchem (NO pIC50/sol)
+#
+# Run:
+#   reinvent /home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/configs/pd1_pdl1_mol2mol_medium_scaffold_hop_dock_tyr.toml
 ##############################################################################
 
 run_type        = "staged_learning"
-device          = "cuda:0"
-tb_logdir       = "../tb_mol2mol_medium_hop"
-json_out_config = "json_mol2mol_medium_hop.json"
+device          = "cuda:1"
+tb_logdir       = "/home/genai/Vishnu/psearch-master/reinvent-local-main/tb_mol2mol_medium_hop"
+json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_mol2mol_medium_hop.json"
 
 [parameters]
-prior_file         = "priors/mol2mol_medium_similarity.prior"
-agent_file         = "priors/mol2mol_medium_similarity.prior"
-smiles_file        = "../data/scaffold_hop_lead.smi"
+prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_medium_similarity.prior"
+agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_medium_similarity.prior"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/scaffold_hop_lead.smi"
 sample_strategy    = "multinomial"
 distance_threshold = 100
-summary_csv_prefix = "../results/mol2mol_medium_hop"
+summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/mol2mol_medium_hop"
 batch_size         = 8
 unique_sequences   = true
 randomize_smiles   = true
+use_checkpoint     = false
 
 [learning_strategy]
 type  = "dap"
@@ -30,7 +34,7 @@ bucket_size = 12
 minscore    = 0.25
 
 [[stage]]
-chkpt_file  = "../models/mol2mol_medium_hop.chkpt"
+chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/mol2mol_medium_hop.chkpt"
 termination = "simple"
 max_score   = 1.0
 min_steps   = 40
@@ -42,15 +46,15 @@ type = "arithmetic_mean"
 [[stage.scoring.component]]
 [stage.scoring.component.TanimotoSimilarity]
 [[stage.scoring.component.TanimotoSimilarity.endpoint]]
-name              = "ModerateHop"
-weight            = 1.5
-transform.type    = "reverse_sigmoid"
-transform.low     = 0.35
-transform.high    = 0.70
-transform.k       = 0.35
-params.smiles     = ["REPLACE_WITH_SAME_SMILES_AS_scaffold_hop_lead.smi"]
-params.radius     = [2]
-params.use_counts = [false]
+name                = "ModerateHop"
+weight              = 1.5
+transform.type      = "reverse_sigmoid"
+transform.low       = 0.35
+transform.high      = 0.70
+transform.k         = 0.35
+params.smiles       = ["REPLACE_WITH_SAME_SMILES_AS_scaffold_hop_lead.smi"]
+params.radius       = [2]
+params.use_counts   = [false]
 params.use_features = [false]
 
 [[stage.scoring.component]]
