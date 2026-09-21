@@ -14,7 +14,7 @@ json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_mo
 [parameters]
 prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_medium_similarity.prior"
 agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_medium_similarity.prior"
-smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/scaffold_hop_lead.smi"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
 sample_strategy    = "multinomial"
 distance_threshold = 100
 summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/mol2mol_medium_hop"
@@ -52,10 +52,10 @@ transform.type      = "reverse_sigmoid"
 transform.low       = 0.35
 transform.high      = 0.70
 transform.k         = 0.35
-params.smiles       = ["REPLACE_WITH_SAME_SMILES_AS_scaffold_hop_lead.smi"]
-params.radius       = [2]
-params.use_counts   = [false]
-params.use_features = [false]
+params.smiles_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
+params.radius       = 2
+params.use_counts   = false
+params.use_features = false
 
 [[stage.scoring.component]]
 [stage.scoring.component.DockingScore]

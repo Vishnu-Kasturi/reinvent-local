@@ -5,7 +5,7 @@
 # Prior: mol2mol_scaffold_generic.prior (LOW similarity / scaffold hop)
 # Rewards: docking + tyrosine + low-Tanimoto-to-lead + physchem (NO pIC50/sol)
 #
-# Edit smiles_file + params.smiles to your lead SMILES (must match).
+# Edit smiles_file + params.smiles_file to your lead SMILES file (must match).
 # Run:
 #   reinvent /home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/configs/pd1_pdl1_mol2mol_scaffold_hop_dock_tyr.toml
 ##############################################################################
@@ -18,7 +18,7 @@ json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_mo
 [parameters]
 prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_scaffold_generic.prior"
 agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_scaffold_generic.prior"
-smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/iict_libinvent/scaffold_hop_lead.smi"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
 sample_strategy    = "multinomial"
 distance_threshold = 100
 summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/mol2mol_scaffold_hop"
@@ -57,10 +57,10 @@ transform.type      = "reverse_sigmoid"
 transform.low       = 0.25
 transform.high      = 0.55
 transform.k         = 0.4
-params.smiles       = ["REPLACE_WITH_SAME_SMILES_AS_scaffold_hop_lead.smi"]
-params.radius       = [2]
-params.use_counts   = [false]
-params.use_features = [false]
+params.smiles_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
+params.radius       = 2
+params.use_counts   = false
+params.use_features = false
 
 # ── 2. GNINA docking ─────────────────────────────────────────────────────────
 [[stage.scoring.component]]

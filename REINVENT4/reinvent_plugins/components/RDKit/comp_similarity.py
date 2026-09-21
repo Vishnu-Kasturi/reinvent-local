@@ -4,16 +4,34 @@ from __future__ import annotations
 
 __all__ = ["TanimotoSimilarity", "TanimotoDistance"]
 
+import os
 import warnings
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from pydantic.dataclasses import dataclass
 
 from reinvent.chemistry import conversions
-from reinvent.chemistry.similarity import calculate_tanimoto_batch
+from reinvent.chemistry.similarity import calculate_tanimoto, calculate_tanimoto_batch
 from ..component_results import ComponentResults
 from ..add_tag import add_tag
+
+
+def _load_smiles_from_file(smiles_file: str) -> List[str]:
+    if not os.path.exists(smiles_file):
+        raise FileNotFoundError(f"{__name__}: reference SMILES file not found: {smiles_file}")
+
+    smilies = []
+    with open(smiles_file, "r") as handle:
+        for line in handle:
+            smi = line.strip()
+            if smi and not smi.startswith("#"):
+                smilies.append(smi)
+
+    if not smilies:
+        raise ValueError(f"{__name__}: no SMILES found in {smiles_file}")
+
+    return smilies
 
 
 @add_tag("__parameters")
@@ -27,7 +45,8 @@ class Parameters:
     endpoint.
     """
 
-    smiles: List[List[str]]
+    smiles: Optional[List[Optional[List[str]]]] = None
+    smiles_file: Optional[List[Optional[str]]] = None
     radius: List[int]
     use_counts: List[bool]
     use_features: List[bool]
@@ -45,10 +64,24 @@ class TanimotoSimilarity:
 
     def __init__(self, params: Parameters):
         self.fp_params = []
+        n_endpoints = len(params.radius)
+        smiles_list = params.smiles if params.smiles is not None else [None] * n_endpoints
+        smiles_file_list = (
+            params.smiles_file if params.smiles_file is not None else [None] * n_endpoints
+        )
 
-        for smilies, radius, use_counts, use_features in zip(
-            params.smiles, params.radius, params.use_counts, params.use_features
+        for smilies, smiles_file, radius, use_counts, use_features in zip(
+            smiles_list,
+            smiles_file_list,
+            params.radius,
+            params.use_counts,
+            params.use_features,
         ):
+            if smiles_file:
+                smilies = _load_smiles_from_file(smiles_file)
+            elif not smilies:
+                raise ValueError(f"{__name__}: either smiles or smiles_file must be provided")
+
             fingerprints = conversions.smiles_to_fingerprints(
                 smilies, radius=radius, use_counts=use_counts, use_features=use_features
             )
@@ -56,24 +89,34 @@ class TanimotoSimilarity:
             if not fingerprints:
                 raise ValueError(f"{__name__}: unable to convert any SMILES to fingerprints")
 
-            self.fp_params.append((fingerprints, radius, use_counts, use_features))
+            use_max_similarity = bool(smiles_file) and len(fingerprints) > 1
+            self.fp_params.append(
+                (fingerprints, radius, use_counts, use_features, use_max_similarity)
+            )
 
-        self.number_of_endpoints = len(params.smiles)
+        self.number_of_endpoints = len(self.fp_params)
 
     def __call__(self, smilies: List[str]) -> np.array:
         scores = []
 
-        for fingerprints, radius, use_counts, use_features in self.fp_params:
+        for fingerprints, radius, use_counts, use_features, use_max_similarity in self.fp_params:
             query_fingerprints = conversions.smiles_to_fingerprints(
                 smilies, radius=radius, use_counts=use_counts, use_features=use_features
             )
 
-            scores.extend(
-                [
-                    calculate_tanimoto_batch(fingerprint, query_fingerprints)
-                    for fingerprint in fingerprints
-                ]
-            )
+            if use_max_similarity:
+                scores.append(calculate_tanimoto(query_fingerprints, fingerprints))
+            elif len(fingerprints) == 1:
+                scores.append(
+                    calculate_tanimoto_batch(fingerprints[0], query_fingerprints)
+                )
+            else:
+                scores.extend(
+                    [
+                        calculate_tanimoto_batch(fingerprint, query_fingerprints)
+                        for fingerprint in fingerprints
+                    ]
+                )
 
         return ComponentResults(scores)
 
