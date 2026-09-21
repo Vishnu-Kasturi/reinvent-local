@@ -61,7 +61,7 @@ def init_scorers() -> None:
 
 
 def get_reward(dock_result, smiles: str, predictor=None) -> float:
-    """RBDD RL reward — uses reward_config toggles (geometric mean of enabled terms)."""
+    """RBDD RL reward — uses reward_config toggles (arithmetic or geometric aggregation)."""
     from rdkit import Chem
 
     if Chem.MolFromSmiles(smiles) is None:

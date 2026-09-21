@@ -96,6 +96,24 @@ def transform_solubility(logs):
     )
 
 
+def weighted_arithmetic_mean(scores_and_weights):
+    """Weighted arithmetic mean (gentler than geometric; scores need not be > 0)."""
+    if not scores_and_weights:
+        return 0.0
+
+    scores = np.array([s for s, _ in scores_and_weights], dtype=np.float64)
+    weights = np.array([w for _, w in scores_and_weights], dtype=np.float64)
+
+    if not np.all(np.isfinite(scores)):
+        return 0.0
+
+    weight_sum = float(weights.sum())
+    if weight_sum <= 0:
+        return 0.0
+
+    return float(np.average(scores, weights=weights))
+
+
 def weighted_geometric_mean(scores_and_weights):
     """REINVENT geometric_mean: prod(score_i ** (w_i / sum(w)))."""
     if not scores_and_weights:
