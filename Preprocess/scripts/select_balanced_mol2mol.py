@@ -6,7 +6,7 @@ From a Mol2Mol REINVENT RL summary CSV (enriched with enrich_mol2mol_csv.py or r
   1. Select top N molecules by weighted composite score
   2. Cluster them by ECFP4 Butina clustering
   3. Output:
-       - top{N}_balanced.csv   (keeps RL + pIC50/sol columns)
+       - top{N}_balanced.csv   (TOML scoring cols + pIC50/sol only)
        - top_clusters.csv
        - top{N}_molecules.png
        - top_clusters.png
@@ -89,16 +89,9 @@ USE_MULTIRING = False
 W_MULTIRING = 0.05
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Extra Mol2Mol RL columns written to top{N}_balanced.csv (when present in input).
-PASS_THROUGH_COLUMNS = [
-    "Agent",
-    "Prior",
-    "Target",
-    "Score",
+# TOML scoring columns + pIC50 / Solubility only (matches enrich_mol2mol_csv.py).
+OUTPUT_COLUMNS = [
     "SMILES",
-    "SMILES_state",
-    "Input_SMILES",
-    "Scaffold",
     "ScaffoldHop",
     "ScaffoldHop (raw)",
     "DockingReward",
@@ -120,7 +113,6 @@ PASS_THROUGH_COLUMNS = [
     "MultiRing (raw)",
     "pIC50",
     "Solubility",
-    "step",
 ]
 
 _METRICS = (
@@ -265,14 +257,10 @@ def cluster_grid_png(cluster_df, outpath, active, cols):
 
 
 def _build_output_frame(df_top: pd.DataFrame, source: pd.DataFrame) -> pd.DataFrame:
-    out_cols = [c for c in PASS_THROUGH_COLUMNS if c in source.columns]
+    out_cols = [c for c in OUTPUT_COLUMNS if c in source.columns]
     if "SMILES" not in out_cols:
         out_cols.insert(0, "SMILES")
-    out = source.loc[df_top.index, out_cols].copy()
-    out["composite"] = df_top["composite"].values
-    if "cluster_id" in df_top.columns:
-        out["cluster_id"] = df_top["cluster_id"].values
-    return out
+    return source.loc[df_top.index, out_cols].copy()
 
 
 def main():

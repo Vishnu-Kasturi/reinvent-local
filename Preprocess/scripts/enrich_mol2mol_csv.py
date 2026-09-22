@@ -38,16 +38,10 @@ SOL_SCALER = BASE_DIR / "Preprocess" / "final_acc" / "pd1_pdl1_sol_final_acc_sca
 
 REINVENT4_DIR = BASE_DIR / "REINVENT4"
 
-# Columns to keep from the Mol2Mol RL CSV (missing ones are skipped).
-MOL2MOL_COLUMNS = [
-    "Agent",
-    "Prior",
-    "Target",
-    "Score",
+# Columns from pd1_pdl1_mol2mol_scaffold_hop_dock_tyr.toml scoring endpoints only.
+# Missing columns are skipped. pIC50 / Solubility are appended after SMILES.
+OUTPUT_COLUMNS = [
     "SMILES",
-    "SMILES_state",
-    "Input_SMILES",
-    "Scaffold",
     "ScaffoldHop",
     "ScaffoldHop (raw)",
     "DockingReward",
@@ -67,7 +61,8 @@ MOL2MOL_COLUMNS = [
     "AromaticRings_2_4 (raw)",
     "MultiRing",
     "MultiRing (raw)",
-    "step",
+    "pIC50",
+    "Solubility",
 ]
 
 sys.path.insert(0, str(REINVENT4_DIR))
@@ -141,24 +136,18 @@ def main() -> None:
     sol_values = _predict(smiles_list, sol_model, SOL_SCALER, compute_sol_features)
 
     print("--> Assembling output...")
-    out = pd.DataFrame()
-    for col in MOL2MOL_COLUMNS:
+    scoring_cols = [c for c in OUTPUT_COLUMNS if c not in ("SMILES", "pIC50", "Solubility")]
+    out = pd.DataFrame({"SMILES": smiles_list})
+    for col in scoring_cols:
         if col in df_in.columns:
             out[col] = df_in[col].values
-        elif col == "SMILES":
-            out[col] = smiles_list
 
-    if "SMILES" not in out.columns:
-        out.insert(0, "SMILES", smiles_list)
+    out["pIC50"] = pic50_values
+    out["Solubility"] = sol_values
 
-    insert_at = out.columns.get_loc("SMILES") + 1
-    out.insert(insert_at, "pIC50", pic50_values)
-    out.insert(insert_at + 1, "Solubility", sol_values)
-
-    kept = [c for c in MOL2MOL_COLUMNS if c in df_in.columns]
-    skipped = [c for c in MOL2MOL_COLUMNS if c not in df_in.columns]
-    if skipped:
-        print(f"--> Note: skipped missing columns: {skipped}")
+    missing = [c for c in scoring_cols if c not in df_in.columns]
+    if missing:
+        print(f"--> Note: TOML scoring columns not in input (skipped): {missing}")
 
     OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(OUTPUT_CSV, index=False)
