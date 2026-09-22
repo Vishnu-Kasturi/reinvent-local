@@ -45,7 +45,7 @@ min_steps   = 40
 max_steps   = 120
 
 [stage.scoring]
-type = "arithmetic_mean"
+type = "geometric_mean"
 
 # ── 1. Penalize staying too similar to input lead (reward scaffold change) ─────
 [[stage.scoring.component]]

@@ -41,7 +41,7 @@ min_steps   = 40
 max_steps   = 120
 
 [stage.scoring]
-type = "arithmetic_mean"
+type = "geometric_mean"
 
 [[stage.scoring.component]]
 [stage.scoring.component.TanimotoSimilarity]
