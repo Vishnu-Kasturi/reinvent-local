@@ -2,7 +2,7 @@
 """
 Mol2Mol balanced top-N selection + Butina clustering.
 
-From a Mol2Mol REINVENT RL summary CSV (enriched with enrich_mol2mol_csv.py or raw):
+From a Mol2Mol REINVENT RL summary CSV (enriched with make_mol2mol_rl_toml.py RUN_ENRICH=True or raw):
   1. Select top N molecules by weighted composite score
   2. Cluster them by ECFP4 Butina clustering
   3. Output:
@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import math
 import os
-import sys
 from pathlib import Path
 
 import matplotlib
@@ -90,9 +89,34 @@ USE_MULTIRING = False
 W_MULTIRING = 0.05
 # ─────────────────────────────────────────────────────────────────────────────
 
-_SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(_SCRIPT_DIR))
-from mol2mol_rl_columns import MOL2MOL_OUTPUT_COLUMNS as OUTPUT_COLUMNS  # noqa: E402
+OUTPUT_COLUMNS = [
+    "SMILES",
+    "ScaffoldHop",
+    "ScaffoldHop (raw)",
+    "DockingReward",
+    "DockingReward (raw)",
+    "DockingAffinity_raw",
+    "DockingAffinity_raw (raw)",
+    "TyrInteractionReward",
+    "TyrInteractionReward (raw)",
+    "TyrInteractionCount_raw",
+    "TyrInteractionCount_raw (raw)",
+    "tyr_pi_stacking (TyrInteractionReward)",
+    "LowCsp3",
+    "LowCsp3 (raw)",
+    "LowRotBonds",
+    "LowRotBonds (raw)",
+    "AromaticRings_2_4",
+    "AromaticRings_2_4 (raw)",
+    "MultiRing",
+    "MultiRing (raw)",
+    "PD1PDL1pIC50",
+    "PD1PDL1pIC50 (raw)",
+    "PD1PDL1Sol",
+    "PD1PDL1Sol (raw)",
+    "pIC50",
+    "Solubility",
+]
 
 _METRICS = (
     ("scaffold_hop", USE_SCAFFOLD, W_SCAFFOLD, "ScaffoldHop",

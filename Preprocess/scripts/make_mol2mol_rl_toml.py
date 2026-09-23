@@ -1,34 +1,47 @@
 #!/usr/bin/env python3
 """
-Generate a Mol2Mol staged-learning TOML (scaffold-hop + dock + tyr + physchem).
+Mol2Mol RL — one script: TOML generator + post-RL CSV enrich (pIC50 / Solubility).
 
-Optional in-RL QSAR: PD1PDL1pIC50 and PD1PDL1Sol (toggle USE_PIC50 / USE_SOL).
-Post-RL: repredict pIC50 + Solubility offline (same as enrich_mol2mol_csv.py).
-
-Edit CONFIG, then from repo root:
+Edit CONFIG toggles below, then:
   python Preprocess/scripts/make_mol2mol_rl_toml.py
-  python Preprocess/scripts/make_mol2mol_rl_toml.py --enrich-only
-  python Preprocess/scripts/make_mol2mol_rl_toml.py --write-toml --enrich
 """
 
 from __future__ import annotations
 
-import argparse
 import sys
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(_SCRIPT_DIR))
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+from rdkit import RDLogger
 
-# ── EDIT CONFIG ───────────────────────────────────────────────────────────────
+RDLogger.DisableLog("rdApp.*")
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONFIG — turn steps on/off here (True / False)
+# ══════════════════════════════════════════════════════════════════════════════
+WRITE_TOML = True          # write REINVENT staged-learning TOML
+RUN_ENRICH = False         # repredict pIC50 + Solubility on RL summary CSV
+
+USE_PIC50_IN_RL = False    # PD1PDL1pIC50 component inside TOML (in-RL reward)
+USE_SOL_IN_RL = False      # PD1PDL1Sol component inside TOML (in-RL reward)
+
+# ── paths ───────────────────────────────────────────────────────────────────
 BASE_DIR = Path("/home/genai/Vishnu/psearch-master/reinvent-local-main")
 
 RUN_NAME = "mol2mol_sh2"
 OUTPUT_TOML = BASE_DIR / "REINVENT4" / "configs" / f"pd1_pdl1_{RUN_NAME}_dock_tyr.toml"
 
+ENRICH_INPUT_CSV = BASE_DIR / "results" / f"{RUN_NAME}_1.csv"
+ENRICH_OUTPUT_CSV = BASE_DIR / "iict_libinvent" / f"{RUN_NAME}_enriched.csv"
+ENRICH_XGB_DEVICE = "cuda:0"
+SMILES_COL = "SMILES"
+
 DEVICE = "cuda:1"
-PRIOR = "mol2mol_medium_similarity.prior"  # or mol2mol_scaffold_generic.prior
+PRIOR = "mol2mol_medium_similarity.prior"
 SMILES_FILE = "data/scafolds_5.smi"
 SUMMARY_PREFIX = f"results/{RUN_NAME}"
 CHKPT = f"models/{RUN_NAME}.chkpt"
@@ -39,12 +52,10 @@ SCORING_AGG = "geometric_mean"
 MIN_STEPS = 40
 MAX_STEPS = 120
 
-# ScaffoldHop (reverse_sigmoid on Tanimoto to leads)
 SCAFFOLD_LOW = 0.40
 SCAFFOLD_HIGH = 0.70
 SCAFFOLD_K = 0.55
 W_SCAFFOLD = 2.0
-
 W_DOCK = 3.0
 W_TYR = 2.5
 W_CSP3 = 1.5
@@ -52,34 +63,46 @@ W_ROT = 1.5
 W_AROMATIC = 1.5
 W_MULTIRING = 1.0
 
-# In-RL QSAR (off = use post-RL enrich for pIC50 / Solubility columns only)
-USE_PIC50 = False
 W_PIC50 = 2.0
 PIC50_LOW = 8.5
 PIC50_HIGH = 11.0
 PIC50_K = 0.5
-
-USE_SOL = False
 W_SOL = 1.5
 SOL_LOW = -5.5
 SOL_HIGH = 2.0
 SOL_K = 0.5
 
-# Post-RL enrich (XGBoost repredict — columns pIC50, Solubility)
-ENRICH_INPUT_CSV = BASE_DIR / "results" / f"{RUN_NAME}_1.csv"
-ENRICH_OUTPUT_CSV = BASE_DIR / "iict_libinvent" / f"{RUN_NAME}_enriched.csv"
-ENRICH_XGB_DEVICE = "cuda:0"
-
 DOCKING_ROOT = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
 RECEPTOR = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
 AUTOBOX = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
 GNINA = "/home/genai/Documents/gnina/gnina"
+# ══════════════════════════════════════════════════════════════════════════════
 
-PIC50_MODEL = "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
-PIC50_SCALER = "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
-SOL_MODEL = "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
-SOL_SCALER = "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
-# ─────────────────────────────────────────────────────────────────────────────
+RL_SCORING_COLUMNS = [
+    "ScaffoldHop",
+    "ScaffoldHop (raw)",
+    "DockingReward",
+    "DockingReward (raw)",
+    "DockingAffinity_raw",
+    "DockingAffinity_raw (raw)",
+    "TyrInteractionReward",
+    "TyrInteractionReward (raw)",
+    "TyrInteractionCount_raw",
+    "TyrInteractionCount_raw (raw)",
+    "tyr_pi_stacking (TyrInteractionReward)",
+    "LowCsp3",
+    "LowCsp3 (raw)",
+    "LowRotBonds",
+    "LowRotBonds (raw)",
+    "AromaticRings_2_4",
+    "AromaticRings_2_4 (raw)",
+    "MultiRing",
+    "MultiRing (raw)",
+    "PD1PDL1pIC50",
+    "PD1PDL1pIC50 (raw)",
+    "PD1PDL1Sol",
+    "PD1PDL1Sol (raw)",
+]
 
 
 def _p(base: Path, rel: str) -> str:
@@ -118,15 +141,14 @@ def build_toml() -> str:
     prior_path = _p(BASE_DIR, f"REINVENT4/priors/{PRIOR}")
     summary = _p(BASE_DIR, SUMMARY_PREFIX)
     chkpt = _p(BASE_DIR, CHKPT)
-    pic50_model = _p(BASE_DIR, PIC50_MODEL)
-    pic50_scaler = _p(BASE_DIR, PIC50_SCALER)
-    sol_model = _p(BASE_DIR, SOL_MODEL)
-    sol_scaler = _p(BASE_DIR, SOL_SCALER)
+    pic50_model = _p(BASE_DIR, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj")
+    pic50_scaler = _p(BASE_DIR, "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl")
+    sol_model = _p(BASE_DIR, "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj")
+    sol_scaler = _p(BASE_DIR, "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl")
 
     qsar_blocks = ""
-    if USE_PIC50:
+    if USE_PIC50_IN_RL:
         qsar_blocks += f"""
-# ── PD1-PDL1 pIC50 (in-RL QSAR) ───────────────────────────────────────────────
 [[stage.scoring.component]]
 [stage.scoring.component.PD1PDL1pIC50]
 [[stage.scoring.component.PD1PDL1pIC50.endpoint]]
@@ -139,9 +161,8 @@ transform.k        = {PIC50_K}
 params.model_path  = "{pic50_model}"
 params.scaler_path = "{pic50_scaler}"
 """
-    if USE_SOL:
+    if USE_SOL_IN_RL:
         qsar_blocks += f"""
-# ── PD1-PDL1 Solubility (in-RL QSAR) ──────────────────────────────────────────
 [[stage.scoring.component]]
 [stage.scoring.component.PD1PDL1Sol]
 [[stage.scoring.component.PD1PDL1Sol.endpoint]]
@@ -156,9 +177,8 @@ params.scaler_path = "{sol_scaler}"
 """
 
     return f"""##############################################################################
-# Generated by make_mol2mol_rl_toml.py — RUN_NAME={RUN_NAME}
-# Post-RL enrich: python Preprocess/scripts/make_mol2mol_rl_toml.py --enrich-only
-#   -> {ENRICH_OUTPUT_CSV}  (SMILES + TOML scores + pIC50 + Solubility)
+# {RUN_NAME} — generated by make_mol2mol_rl_toml.py
+# Post-RL: set RUN_ENRICH=True in this script
 ##############################################################################
 
 run_type        = "staged_learning"
@@ -264,65 +284,95 @@ transform.k    = 0.35
 """
 
 
-def write_toml() -> Path:
-    out_path = OUTPUT_TOML
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    text = build_toml()
-    out_path.write_text(text, encoding="utf-8")
-    print(f"Wrote {out_path}")
-    print(f"  USE_PIC50={USE_PIC50}  USE_SOL={USE_SOL}")
-    print(f"Then: reinvent {out_path}")
-    print(f"After RL: python {Path(__file__).name} --enrich-only")
-    print(f"  input:  {ENRICH_INPUT_CSV}")
-    print(f"  output: {ENRICH_OUTPUT_CSV}")
-    return out_path
+def _resolve_smiles_col(df: pd.DataFrame, preferred: str) -> str:
+    if preferred in df.columns:
+        return preferred
+    matches = [c for c in df.columns if c.lower() == preferred.lower()]
+    if not matches:
+        raise ValueError(f"SMILES column not found. Columns: {list(df.columns)}")
+    return matches[0]
+
+
+def _load_booster(model_path: Path, device: str) -> xgb.Booster:
+    booster = xgb.Booster({"device": device})
+    booster.load_model(str(model_path))
+    return booster
+
+
+def _predict(smiles: list[str], model: xgb.Booster, scaler_path: Path, feature_fn) -> list[float]:
+    features, mask = feature_fn(smiles, str(scaler_path))
+    preds = model.predict(xgb.DMatrix(features, nthread=-1))
+    return [
+        round(float(preds[i]), 4) if mask[i] and np.isfinite(preds[i]) else np.nan
+        for i in range(len(smiles))
+    ]
 
 
 def run_enrich() -> None:
-    from mol2mol_enrich_core import enrich_mol2mol_csv_file
+    reinvent4_dir = BASE_DIR / "REINVENT4"
+    sys.path.insert(0, str(reinvent4_dir))
+    from reinvent_plugins.components.nophyschem_features import (
+        compute_features as compute_pic50_features,
+    )
+    from reinvent_plugins.components.pd1_pdl1_features import (
+        compute_features as compute_sol_features,
+    )
 
     if not ENRICH_INPUT_CSV.is_file():
-        raise FileNotFoundError(
-            f"RL CSV not found: {ENRICH_INPUT_CSV}\n"
-            f"Edit ENRICH_INPUT_CSV in make_mol2mol_rl_toml.py (RUN_NAME={RUN_NAME})."
-        )
+        raise FileNotFoundError(f"RL CSV not found: {ENRICH_INPUT_CSV}")
 
-    print("=================================================================")
-    print("  Mol2Mol post-RL enrich (pIC50 + Solubility repredict)          ")
-    print("=================================================================\n")
-    out = enrich_mol2mol_csv_file(
-        ENRICH_INPUT_CSV,
-        ENRICH_OUTPUT_CSV,
-        base_dir=BASE_DIR,
-        xgb_device=ENRICH_XGB_DEVICE,
+    print(f"--> Loading {ENRICH_INPUT_CSV}")
+    df_in = pd.read_csv(ENRICH_INPUT_CSV, on_bad_lines="skip", engine="python")
+    smi_col = _resolve_smiles_col(df_in, SMILES_COL)
+    work = df_in.dropna(subset=[smi_col]).copy()
+    smiles_list = work[smi_col].astype(str).tolist()
+
+    pic50_model = _load_booster(
+        BASE_DIR / "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj",
+        ENRICH_XGB_DEVICE,
     )
-    print(f"\nWrote {len(out)} rows -> {ENRICH_OUTPUT_CSV}")
-    print(f"Columns: {list(out.columns)}")
+    sol_model = _load_booster(
+        BASE_DIR / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj",
+        ENRICH_XGB_DEVICE,
+    )
+
+    pic50_values = _predict(
+        smiles_list,
+        pic50_model,
+        BASE_DIR / "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl",
+        compute_pic50_features,
+    )
+    sol_values = _predict(
+        smiles_list,
+        sol_model,
+        BASE_DIR / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl",
+        compute_sol_features,
+    )
+
+    out = pd.DataFrame({"SMILES": smiles_list})
+    for col in RL_SCORING_COLUMNS:
+        if col in work.columns:
+            out[col] = work[col].values
+    out["pIC50"] = pic50_values
+    out["Solubility"] = sol_values
+
+    ENRICH_OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(ENRICH_OUTPUT_CSV, index=False)
+    print(f"[+] Wrote {len(out)} rows -> {ENRICH_OUTPUT_CSV}")
+    print(f"    Columns: {list(out.columns)}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Mol2Mol RL TOML generator + CSV enrich")
-    parser.add_argument(
-        "--enrich-only",
-        action="store_true",
-        help="Repredict pIC50/Solubility on ENRICH_INPUT_CSV (no TOML write)",
-    )
-    parser.add_argument(
-        "--write-toml",
-        action="store_true",
-        help="Write TOML (default unless --enrich-only alone)",
-    )
-    parser.add_argument(
-        "--enrich",
-        action="store_true",
-        help="After writing TOML, run enrich if ENRICH_INPUT_CSV exists",
-    )
-    args = parser.parse_args()
+    if not WRITE_TOML and not RUN_ENRICH:
+        raise SystemExit("Set WRITE_TOML=True or RUN_ENRICH=True in CONFIG.")
 
-    do_toml = args.write_toml or not args.enrich_only
-    if do_toml:
-        write_toml()
-    if args.enrich_only or args.enrich:
+    if WRITE_TOML:
+        OUTPUT_TOML.parent.mkdir(parents=True, exist_ok=True)
+        OUTPUT_TOML.write_text(build_toml(), encoding="utf-8")
+        print(f"[+] TOML -> {OUTPUT_TOML}")
+        print(f"    reinvent {OUTPUT_TOML}")
+
+    if RUN_ENRICH:
         run_enrich()
 
 
