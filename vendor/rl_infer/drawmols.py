@@ -15,13 +15,14 @@ Usage:
 
 Outputs (in --out-dir, default <root>/analysis/):
   all_molecules.csv
-  all_molecules_deduped.csv       (butina_cluster, is_butina_centroid)
-  butina_cluster_summary.csv
-  butina_cluster_centroids.png    (2D structures — one RDKit Butina centroid per cluster)
-  butina_clusters/cluster_*.sdf
-  butina_clusters/cluster_*.png   (2D structure grid of all members in that cluster)
-  top100_balanced.csv
+  all_molecules_deduped.csv
+  top{N}_balanced.csv
+  top{N}_balanced_butina_cluster_summary.csv
+  butina_clusters.png               (RDKit 2D grid — Butina centroids of top balanced set)
+  top{N}_balanced_butina_clusters/cluster_*.png  (RDKit member grids per cluster)
   top10_molecules.png
+
+Optional (--cluster-all-deduped): full dedupe set Butina CSV/SDF/cluster PNGs under butina_clusters/
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from __future__ import annotations
 import argparse
 import math
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -124,12 +126,14 @@ def _find_pose_sdf(log_path: Path) -> Optional[Path]:
     return None
 
 
-def collect_records(root: Path) -> List[Dict]:
+def collect_records(root: Path, rl_iter: Optional[int] = None) -> List[Dict]:
     records: List[Dict] = []
     seen_logs = set()
 
     for log_path in sorted(root.rglob("mol*_log.txt")):
         log_path = log_path.resolve()
+        if rl_iter is not None and _parse_rl_iter(log_path) != rl_iter:
+            continue
         if log_path in seen_logs:
             continue
         seen_logs.add(log_path)
@@ -275,8 +279,10 @@ def butina_cluster_summary(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("size", ascending=False).reset_index(drop=True)
 
 
-def write_butina_cluster_sdfs(df: pd.DataFrame, out_dir: Path) -> int:
-    cluster_dir = out_dir / "butina_clusters"
+def write_butina_cluster_sdfs(
+    df: pd.DataFrame, out_dir: Path, cluster_subdir: str = "butina_clusters"
+) -> int:
+    cluster_dir = out_dir / cluster_subdir
     cluster_dir.mkdir(parents=True, exist_ok=True)
     n_written = 0
     for cid, grp in df.groupby("butina_cluster", sort=True):
@@ -355,12 +361,13 @@ def plot_butina_cluster_member_grids(
     max_clusters: int = 30,
     max_mols_per_cluster: int = 20,
     mols_per_row: int = 5,
+    cluster_subdir: str = "butina_clusters",
 ) -> int:
     """
     For each Butina cluster: RDKit 2D grid of all member structures.
     Centroid molecules are marked with * in the legend.
     """
-    cluster_dir = out_dir / "butina_clusters"
+    cluster_dir = out_dir / cluster_subdir
     cluster_dir.mkdir(parents=True, exist_ok=True)
     n_png = 0
 
@@ -397,6 +404,57 @@ def plot_butina_cluster_member_grids(
         n_png += 1
 
     return n_png
+
+
+def export_butina_rdkit_grids(
+    df: pd.DataFrame,
+    out_dir: Path,
+    label: str,
+    cutoff: float,
+    max_centroid_plots: int,
+    max_cluster_grids: int,
+    max_mols_per_cluster: int,
+    write_sdfs: bool = False,
+) -> Optional[Path]:
+    """
+    Butina-cluster molecules and write RDKit structure PNGs only (no scatter plots).
+    Returns path to centroid grid PNG, or None if clustering could not run.
+    """
+    if df.empty or len(df) < 2:
+        print(f"  [skip] Butina RDKit grids for {label}: need at least 2 molecules")
+        return None
+
+    clustered = add_butina_clusters(df.copy(), cutoff=cutoff)
+    summary = butina_cluster_summary(clustered)
+
+    summary_path = out_dir / f"{label}_butina_cluster_summary.csv"
+    clustered_path = out_dir / f"{label}_butina_clustered.csv"
+    summary.to_csv(summary_path, index=False)
+    clustered.to_csv(clustered_path, index=False)
+    print(f"[+] {label} Butina summary -> {summary_path}")
+
+    cluster_subdir = f"{label}_butina_clusters"
+    if write_sdfs:
+        n_sdfs = write_butina_cluster_sdfs(clustered, out_dir, cluster_subdir=cluster_subdir)
+        print(f"[+] {n_sdfs} {label} cluster SDFs -> {out_dir / cluster_subdir}/")
+
+    centroid_png = out_dir / f"{label}_butina_centroids.png"
+    plot_butina_centroids(summary, centroid_png, max_clusters=max_centroid_plots)
+    print(f"[+] {label} Butina centroids (RDKit grid) -> {centroid_png}")
+
+    n_grids = plot_butina_cluster_member_grids(
+        clustered,
+        summary,
+        out_dir,
+        max_clusters=max_cluster_grids,
+        max_mols_per_cluster=max_mols_per_cluster,
+        cluster_subdir=cluster_subdir,
+    )
+    print(
+        f"[+] {n_grids} {label} per-cluster RDKit grids -> "
+        f"{out_dir / cluster_subdir}/cluster_*.png"
+    )
+    return centroid_png
 
 
 def select_balanced(
@@ -473,6 +531,17 @@ def main():
     p.add_argument("--top-n", type=int, default=TOP_BALANCED_N)
     p.add_argument("--diversity", type=float, default=DIVERSITY_MAX_TANIMOTO)
     p.add_argument(
+        "--rl-iter",
+        type=int,
+        default=None,
+        help="Only scan molecules under RL_iter_<N> (e.g. 12 for one training iteration)",
+    )
+    p.add_argument(
+        "--cluster-all-deduped",
+        action="store_true",
+        help="Also cluster the full deduplicated set (default: Butina RDKit PNGs on top balanced only)",
+    )
+    p.add_argument(
         "--butina-cutoff",
         type=float,
         default=BUTINA_CUTOFF,
@@ -506,8 +575,11 @@ def main():
     readPic50Model()
     readSolModel()
 
-    print(f"Scanning {root} ...")
-    records = collect_records(root)
+    if args.rl_iter is not None:
+        print(f"Scanning {root} (RL_iter_{args.rl_iter} only) ...")
+    else:
+        print(f"Scanning {root} ...")
+    records = collect_records(root, rl_iter=args.rl_iter)
     if not records:
         print("No mol*_log.txt + pose SDF pairs found.")
         sys.exit(1)
@@ -519,37 +591,42 @@ def main():
     print(f"[+] {len(df)} rows -> {all_path}")
 
     deduped = dedupe_best_composite(df)
-    deduped = add_butina_clusters(deduped, cutoff=args.butina_cutoff)
     dedup_path = out_dir / "all_molecules_deduped.csv"
     deduped.to_csv(dedup_path, index=False)
-    n_butina = deduped["butina_cluster"].nunique()
-    print(f"[+] {len(deduped)} unique SMILES, {n_butina} Butina clusters -> {dedup_path}")
+    print(f"[+] {len(deduped)} unique SMILES -> {dedup_path}")
 
-    summary = butina_cluster_summary(deduped)
-    summary_path = out_dir / "butina_cluster_summary.csv"
-    summary.to_csv(summary_path, index=False)
-    print(f"[+] Butina cluster summary -> {summary_path}")
-
-    n_sdfs = write_butina_cluster_sdfs(deduped, out_dir)
-    print(f"[+] {n_sdfs} Butina cluster SDFs -> {out_dir / 'butina_clusters'}/")
-
-    centroid_png = out_dir / "butina_cluster_centroids.png"
-    plot_butina_centroids(summary, centroid_png, max_clusters=args.max_centroid_plots)
-    print(f"[+] Butina centroid structures (RDKit grid) -> {centroid_png}")
-
-    n_grids = plot_butina_cluster_member_grids(
-        deduped,
-        summary,
-        out_dir,
-        max_clusters=args.max_cluster_grids,
-        max_mols_per_cluster=args.max_mols_per_cluster,
-    )
-    print(f"[+] {n_grids} per-cluster member structure PNGs -> {out_dir / 'butina_clusters'}/cluster_*.png")
+    if args.cluster_all_deduped:
+        export_butina_rdkit_grids(
+            deduped,
+            out_dir,
+            label="all_deduped",
+            cutoff=args.butina_cutoff,
+            max_centroid_plots=args.max_centroid_plots,
+            max_cluster_grids=args.max_cluster_grids,
+            max_mols_per_cluster=args.max_mols_per_cluster,
+            write_sdfs=True,
+        )
 
     balanced = select_balanced(deduped, n=args.top_n, max_tanimoto=args.diversity)
     bal_path = out_dir / f"top{args.top_n}_balanced.csv"
     balanced.to_csv(bal_path, index=False)
     print(f"[+] top {len(balanced)} balanced -> {bal_path}")
+
+    label = f"top{args.top_n}_balanced"
+    centroid_png = export_butina_rdkit_grids(
+        balanced,
+        out_dir,
+        label=label,
+        cutoff=args.butina_cutoff,
+        max_centroid_plots=args.max_centroid_plots,
+        max_cluster_grids=args.max_cluster_grids,
+        max_mols_per_cluster=args.max_mols_per_cluster,
+        write_sdfs=False,
+    )
+    if centroid_png is not None:
+        legacy_png = out_dir / "butina_clusters.png"
+        shutil.copy2(centroid_png, legacy_png)
+        print(f"[+] butina_clusters.png (RDKit centroid grid) -> {legacy_png}")
 
     top10_png = out_dir / "top10_molecules.png"
     plot_top_molecules(deduped, top10_png, n=TOP_MOLS_N)
