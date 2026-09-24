@@ -14,7 +14,10 @@ Usage:
   python plot_checkpoint_analysis.py SAMPLES_DIR TRAIN_CSV
 
 Optional:
-  --write-csv   also write checkpoint_similarity_summary.csv and *_scored.csv
+  --write-csv              also write checkpoint_similarity_summary.csv and *_scored.csv
+  --max-train-mols N       cap training set size for Tanimoto (0 = all)
+  --max-sample-mols N      cap molecules per checkpoint CSV (0 = all)
+  --seed INT               random seed for subsampling (default 42)
 """
 
 from __future__ import annotations
@@ -191,6 +194,13 @@ def _fill_missing_qsar(props: pd.DataFrame) -> pd.DataFrame:
 _fill_missing_qsar._models_ready = False  # type: ignore[attr-defined]
 
 
+def _subsample_df(props: pd.DataFrame, max_mols: int, rng: np.random.Generator) -> pd.DataFrame:
+    if max_mols <= 0 or len(props) <= max_mols:
+        return props.reset_index(drop=True)
+    idx = rng.choice(len(props), size=max_mols, replace=False)
+    return props.iloc[np.sort(idx)].reset_index(drop=True)
+
+
 def _list_sample_csvs(samples_dir: Path, pattern: str, out_dir: Path) -> List[Path]:
     paths = sorted(samples_dir.glob(pattern))
     filtered: List[Path] = []
@@ -262,7 +272,22 @@ def main() -> None:
         action="store_true",
         help="Also write training_scored.csv, per-checkpoint *_scored.csv, and summary CSV",
     )
+    p.add_argument(
+        "--max-train-mols",
+        type=int,
+        default=0,
+        help="Random subsample of training mols for fingerprints/Tanimoto (0 = use all)",
+    )
+    p.add_argument(
+        "--max-sample-mols",
+        type=int,
+        default=0,
+        help="Random subsample per checkpoint CSV for plots/Tanimoto (0 = use all)",
+    )
+    p.add_argument("--seed", type=int, default=42, help="RNG seed for subsampling")
     args = p.parse_args()
+
+    rng = np.random.default_rng(args.seed)
 
     samples_dir = Path(args.samples_dir).expanduser().resolve()
     train_csv = Path(args.train_csv).expanduser().resolve()
@@ -283,11 +308,19 @@ def main() -> None:
     if train_props.empty:
         raise SystemExit(f"No valid SMILES in {train_csv}")
     train_props = _fill_missing_qsar(train_props)
+    n_train_full = len(train_props)
+    train_props = _subsample_df(train_props, args.max_train_mols, rng)
     train_smiles = train_props["SMILES"].tolist()
     train_fps, train_smiles = _fps_for_smiles(train_smiles)
     train_props = train_props.set_index("SMILES").loc[train_smiles].reset_index()
     train_props["max_tanimoto"] = _max_tanimoto_within_training(train_fps)
-    print(f"  {len(train_smiles)} unique valid training molecules")
+    if args.max_train_mols > 0 and n_train_full > len(train_smiles):
+        print(
+            f"  training: using {len(train_smiles)} / {n_train_full} mols for Tanimoto "
+            f"(--max-train-mols {args.max_train_mols})"
+        )
+    else:
+        print(f"  {len(train_smiles)} unique valid training molecules")
 
     if args.write_csv:
         train_props.to_csv(out_dir / "training_scored.csv", index=False)
@@ -302,6 +335,8 @@ def main() -> None:
             print(f"  {label}: skip (no valid SMILES in {csv_path.name})")
             continue
         props = _fill_missing_qsar(props)
+        n_full = len(props)
+        props = _subsample_df(props, args.max_sample_mols, rng)
         gen_smiles = props["SMILES"].tolist()
         gen_fps, gen_smiles = _fps_for_smiles(gen_smiles)
         props = props.set_index("SMILES").loc[gen_smiles].reset_index()
@@ -320,7 +355,13 @@ def main() -> None:
             "mean_pIC50": float(props["pIC50"].mean()),
             "mean_Solubility": float(props["Solubility"].mean()),
         })
-        print(f"  {label}: n={len(gen_smiles)} from {csv_path.name} mean_max_tanimoto={mean_max:.3f}")
+        sub_note = ""
+        if args.max_sample_mols > 0 and n_full > len(gen_smiles):
+            sub_note = f" (subsampled from {n_full})"
+        print(
+            f"  {label}: n={len(gen_smiles)}{sub_note} from {csv_path.name} "
+            f"mean_max_tanimoto={mean_max:.3f}"
+        )
 
     if not scored_generated:
         raise SystemExit("No checkpoint data to plot.")
