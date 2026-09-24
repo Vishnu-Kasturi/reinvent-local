@@ -116,24 +116,14 @@ RL_SCORING_COLUMNS = [
     "LowCsp3 (raw)",
     "LowRotBonds",
     "LowRotBonds (raw)",
+    "AromaticRings",
+    "AromaticRings (raw)",
+    "RingHetero",
+    "RingHetero (raw)",
     "AromaticRings_2_4",
     "AromaticRings_2_4 (raw)",
     "MultiRing",
     "MultiRing (raw)",
-    "AliphaticRings_soft",
-    "AliphaticRings_soft (raw)",
-    "LargestRing_5_7",
-    "LargestRing_5_7 (raw)",
-    "HeteroAtoms_moderate",
-    "HeteroAtoms_moderate (raw)",
-    "AromaticN_in_ring",
-    "AromaticN_in_ring (raw)",
-    "RingNH",
-    "RingNH (raw)",
-    "AromaticO_in_ring",
-    "AromaticO_in_ring (raw)",
-    "AromaticRings_2_5",
-    "AromaticRings_2_5 (raw)",
     "PD1PDL1pIC50",
     "PD1PDL1pIC50 (raw)",
     "PD1PDL1Sol",
@@ -188,13 +178,6 @@ params.radius       = 2
 params.use_counts   = false
 params.use_features = false
 
-[[stage.scoring.component.TanimotoSimilarity.endpoint]]
-name                = "MaxLeadTanimoto_raw"
-weight              = 0.0
-params.smiles_file  = "{smiles_path}"
-params.radius       = 2
-params.use_counts   = false
-params.use_features = false
 """
     return f"""[[stage.scoring.component]]
 [stage.scoring.component.TanimotoSimilarity]
@@ -236,83 +219,22 @@ transform.k    = 0.35
     return f"""[[stage.scoring.component]]
 [stage.scoring.component.NumAromaticRings]
 [[stage.scoring.component.NumAromaticRings.endpoint]]
-name           = "AromaticRings_2_5"
+name           = "AromaticRings"
 weight         = {W_AROMATIC}
 transform.type = "step"
 transform.low  = 2
 transform.high = 5
 
 [[stage.scoring.component]]
-[stage.scoring.component.NumRings]
-[[stage.scoring.component.NumRings.endpoint]]
-name           = "MultiRing"
+[stage.scoring.component.GroupCount]
+[[stage.scoring.component.GroupCount.endpoint]]
+name           = "RingHetero"
 weight         = {W_MULTIRING}
 transform.type = "sigmoid"
-transform.low  = 2
-transform.high = 6
-transform.k    = 0.32
-
-[[stage.scoring.component]]
-[stage.scoring.component.NumAliphaticRings]
-[[stage.scoring.component.NumAliphaticRings.endpoint]]
-name           = "AliphaticRings_soft"
-weight         = 0.8
-transform.type = "sigmoid"
 transform.low  = 0
-transform.high = 2
+transform.high = 5
 transform.k    = 0.35
-
-[[stage.scoring.component]]
-[stage.scoring.component.LargestRingSize]
-[[stage.scoring.component.LargestRingSize.endpoint]]
-name           = "LargestRing_5_7"
-weight         = 0.9
-transform.type = "step"
-transform.low  = 5
-transform.high = 7
-
-[[stage.scoring.component]]
-[stage.scoring.component.NumHeteroAtoms]
-[[stage.scoring.component.NumHeteroAtoms.endpoint]]
-name           = "HeteroAtoms_moderate"
-weight         = 1.0
-transform.type = "sigmoid"
-transform.low  = 2
-transform.high = 14
-transform.k    = 0.18
-
-[[stage.scoring.component]]
-[stage.scoring.component.GroupCount]
-[[stage.scoring.component.GroupCount.endpoint]]
-name           = "AromaticN_in_ring"
-weight         = 1.2
-transform.type = "sigmoid"
-transform.low  = 0
-transform.high = 4
-transform.k    = 0.35
-params.smarts  = "[nR]"
-
-[[stage.scoring.component]]
-[stage.scoring.component.GroupCount]
-[[stage.scoring.component.GroupCount.endpoint]]
-name           = "RingNH"
-weight         = 1.0
-transform.type = "sigmoid"
-transform.low  = 0
-transform.high = 3
-transform.k    = 0.4
-params.smarts  = "[nR;H1]"
-
-[[stage.scoring.component]]
-[stage.scoring.component.GroupCount]
-[[stage.scoring.component.GroupCount.endpoint]]
-name           = "AromaticO_in_ring"
-weight         = 1.0
-transform.type = "sigmoid"
-transform.low  = 0
-transform.high = 3
-transform.k    = 0.4
-params.smarts  = "[oR]"
+params.smarts  = "[#7,#8;R]"
 """
 
 
@@ -402,14 +324,14 @@ type = "{SCORING_AGG}"
 [[stage.scoring.component]]
 [stage.scoring.component.DockingScore]
 {_dock_block("DockingReward", W_DOCK)}
-{_dock_block("DockingAffinity_raw", 0.0)}
+{"" if RL_MODE == "ring_decor" else _dock_block("DockingAffinity_raw", 0.0)}
 
 [[stage.scoring.component]]
 [stage.scoring.component.TyrosineInteraction]
 {_tyr_block("TyrInteractionReward", W_TYR)}
-{_tyr_block("TyrInteractionCount_raw", 0.0)}
+{"" if RL_MODE == "ring_decor" else _tyr_block("TyrInteractionCount_raw", 0.0)}
 
-[[stage.scoring.component]]
+{"" if RL_MODE == "ring_decor" else f'''[[stage.scoring.component]]
 [stage.scoring.component.Csp3]
 [[stage.scoring.component.Csp3.endpoint]]
 name           = "LowCsp3"
@@ -429,6 +351,7 @@ transform.low  = 0
 transform.high = 6
 transform.k    = 0.35
 
+'''}
 {_ring_decor_physchem()}
 {qsar_blocks}
 """

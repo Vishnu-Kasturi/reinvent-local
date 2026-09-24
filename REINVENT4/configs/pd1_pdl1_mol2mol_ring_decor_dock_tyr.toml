@@ -1,12 +1,9 @@
 ##############################################################################
 # pd1_pdl1_mol2mol_ring_decor_dock_tyr.toml
-# Mol2Mol RL — stay near lead (Murcko / high Tanimoto), explore RING systems:
-#   heteroatoms in rings (N, O, NH), fused / aromatic count, ring topology.
-# NOT a heavy scaffold-hop run (no reverse_sigmoid on low similarity).
+# Mol2Mol RL — 5 weighted rewards only:
+#   NearLead | Dock | Tyr | AromaticRings | RingHetero (N/O/NH in rings)
 #
 # Prior: mol2mol_medium_similarity.prior
-# Run:
-#   reinvent /home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/configs/pd1_pdl1_mol2mol_ring_decor_dock_tyr.toml
 ##############################################################################
 
 run_type        = "staged_learning"
@@ -46,7 +43,7 @@ max_steps   = 120
 [stage.scoring]
 type = "geometric_mean"
 
-# ── 1. Reward staying similar to input leads (ring edits, not scaffold hop) ───
+# 1 — stay near lead (not scaffold hop)
 [[stage.scoring.component]]
 [stage.scoring.component.TanimotoSimilarity]
 [[stage.scoring.component.TanimotoSimilarity.endpoint]]
@@ -61,15 +58,7 @@ params.radius       = 2
 params.use_counts   = false
 params.use_features = false
 
-[[stage.scoring.component.TanimotoSimilarity.endpoint]]
-name                = "MaxLeadTanimoto_raw"
-weight              = 0.0
-params.smiles_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
-params.radius       = 2
-params.use_counts   = false
-params.use_features = false
-
-# ── 2. GNINA docking ─────────────────────────────────────────────────────────
+# 2 — docking
 [[stage.scoring.component]]
 [stage.scoring.component.DockingScore]
 [[stage.scoring.component.DockingScore.endpoint]]
@@ -82,17 +71,7 @@ params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main
 params.cnn_scoring      = "none"
 params.keep_outputs     = "true"
 
-[[stage.scoring.component.DockingScore.endpoint]]
-name                    = "DockingAffinity_raw"
-weight                  = 0.0
-params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
-params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
-params.gnina_executable = "/home/genai/Documents/gnina/gnina"
-params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
-params.cnn_scoring      = "none"
-params.keep_outputs     = "true"
-
-# ── 3. Tyr-56 interaction ────────────────────────────────────────────────────
+# 3 — Tyr-56
 [[stage.scoring.component]]
 [stage.scoring.component.TyrosineInteraction]
 [[stage.scoring.component.TyrosineInteraction.endpoint]]
@@ -106,116 +85,24 @@ params.cnn_scoring      = "none"
 params.keep_outputs     = "true"
 params.tyr_residue      = "56"
 
-[[stage.scoring.component.TyrosineInteraction.endpoint]]
-name                    = "TyrInteractionCount_raw"
-weight                  = 0.0
-params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
-params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
-params.gnina_executable = "/home/genai/Documents/gnina/gnina"
-params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
-params.cnn_scoring      = "none"
-params.keep_outputs     = "true"
-params.tyr_residue      = "56"
-
-# ── 4. Physchem: flat/aromatic-friendly, some flexibility for ring swaps ─────
-[[stage.scoring.component]]
-[stage.scoring.component.Csp3]
-[[stage.scoring.component.Csp3.endpoint]]
-name           = "LowCsp3"
-weight         = 1.2
-transform.type = "reverse_sigmoid"
-transform.low  = 0.05
-transform.high = 0.48
-transform.k    = 0.4
-
-[[stage.scoring.component]]
-[stage.scoring.component.NumRotBond]
-[[stage.scoring.component.NumRotBond.endpoint]]
-name           = "LowRotBonds"
-weight         = 1.2
-transform.type = "reverse_sigmoid"
-transform.low  = 0
-transform.high = 7
-transform.k    = 0.3
-
+# 4 — aromatic / fused ring count
 [[stage.scoring.component]]
 [stage.scoring.component.NumAromaticRings]
 [[stage.scoring.component.NumAromaticRings.endpoint]]
-name           = "AromaticRings_2_5"
-weight         = 1.6
+name           = "AromaticRings"
+weight         = 1.5
 transform.type = "step"
 transform.low  = 2
 transform.high = 5
 
+# 5 — N, O, NH in rings (single SMARTS bucket)
 [[stage.scoring.component]]
-[stage.scoring.component.NumRings]
-[[stage.scoring.component.NumRings.endpoint]]
-name           = "MultiRing"
-weight         = 1.3
-transform.type = "sigmoid"
-transform.low  = 2
-transform.high = 6
-transform.k    = 0.32
-
-[[stage.scoring.component]]
-[stage.scoring.component.NumAliphaticRings]
-[[stage.scoring.component.NumAliphaticRings.endpoint]]
-name           = "AliphaticRings_soft"
-weight         = 0.8
+[stage.scoring.component.GroupCount]
+[[stage.scoring.component.GroupCount.endpoint]]
+name           = "RingHetero"
+weight         = 1.5
 transform.type = "sigmoid"
 transform.low  = 0
-transform.high = 2
+transform.high = 5
 transform.k    = 0.35
-
-[[stage.scoring.component]]
-[stage.scoring.component.LargestRingSize]
-[[stage.scoring.component.LargestRingSize.endpoint]]
-name           = "LargestRing_5_7"
-weight         = 0.9
-transform.type = "step"
-transform.low  = 5
-transform.high = 7
-
-[[stage.scoring.component]]
-[stage.scoring.component.NumHeteroAtoms]
-[[stage.scoring.component.NumHeteroAtoms.endpoint]]
-name           = "HeteroAtoms_moderate"
-weight         = 1.0
-transform.type = "sigmoid"
-transform.low  = 2
-transform.high = 14
-transform.k    = 0.18
-
-# ── 5. Ring heteroatoms (SMARTS counts) ──────────────────────────────────────
-[[stage.scoring.component]]
-[stage.scoring.component.GroupCount]
-[[stage.scoring.component.GroupCount.endpoint]]
-name           = "AromaticN_in_ring"
-weight         = 1.2
-transform.type = "sigmoid"
-transform.low  = 0
-transform.high = 4
-transform.k    = 0.35
-params.smarts  = "[nR]"
-
-[[stage.scoring.component]]
-[stage.scoring.component.GroupCount]
-[[stage.scoring.component.GroupCount.endpoint]]
-name           = "RingNH"
-weight         = 1.0
-transform.type = "sigmoid"
-transform.low  = 0
-transform.high = 3
-transform.k    = 0.4
-params.smarts  = "[nR;H1]"
-
-[[stage.scoring.component]]
-[stage.scoring.component.GroupCount]
-[[stage.scoring.component.GroupCount.endpoint]]
-name           = "AromaticO_in_ring"
-weight         = 1.0
-transform.type = "sigmoid"
-transform.low  = 0
-transform.high = 3
-transform.k    = 0.4
-params.smarts  = "[oR]"
+params.smarts  = "[#7,#8;R]"
