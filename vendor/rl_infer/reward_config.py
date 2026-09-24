@@ -21,6 +21,7 @@ from reinvent_transforms import (
 )
 
 # Edit defaults here, or override in Sample_index.txt (see apply_reward_config).
+# GPU (vis_rl.py): gpu_id=1 | cuda_device=1 | cuda_visible_devices=0,1 | use_cpu=1
 DEFAULT_COMPONENTS: Dict[str, Dict[str, Any]] = {
     "solubility": {"enabled": True, "weight": 5.0},
     "pic50": {"enabled": True, "weight": 4.0},
