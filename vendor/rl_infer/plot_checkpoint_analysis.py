@@ -4,10 +4,12 @@ Compare checkpoint-generated SMILES to a training set.
 
 Reads per-checkpoint CSVs (SMILES column), computes:
   - mean max Tanimoto similarity to training set (bar chart)
+  - KDE of max Tanimoto to training set (per molecule)
   - KDE of predicted pIC50 and solubility (generated vs training)
 
 Usage:
   python plot_checkpoint_analysis.py SAMPLES_DIR TRAIN_CSV --out-dir results/compare/
+  python plot.py SAMPLES_DIR TRAIN_CSV --out-dir results/compare/
 
 SAMPLES_DIR: directory with checkpoint CSVs from sample_checkpoints.py
 TRAIN_CSV:     training CSV with a smiles column (only SMILES is used)
@@ -90,13 +92,36 @@ def _fps_for_smiles(smiles_list: List[str]) -> Tuple[List, List[str]]:
 
 
 def _mean_max_tanimoto(gen_fps: List, train_fps: List) -> float:
-    if not gen_fps or not train_fps:
+    vals = _max_tanimoto_to_training(gen_fps, train_fps)
+    if len(vals) == 0:
         return float("nan")
-    max_sims = []
-    for fp in gen_fps:
+    return float(np.mean(vals))
+
+
+def _max_tanimoto_to_training(mol_fps: List, train_fps: List) -> np.ndarray:
+    """Per-molecule max Morgan Tanimoto vs the training fingerprint set."""
+    if not mol_fps or not train_fps:
+        return np.array([], dtype=float)
+    out: List[float] = []
+    for fp in mol_fps:
         sims = DataStructs.BulkTanimotoSimilarity(fp, train_fps)
-        max_sims.append(max(sims) if sims else 0.0)
-    return float(np.mean(max_sims))
+        out.append(max(sims) if sims else 0.0)
+    return np.array(out, dtype=float)
+
+
+def _max_tanimoto_within_training(train_fps: List) -> np.ndarray:
+    """Per training molecule: max Tanimoto to another training molecule (self excluded)."""
+    n = len(train_fps)
+    if n == 0:
+        return np.array([], dtype=float)
+    if n == 1:
+        return np.array([0.0], dtype=float)
+    out: List[float] = []
+    for i, fp in enumerate(train_fps):
+        sims = list(DataStructs.BulkTanimotoSimilarity(fp, train_fps))
+        sims[i] = -1.0
+        out.append(max(sims))
+    return np.array(out, dtype=float)
 
 
 def _checkpoint_label(path: Path) -> str:
@@ -141,6 +166,7 @@ def _plot_kde(
     value_col: str,
     ylabel: str,
     out_png: Path,
+    xlim: Optional[Tuple[float, float]] = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(10, 6))
     train_vals = train_df[value_col].dropna().astype(float)
@@ -157,6 +183,8 @@ def _plot_kde(
     ax.set_xlabel(ylabel)
     ax.set_ylabel("Density")
     ax.set_title(f"{ylabel} distribution: training vs checkpoints")
+    if xlim is not None:
+        ax.set_xlim(*xlim)
     ax.legend(fontsize=8, loc="best")
     fig.tight_layout()
     fig.savefig(out_png, dpi=200)
@@ -193,6 +221,7 @@ def main() -> None:
     print(f"  {len(train_smiles)} unique valid training molecules")
 
     train_props = _score_properties(train_smiles)
+    train_props["max_tanimoto"] = _max_tanimoto_within_training(train_fps)
     train_props.to_csv(out_dir / "training_scored.csv", index=False)
 
     summary_rows = []
@@ -204,6 +233,7 @@ def main() -> None:
         gen_fps, gen_smiles = _fps_for_smiles(gen_smiles)
         mean_max = _mean_max_tanimoto(gen_fps, train_fps)
         props = _score_properties(gen_smiles)
+        props["max_tanimoto"] = _max_tanimoto_to_training(gen_fps, train_fps)
         props.to_csv(out_dir / f"{csv_path.stem}_scored.csv", index=False)
         scored_generated[label] = props
         summary_rows.append({
@@ -224,6 +254,17 @@ def main() -> None:
     tanimoto_png = out_dir / "tanimoto_similarity_bar.png"
     _plot_tanimoto_bar(summary, tanimoto_png)
     print(f"[+] bar plot -> {tanimoto_png}")
+
+    tanimoto_kde_png = out_dir / "tanimoto_kde.png"
+    _plot_kde(
+        train_props,
+        scored_generated,
+        "max_tanimoto",
+        "Max Tanimoto to training set (Morgan r=2)",
+        tanimoto_kde_png,
+        xlim=(0.0, 1.0),
+    )
+    print(f"[+] Tanimoto KDE -> {tanimoto_kde_png}")
 
     pic50_png = out_dir / "pic50_kde.png"
     _plot_kde(train_props, scored_generated, "pIC50", "pIC50 (predicted)", pic50_png)
