@@ -15,9 +15,10 @@ Usage:
 
 Optional:
   --write-csv              also write checkpoint_similarity_summary.csv and *_scored.csv
-  --max-train-mols N       cap training set size for Tanimoto (0 = all)
-  --max-sample-mols N      cap molecules per checkpoint CSV (0 = all)
+  --max-train-mols N       training pool for Tanimoto (default 150 random)
+  --max-sample-mols N      per checkpoint CSV (default 150 random)
   --seed INT               random seed for subsampling (default 42)
+  Use 0 on either flag to disable that cap and use all molecules.
 """
 
 from __future__ import annotations
@@ -307,9 +308,9 @@ def main() -> None:
     train_props = _load_molecule_table(train_csv)
     if train_props.empty:
         raise SystemExit(f"No valid SMILES in {train_csv}")
-    train_props = _fill_missing_qsar(train_props)
     n_train_full = len(train_props)
     train_props = _subsample_df(train_props, args.max_train_mols, rng)
+    train_props = _fill_missing_qsar(train_props)
     train_smiles = train_props["SMILES"].tolist()
     train_fps, train_smiles = _fps_for_smiles(train_smiles)
     train_props = train_props.set_index("SMILES").loc[train_smiles].reset_index()
@@ -334,9 +335,9 @@ def main() -> None:
         if props.empty:
             print(f"  {label}: skip (no valid SMILES in {csv_path.name})")
             continue
-        props = _fill_missing_qsar(props)
         n_full = len(props)
         props = _subsample_df(props, args.max_sample_mols, rng)
+        props = _fill_missing_qsar(props)
         gen_smiles = props["SMILES"].tolist()
         gen_fps, gen_smiles = _fps_for_smiles(gen_smiles)
         props = props.set_index("SMILES").loc[gen_smiles].reset_index()
