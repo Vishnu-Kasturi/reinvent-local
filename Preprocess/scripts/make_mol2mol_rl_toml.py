@@ -32,8 +32,15 @@ USE_SOL_IN_RL = False      # PD1PDL1Sol component inside TOML (in-RL reward)
 # ── paths ───────────────────────────────────────────────────────────────────
 BASE_DIR = Path("/home/genai/Vishnu/psearch-master/reinvent-local-main")
 
-RUN_NAME = "mol2mol_sh2"
-OUTPUT_TOML = BASE_DIR / "REINVENT4" / "configs" / f"pd1_pdl1_{RUN_NAME}_dock_tyr.toml"
+# RL_MODE: "scaffold_hop" (reverse_sigmoid Tanimoto) | "ring_decor" (stay near lead)
+RL_MODE = "ring_decor"
+
+RUN_NAME = "mol2mol_ring_decor" if RL_MODE == "ring_decor" else "mol2mol_sh2"
+OUTPUT_TOML = BASE_DIR / "REINVENT4" / "configs" / (
+    f"pd1_pdl1_{RUN_NAME}_dock_tyr.toml"
+    if RL_MODE == "scaffold_hop"
+    else "pd1_pdl1_mol2mol_ring_decor_dock_tyr.toml"
+)
 
 ENRICH_INPUT_CSV = BASE_DIR / "results" / f"{RUN_NAME}_1.csv"
 ENRICH_OUTPUT_CSV = BASE_DIR / "iict_libinvent" / f"{RUN_NAME}_enriched.csv"
@@ -41,7 +48,11 @@ ENRICH_XGB_DEVICE = "cuda:0"
 SMILES_COL = "SMILES"
 
 DEVICE = "cuda:1"
-PRIOR = "mol2mol_medium_similarity.prior"
+PRIOR = (
+    "mol2mol_medium_similarity.prior"
+    if RL_MODE == "ring_decor"
+    else "mol2mol_medium_similarity.prior"
+)
 SMILES_FILE = "data/scafolds_5.smi"
 SUMMARY_PREFIX = f"results/{RUN_NAME}"
 CHKPT = f"models/{RUN_NAME}.chkpt"
@@ -56,6 +67,13 @@ SCAFFOLD_LOW = 0.40
 SCAFFOLD_HIGH = 0.70
 SCAFFOLD_K = 0.55
 W_SCAFFOLD = 2.0
+
+NEAR_LEAD_LOW = 0.58
+NEAR_LEAD_HIGH = 0.88
+NEAR_LEAD_K = 0.42
+W_NEAR_LEAD = 2.5
+DIV_MINSCORE = 0.42 if RL_MODE == "ring_decor" else 0.45
+DIV_FILTER = "IdenticalMurckoScaffold" if RL_MODE == "ring_decor" else "IdenticalTopologicalScaffold"
 W_DOCK = 3.0
 W_TYR = 2.5
 W_CSP3 = 1.5
@@ -79,6 +97,10 @@ GNINA = "/home/genai/Documents/gnina/gnina"
 # ══════════════════════════════════════════════════════════════════════════════
 
 RL_SCORING_COLUMNS = [
+    "NearLead",
+    "NearLead (raw)",
+    "MaxLeadTanimoto_raw",
+    "MaxLeadTanimoto_raw (raw)",
     "ScaffoldHop",
     "ScaffoldHop (raw)",
     "DockingReward",
@@ -98,6 +120,20 @@ RL_SCORING_COLUMNS = [
     "AromaticRings_2_4 (raw)",
     "MultiRing",
     "MultiRing (raw)",
+    "AliphaticRings_soft",
+    "AliphaticRings_soft (raw)",
+    "LargestRing_5_7",
+    "LargestRing_5_7 (raw)",
+    "HeteroAtoms_moderate",
+    "HeteroAtoms_moderate (raw)",
+    "AromaticN_in_ring",
+    "AromaticN_in_ring (raw)",
+    "RingNH",
+    "RingNH (raw)",
+    "AromaticO_in_ring",
+    "AromaticO_in_ring (raw)",
+    "AromaticRings_2_5",
+    "AromaticRings_2_5 (raw)",
     "PD1PDL1pIC50",
     "PD1PDL1pIC50 (raw)",
     "PD1PDL1Sol",
@@ -133,6 +169,150 @@ def _tyr_block(name: str, weight: float, indent: str = "") -> str:
 {indent}params.cnn_scoring      = "none"
 {indent}params.keep_outputs     = "true"
 {indent}params.tyr_residue      = "56"
+"""
+
+
+def _tanimoto_block(smiles_path: str) -> str:
+    if RL_MODE == "ring_decor":
+        return f"""[[stage.scoring.component]]
+[stage.scoring.component.TanimotoSimilarity]
+[[stage.scoring.component.TanimotoSimilarity.endpoint]]
+name                = "NearLead"
+weight              = {W_NEAR_LEAD}
+transform.type      = "sigmoid"
+transform.low       = {NEAR_LEAD_LOW}
+transform.high      = {NEAR_LEAD_HIGH}
+transform.k         = {NEAR_LEAD_K}
+params.smiles_file  = "{smiles_path}"
+params.radius       = 2
+params.use_counts   = false
+params.use_features = false
+
+[[stage.scoring.component.TanimotoSimilarity.endpoint]]
+name                = "MaxLeadTanimoto_raw"
+weight              = 0.0
+params.smiles_file  = "{smiles_path}"
+params.radius       = 2
+params.use_counts   = false
+params.use_features = false
+"""
+    return f"""[[stage.scoring.component]]
+[stage.scoring.component.TanimotoSimilarity]
+[[stage.scoring.component.TanimotoSimilarity.endpoint]]
+name                = "ScaffoldHop"
+weight              = {W_SCAFFOLD}
+transform.type      = "reverse_sigmoid"
+transform.low       = {SCAFFOLD_LOW}
+transform.high      = {SCAFFOLD_HIGH}
+transform.k         = {SCAFFOLD_K}
+params.smiles_file  = "{smiles_path}"
+params.radius       = 2
+params.use_counts   = false
+params.use_features = false
+"""
+
+
+def _ring_decor_physchem() -> str:
+    if RL_MODE != "ring_decor":
+        return f"""[[stage.scoring.component]]
+[stage.scoring.component.NumAromaticRings]
+[[stage.scoring.component.NumAromaticRings.endpoint]]
+name           = "AromaticRings_2_4"
+weight         = {W_AROMATIC}
+transform.type = "step"
+transform.low  = 2
+transform.high = 4
+
+[[stage.scoring.component]]
+[stage.scoring.component.NumRings]
+[[stage.scoring.component.NumRings.endpoint]]
+name           = "MultiRing"
+weight         = {W_MULTIRING}
+transform.type = "sigmoid"
+transform.low  = 2
+transform.high = 5
+transform.k    = 0.35
+"""
+    return f"""[[stage.scoring.component]]
+[stage.scoring.component.NumAromaticRings]
+[[stage.scoring.component.NumAromaticRings.endpoint]]
+name           = "AromaticRings_2_5"
+weight         = {W_AROMATIC}
+transform.type = "step"
+transform.low  = 2
+transform.high = 5
+
+[[stage.scoring.component]]
+[stage.scoring.component.NumRings]
+[[stage.scoring.component.NumRings.endpoint]]
+name           = "MultiRing"
+weight         = {W_MULTIRING}
+transform.type = "sigmoid"
+transform.low  = 2
+transform.high = 6
+transform.k    = 0.32
+
+[[stage.scoring.component]]
+[stage.scoring.component.NumAliphaticRings]
+[[stage.scoring.component.NumAliphaticRings.endpoint]]
+name           = "AliphaticRings_soft"
+weight         = 0.8
+transform.type = "sigmoid"
+transform.low  = 0
+transform.high = 2
+transform.k    = 0.35
+
+[[stage.scoring.component]]
+[stage.scoring.component.LargestRingSize]
+[[stage.scoring.component.LargestRingSize.endpoint]]
+name           = "LargestRing_5_7"
+weight         = 0.9
+transform.type = "step"
+transform.low  = 5
+transform.high = 7
+
+[[stage.scoring.component]]
+[stage.scoring.component.NumHeteroAtoms]
+[[stage.scoring.component.NumHeteroAtoms.endpoint]]
+name           = "HeteroAtoms_moderate"
+weight         = 1.0
+transform.type = "sigmoid"
+transform.low  = 2
+transform.high = 14
+transform.k    = 0.18
+
+[[stage.scoring.component]]
+[stage.scoring.component.GroupCount]
+[[stage.scoring.component.GroupCount.endpoint]]
+name           = "AromaticN_in_ring"
+weight         = 1.2
+transform.type = "sigmoid"
+transform.low  = 0
+transform.high = 4
+transform.k    = 0.35
+params.smarts  = "[nR]"
+
+[[stage.scoring.component]]
+[stage.scoring.component.GroupCount]
+[[stage.scoring.component.GroupCount.endpoint]]
+name           = "RingNH"
+weight         = 1.0
+transform.type = "sigmoid"
+transform.low  = 0
+transform.high = 3
+transform.k    = 0.4
+params.smarts  = "[nR;H1]"
+
+[[stage.scoring.component]]
+[stage.scoring.component.GroupCount]
+[[stage.scoring.component.GroupCount.endpoint]]
+name           = "AromaticO_in_ring"
+weight         = 1.0
+transform.type = "sigmoid"
+transform.low  = 0
+transform.high = 3
+transform.k    = 0.4
+params.smarts  = "[oR]"
 """
 
 
@@ -204,9 +384,9 @@ sigma = 128
 rate  = 0.0001
 
 [diversity_filter]
-type        = "IdenticalTopologicalScaffold"
+type        = "{DIV_FILTER}"
 bucket_size = 8
-minscore    = 0.45
+minscore    = {DIV_MINSCORE}
 
 [[stage]]
 chkpt_file  = "{chkpt}"
@@ -218,20 +398,7 @@ max_steps   = {MAX_STEPS}
 [stage.scoring]
 type = "{SCORING_AGG}"
 
-[[stage.scoring.component]]
-[stage.scoring.component.TanimotoSimilarity]
-[[stage.scoring.component.TanimotoSimilarity.endpoint]]
-name                = "ScaffoldHop"
-weight              = {W_SCAFFOLD}
-transform.type      = "reverse_sigmoid"
-transform.low       = {SCAFFOLD_LOW}
-transform.high      = {SCAFFOLD_HIGH}
-transform.k         = {SCAFFOLD_K}
-params.smiles_file  = "{smiles_path}"
-params.radius       = 2
-params.use_counts   = false
-params.use_features = false
-
+{_tanimoto_block(smiles_path)}
 [[stage.scoring.component]]
 [stage.scoring.component.DockingScore]
 {_dock_block("DockingReward", W_DOCK)}
@@ -262,24 +429,7 @@ transform.low  = 0
 transform.high = 6
 transform.k    = 0.35
 
-[[stage.scoring.component]]
-[stage.scoring.component.NumAromaticRings]
-[[stage.scoring.component.NumAromaticRings.endpoint]]
-name           = "AromaticRings_2_4"
-weight         = {W_AROMATIC}
-transform.type = "step"
-transform.low  = 2
-transform.high = 4
-
-[[stage.scoring.component]]
-[stage.scoring.component.NumRings]
-[[stage.scoring.component.NumRings.endpoint]]
-name           = "MultiRing"
-weight         = {W_MULTIRING}
-transform.type = "sigmoid"
-transform.low  = 2
-transform.high = 5
-transform.k    = 0.35
+{_ring_decor_physchem()}
 {qsar_blocks}
 """
 
