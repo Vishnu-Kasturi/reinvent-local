@@ -99,8 +99,6 @@ GNINA = "/home/genai/Documents/gnina/gnina"
 RL_SCORING_COLUMNS = [
     "NearLead",
     "NearLead (raw)",
-    "MaxLeadTanimoto_raw",
-    "MaxLeadTanimoto_raw (raw)",
     "ScaffoldHop",
     "ScaffoldHop (raw)",
     "DockingReward",
@@ -324,12 +322,12 @@ type = "{SCORING_AGG}"
 [[stage.scoring.component]]
 [stage.scoring.component.DockingScore]
 {_dock_block("DockingReward", W_DOCK)}
-{"" if RL_MODE == "ring_decor" else _dock_block("DockingAffinity_raw", 0.0)}
+{_dock_block("DockingAffinity_raw", 0.0)}
 
 [[stage.scoring.component]]
 [stage.scoring.component.TyrosineInteraction]
 {_tyr_block("TyrInteractionReward", W_TYR)}
-{"" if RL_MODE == "ring_decor" else _tyr_block("TyrInteractionCount_raw", 0.0)}
+{_tyr_block("TyrInteractionCount_raw", 0.0)}
 
 {"" if RL_MODE == "ring_decor" else f'''[[stage.scoring.component]]
 [stage.scoring.component.Csp3]

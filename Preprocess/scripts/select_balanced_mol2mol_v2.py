@@ -41,8 +41,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FP_GEN = GetMorganGenerator(radius=2, fpSize=2048)
 
 # ── paths (relative to repo root unless absolute) ───────────────────────────
-INPUT_PATH = "iict_libinvent/mol2mol_sh1/r1_rd_top.csv"
-OUTPUT_DIR = "iict_libinvent/mol2mol_rdfilter/r1_v2"
+INPUT_PATH = "iict_libinvent/mol2mol_ring_decor_enriched.csv"
+OUTPUT_DIR = "iict_libinvent/mol2mol_ring_decor_analysis"
 
 # ── selection / clustering ───────────────────────────────────────────────────
 TOP_N = 500

@@ -71,12 +71,33 @@ params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main
 params.cnn_scoring      = "none"
 params.keep_outputs     = "true"
 
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingAffinity_raw"
+weight                  = 0.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
 # 3 — Tyr-56
 [[stage.scoring.component]]
 [stage.scoring.component.TyrosineInteraction]
 [[stage.scoring.component.TyrosineInteraction.endpoint]]
 name                    = "TyrInteractionReward"
 weight                  = 2.5
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+params.tyr_residue      = "56"
+
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                    = "TyrInteractionCount_raw"
+weight                  = 0.0
 params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
 params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
 params.gnina_executable = "/home/genai/Documents/gnina/gnina"
