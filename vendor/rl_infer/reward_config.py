@@ -8,8 +8,12 @@ from typing import Any, Dict, Optional, Tuple
 
 from pic50_scorer import calculateScore as calculatePic50
 from sol_scorer import calculateScore as calculateSolubility
+from rdkit import Chem
+from rdkit.Chem import Descriptors
+
 from reinvent_transforms import (
     transform_docking,
+    transform_mw,
     transform_pic50,
     transform_solubility,
     transform_tyrosine,
@@ -22,6 +26,7 @@ DEFAULT_COMPONENTS: Dict[str, Dict[str, Any]] = {
     "pic50": {"enabled": True, "weight": 4.0},
     "tyrosine": {"enabled": True, "weight": 4.0},
     "docking": {"enabled": True, "weight": 2.0},
+    "mw": {"enabled": True, "weight": 2.0},
 }
 
 _COMPONENTS: Dict[str, Dict[str, Any]] = copy.deepcopy(DEFAULT_COMPONENTS)
@@ -109,6 +114,17 @@ def compute_reward(dock_result, smiles: str) -> Tuple[float, Dict[str, float]]:
             return 0.0, breakdown
         breakdown["solubility"] = score
         pairs.append((score, _COMPONENTS["solubility"]["weight"]))
+
+    if _COMPONENTS["mw"]["enabled"]:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return 0.0, breakdown
+        mw = Descriptors.MolWt(mol)
+        score = transform_mw(mw)
+        if score <= 0:
+            return 0.0, breakdown
+        breakdown["mw"] = score
+        pairs.append((score, _COMPONENTS["mw"]["weight"]))
 
     if not pairs:
         return 0.0, breakdown
