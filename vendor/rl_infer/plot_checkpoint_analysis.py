@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """
-Compare checkpoint-generated SMILES to a training set.
+Plot checkpoint sample CSVs vs a training set (plots only by default).
 
-Reads per-checkpoint CSVs (SMILES column), computes:
-  - mean max Tanimoto similarity to training set (bar chart)
-  - KDE of predicted pIC50 and solubility (generated vs training)
+Does NOT sample or generate new SMILES — reads existing per-checkpoint CSVs from
+``sample_checkpoints.py`` (or any folder of sample CSVs), computes metrics in memory,
+and writes PNGs.
+
+Uses pIC50 / Solubility from each CSV when those columns exist; otherwise predicts
+with the local QSAR models.
 
 Usage:
-  python plot_checkpoint_analysis.py SAMPLES_DIR TRAIN_CSV --out-dir results/compare/
+  python plot.py SAMPLES_DIR TRAIN_CSV --out-dir results/compare/
+  python plot_checkpoint_analysis.py SAMPLES_DIR TRAIN_CSV
 
-SAMPLES_DIR: directory with checkpoint CSVs from sample_checkpoints.py
-TRAIN_CSV:     training CSV with a smiles column (only SMILES is used)
+Optional:
+  --write-csv              also write checkpoint_similarity_summary.csv and *_scored.csv
+  --max-train-mols N       training pool for Tanimoto (default 150 random)
+  --max-sample-mols N      per checkpoint CSV (default 150 random)
+  --seed INT               random seed for subsampling (default 42)
+  Use 0 on either flag to disable that cap and use all molecules.
 """
 
 from __future__ import annotations
@@ -37,6 +45,9 @@ from sol_scorer import readModel as readSolModel, calculateScore as calculateSol
 
 _MORGAN_GEN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 SMILES_COL_NAMES = ("smiles", "canonical_smiles", "input_smiles", "SMILES")
+PIC50_COL_ALIASES = ("pIC50", "pic50", "PD1PDL1pIC50", "PD1PDL1pIC50 (raw)")
+SOL_COL_ALIASES = ("Solubility", "solubility", "logS", "PD1PDL1Sol", "PD1PDL1Sol (raw)")
+SKIP_CSV_NAMES = frozenset({"checkpoint_similarity_summary.csv", "training_scored.csv"})
 
 
 def _find_smiles_col(df: pd.DataFrame) -> str:
@@ -47,6 +58,16 @@ def _find_smiles_col(df: pd.DataFrame) -> str:
         if name.lower() in lower:
             return lower[name.lower()]
     raise SystemExit(f"No SMILES column found. Columns: {list(df.columns)}")
+
+
+def _find_optional_col(df: pd.DataFrame, aliases: tuple[str, ...]) -> Optional[str]:
+    lower = {str(c).lower(): c for c in df.columns}
+    for name in aliases:
+        if name in df.columns:
+            return name
+        if name.lower() in lower:
+            return lower[name.lower()]
+    return None
 
 
 def _canonical_smiles(smiles: str) -> Optional[str]:
@@ -63,19 +84,32 @@ def _morgan_fp(smiles: str):
     return _MORGAN_GEN.GetFingerprint(mol)
 
 
-def _load_unique_smiles(csv_path: Path) -> List[str]:
+def _load_molecule_table(csv_path: Path) -> pd.DataFrame:
+    """One row per unique canonical SMILES; keep scores from CSV when present."""
     df = pd.read_csv(csv_path)
-    col = _find_smiles_col(df)
-    seen = set()
-    out: List[str] = []
-    for raw in df[col].astype(str):
-        if not raw or raw.lower() == "nan":
+    smi_col = _find_smiles_col(df)
+    pic50_col = _find_optional_col(df, PIC50_COL_ALIASES)
+    sol_col = _find_optional_col(df, SOL_COL_ALIASES)
+
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for _, row in df.iterrows():
+        raw = row[smi_col]
+        if raw is None or (isinstance(raw, float) and np.isnan(raw)):
             continue
-        smi = _canonical_smiles(raw)
-        if smi and smi not in seen:
-            seen.add(smi)
-            out.append(smi)
-    return out
+        smi = _canonical_smiles(str(raw))
+        if not smi or smi in seen:
+            continue
+        seen.add(smi)
+        rec: dict = {"SMILES": smi}
+        rec["pIC50"] = (
+            pd.to_numeric(row[pic50_col], errors="coerce") if pic50_col else np.nan
+        )
+        rec["Solubility"] = (
+            pd.to_numeric(row[sol_col], errors="coerce") if sol_col else np.nan
+        )
+        rows.append(rec)
+    return pd.DataFrame(rows)
 
 
 def _fps_for_smiles(smiles_list: List[str]) -> Tuple[List, List[str]]:
@@ -90,13 +124,34 @@ def _fps_for_smiles(smiles_list: List[str]) -> Tuple[List, List[str]]:
 
 
 def _mean_max_tanimoto(gen_fps: List, train_fps: List) -> float:
-    if not gen_fps or not train_fps:
+    vals = _max_tanimoto_to_training(gen_fps, train_fps)
+    if len(vals) == 0:
         return float("nan")
-    max_sims = []
-    for fp in gen_fps:
+    return float(np.mean(vals))
+
+
+def _max_tanimoto_to_training(mol_fps: List, train_fps: List) -> np.ndarray:
+    if not mol_fps or not train_fps:
+        return np.array([], dtype=float)
+    out: List[float] = []
+    for fp in mol_fps:
         sims = DataStructs.BulkTanimotoSimilarity(fp, train_fps)
-        max_sims.append(max(sims) if sims else 0.0)
-    return float(np.mean(max_sims))
+        out.append(max(sims) if sims else 0.0)
+    return np.array(out, dtype=float)
+
+
+def _max_tanimoto_within_training(train_fps: List) -> np.ndarray:
+    n = len(train_fps)
+    if n == 0:
+        return np.array([], dtype=float)
+    if n == 1:
+        return np.array([0.0], dtype=float)
+    out: List[float] = []
+    for i, fp in enumerate(train_fps):
+        sims = list(DataStructs.BulkTanimotoSimilarity(fp, train_fps))
+        sims[i] = -1.0
+        out.append(max(sims))
+    return np.array(out, dtype=float)
 
 
 def _checkpoint_label(path: Path) -> str:
@@ -107,17 +162,56 @@ def _checkpoint_label(path: Path) -> str:
     return name
 
 
-def _score_properties(smiles_list: List[str]) -> pd.DataFrame:
-    rows = []
-    for smi in smiles_list:
-        pic50 = calculatePic50(smi)
-        sol = calculateSolubility(smi)
-        rows.append({
-            "SMILES": smi,
-            "pIC50": pic50 if math.isfinite(pic50) else np.nan,
-            "Solubility": sol if math.isfinite(sol) else np.nan,
-        })
-    return pd.DataFrame(rows)
+def _qsar_models_loaded() -> bool:
+    return getattr(_fill_missing_qsar, "_models_ready", False)
+
+
+def _ensure_qsar_models() -> None:
+    if not _qsar_models_loaded():
+        print("Loading QSAR models (pIC50 / Solubility missing in some inputs)...")
+        readPic50Model()
+        readSolModel()
+        _fill_missing_qsar._models_ready = True  # type: ignore[attr-defined]
+
+
+def _fill_missing_qsar(props: pd.DataFrame) -> pd.DataFrame:
+    out = props.copy()
+    missing_pic50 = out["pIC50"].isna()
+    missing_sol = out["Solubility"].isna()
+    if not missing_pic50.any() and not missing_sol.any():
+        return out
+    _ensure_qsar_models()
+    for idx in out.index:
+        smi = out.at[idx, "SMILES"]
+        if missing_pic50.loc[idx]:
+            v = calculatePic50(smi)
+            out.at[idx, "pIC50"] = v if math.isfinite(v) else np.nan
+        if missing_sol.loc[idx]:
+            v = calculateSolubility(smi)
+            out.at[idx, "Solubility"] = v if math.isfinite(v) else np.nan
+    return out
+
+
+_fill_missing_qsar._models_ready = False  # type: ignore[attr-defined]
+
+
+def _subsample_df(props: pd.DataFrame, max_mols: int, rng: np.random.Generator) -> pd.DataFrame:
+    if max_mols <= 0 or len(props) <= max_mols:
+        return props.reset_index(drop=True)
+    idx = rng.choice(len(props), size=max_mols, replace=False)
+    return props.iloc[np.sort(idx)].reset_index(drop=True)
+
+
+def _list_sample_csvs(samples_dir: Path, pattern: str, out_dir: Path) -> List[Path]:
+    paths = sorted(samples_dir.glob(pattern))
+    filtered: List[Path] = []
+    for p in paths:
+        if p.name in SKIP_CSV_NAMES or p.stem.endswith("_scored"):
+            continue
+        if p.resolve().parent == out_dir.resolve():
+            continue
+        filtered.append(p)
+    return filtered
 
 
 def _plot_tanimoto_bar(summary: pd.DataFrame, out_png: Path) -> None:
@@ -141,6 +235,7 @@ def _plot_kde(
     value_col: str,
     ylabel: str,
     out_png: Path,
+    xlim: Optional[Tuple[float, float]] = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(10, 6))
     train_vals = train_df[value_col].dropna().astype(float)
@@ -157,6 +252,8 @@ def _plot_kde(
     ax.set_xlabel(ylabel)
     ax.set_ylabel("Density")
     ax.set_title(f"{ylabel} distribution: training vs checkpoints")
+    if xlim is not None:
+        ax.set_xlim(*xlim)
     ax.legend(fontsize=8, loc="best")
     fig.tight_layout()
     fig.savefig(out_png, dpi=200)
@@ -164,47 +261,92 @@ def _plot_kde(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Plot Tanimoto + pIC50/solubility KDE for checkpoint samples")
-    p.add_argument("samples_dir", help="Directory with per-checkpoint CSV files")
-    p.add_argument("train_csv", help="Training CSV (smiles column only is used)")
-    p.add_argument("--out-dir", default=None, help="Output directory (default: <samples_dir>/analysis)")
-    p.add_argument("--pattern", default="*.csv", help="Glob for sample CSVs (default: *.csv)")
+    p = argparse.ArgumentParser(
+        description="Plot checkpoint sample CSVs vs training (reads existing samples; PNGs only by default)"
+    )
+    p.add_argument("samples_dir", help="Directory with per-checkpoint sample CSV files")
+    p.add_argument("train_csv", help="Training CSV (SMILES + optional pIC50/Solubility columns)")
+    p.add_argument("--out-dir", default=None, help="Directory for PNGs (default: <samples_dir>/analysis)")
+    p.add_argument("--pattern", default="*.csv", help="Glob for sample CSVs in samples_dir (default: *.csv)")
+    p.add_argument(
+        "--write-csv",
+        action="store_true",
+        help="Also write training_scored.csv, per-checkpoint *_scored.csv, and summary CSV",
+    )
+    p.add_argument(
+        "--max-train-mols",
+        type=int,
+        default=0,
+        help="Random subsample of training mols for fingerprints/Tanimoto (0 = use all)",
+    )
+    p.add_argument(
+        "--max-sample-mols",
+        type=int,
+        default=0,
+        help="Random subsample per checkpoint CSV for plots/Tanimoto (0 = use all)",
+    )
+    p.add_argument("--seed", type=int, default=42, help="RNG seed for subsampling")
     args = p.parse_args()
+
+    rng = np.random.default_rng(args.seed)
 
     samples_dir = Path(args.samples_dir).expanduser().resolve()
     train_csv = Path(args.train_csv).expanduser().resolve()
     out_dir = Path(args.out_dir).expanduser().resolve() if args.out_dir else samples_dir / "analysis"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    sample_csvs = sorted(samples_dir.glob(args.pattern))
-    sample_csvs = [p for p in sample_csvs if p.name != "checkpoint_manifest.txt"]
+    sample_csvs = _list_sample_csvs(samples_dir, args.pattern, out_dir)
     if not sample_csvs:
-        raise SystemExit(f"No CSV files matching {args.pattern!r} in {samples_dir}")
+        raise SystemExit(
+            f"No sample CSV files matching {args.pattern!r} in {samples_dir} "
+            f"(skipped *_scored.csv and prior analysis outputs)"
+        )
 
-    print("Loading QSAR models...")
-    readPic50Model()
-    readSolModel()
+    print(f"Using {len(sample_csvs)} sample CSV(s) from {samples_dir}")
 
-    print(f"Loading training SMILES from {train_csv}")
-    train_smiles = _load_unique_smiles(train_csv)
-    if not train_smiles:
+    print(f"Loading training set from {train_csv}")
+    train_props = _load_molecule_table(train_csv)
+    if train_props.empty:
         raise SystemExit(f"No valid SMILES in {train_csv}")
+    n_train_full = len(train_props)
+    train_props = _subsample_df(train_props, args.max_train_mols, rng)
+    train_props = _fill_missing_qsar(train_props)
+    train_smiles = train_props["SMILES"].tolist()
     train_fps, train_smiles = _fps_for_smiles(train_smiles)
-    print(f"  {len(train_smiles)} unique valid training molecules")
+    train_props = train_props.set_index("SMILES").loc[train_smiles].reset_index()
+    train_props["max_tanimoto"] = _max_tanimoto_within_training(train_fps)
+    if args.max_train_mols > 0 and n_train_full > len(train_smiles):
+        print(
+            f"  training: using {len(train_smiles)} / {n_train_full} mols for Tanimoto "
+            f"(--max-train-mols {args.max_train_mols})"
+        )
+    else:
+        print(f"  {len(train_smiles)} unique valid training molecules")
 
-    train_props = _score_properties(train_smiles)
-    train_props.to_csv(out_dir / "training_scored.csv", index=False)
+    if args.write_csv:
+        train_props.to_csv(out_dir / "training_scored.csv", index=False)
 
     summary_rows = []
     scored_generated: Dict[str, pd.DataFrame] = {}
 
     for csv_path in sample_csvs:
         label = _checkpoint_label(csv_path)
-        gen_smiles = _load_unique_smiles(csv_path)
+        props = _load_molecule_table(csv_path)
+        if props.empty:
+            print(f"  {label}: skip (no valid SMILES in {csv_path.name})")
+            continue
+        n_full = len(props)
+        props = _subsample_df(props, args.max_sample_mols, rng)
+        props = _fill_missing_qsar(props)
+        gen_smiles = props["SMILES"].tolist()
         gen_fps, gen_smiles = _fps_for_smiles(gen_smiles)
-        mean_max = _mean_max_tanimoto(gen_fps, train_fps)
-        props = _score_properties(gen_smiles)
-        props.to_csv(out_dir / f"{csv_path.stem}_scored.csv", index=False)
+        props = props.set_index("SMILES").loc[gen_smiles].reset_index()
+        props["max_tanimoto"] = _max_tanimoto_to_training(gen_fps, train_fps)
+        mean_max = float(props["max_tanimoto"].mean()) if len(props) else float("nan")
+
+        if args.write_csv:
+            props.to_csv(out_dir / f"{csv_path.stem}_scored.csv", index=False)
+
         scored_generated[label] = props
         summary_rows.append({
             "checkpoint": label,
@@ -214,23 +356,44 @@ def main() -> None:
             "mean_pIC50": float(props["pIC50"].mean()),
             "mean_Solubility": float(props["Solubility"].mean()),
         })
-        print(f"  {label}: n={len(gen_smiles)} mean_max_tanimoto={mean_max:.3f}")
+        sub_note = ""
+        if args.max_sample_mols > 0 and n_full > len(gen_smiles):
+            sub_note = f" (subsampled from {n_full})"
+        print(
+            f"  {label}: n={len(gen_smiles)}{sub_note} from {csv_path.name} "
+            f"mean_max_tanimoto={mean_max:.3f}"
+        )
+
+    if not scored_generated:
+        raise SystemExit("No checkpoint data to plot.")
 
     summary = pd.DataFrame(summary_rows)
-    summary_path = out_dir / "checkpoint_similarity_summary.csv"
-    summary.to_csv(summary_path, index=False)
-    print(f"[+] summary -> {summary_path}")
+    if args.write_csv:
+        summary_path = out_dir / "checkpoint_similarity_summary.csv"
+        summary.to_csv(summary_path, index=False)
+        print(f"[+] summary -> {summary_path}")
 
     tanimoto_png = out_dir / "tanimoto_similarity_bar.png"
     _plot_tanimoto_bar(summary, tanimoto_png)
     print(f"[+] bar plot -> {tanimoto_png}")
 
+    tanimoto_kde_png = out_dir / "tanimoto_kde.png"
+    _plot_kde(
+        train_props,
+        scored_generated,
+        "max_tanimoto",
+        "Max Tanimoto to training set (Morgan r=2)",
+        tanimoto_kde_png,
+        xlim=(0.0, 1.0),
+    )
+    print(f"[+] Tanimoto KDE -> {tanimoto_kde_png}")
+
     pic50_png = out_dir / "pic50_kde.png"
-    _plot_kde(train_props, scored_generated, "pIC50", "pIC50 (predicted)", pic50_png)
+    _plot_kde(train_props, scored_generated, "pIC50", "pIC50", pic50_png)
     print(f"[+] pIC50 KDE -> {pic50_png}")
 
     sol_png = out_dir / "solubility_kde.png"
-    _plot_kde(train_props, scored_generated, "Solubility", "Solubility logS (predicted)", sol_png)
+    _plot_kde(train_props, scored_generated, "Solubility", "Solubility logS", sol_png)
     print(f"[+] solubility KDE -> {sol_png}")
 
     print("Done.")
