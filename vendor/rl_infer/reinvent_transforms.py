@@ -22,6 +22,15 @@ DOCKING_REVERSE_SIGMOID = {"low": -16.0, "high": -9.0, "k": 0.4}
 # Tyrosine: higher pi-pi count is better; reward range 1–3 interactions.
 TYR_SIGMOID = {"low": 1.0, "high": 3.0, "k": 0.4}
 
+# Molecular weight band (Da): reward peaks between low and high.
+MW_DOUBLE_SIGMOID = {
+    "low": 400.0,
+    "high": 650.0,
+    "coef_div": 500.0,
+    "coef_si": 20.0,
+    "coef_se": 20.0,
+}
+
 def _hard_sigmoid(x, k):
     return float((k * x > 0))
 
@@ -94,6 +103,16 @@ def transform_solubility(logs):
     p = SOL_DOUBLE_SIGMOID
     return double_sigmoid_transform(
         logs, p["low"], p["high"], p["coef_div"], p["coef_si"], p["coef_se"]
+    )
+
+
+def transform_mw(mw_da):
+    """MW in [400, 650] Da → high reward; tails off outside (double sigmoid)."""
+    if not math.isfinite(mw_da):
+        return 0.0
+    p = MW_DOUBLE_SIGMOID
+    return double_sigmoid_transform(
+        mw_da, p["low"], p["high"], p["coef_div"], p["coef_si"], p["coef_se"]
     )
 
 

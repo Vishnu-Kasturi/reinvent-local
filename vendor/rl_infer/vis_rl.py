@@ -57,13 +57,63 @@ from dock_prolif_backend import (
 from rdkit import rdBase
 rdBase.DisableLog('rdApp.error') #Suppresses error messages from rdkit when parsing SMILES strings to RDKit molecules
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0' #Force keras to use CPU for calculations
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #PyTorch will figure out which device to use for training
-#device = torch.device("cpu")
-print("Device available:",device)
-#print("Current GPU in use:",torch.cuda.current_device())
-#print("Name of GPU in use:",torch.cuda.get_device_name(torch.cuda.current_device()))
 cpu = torch.device("cpu")
+device = cpu  # set from Sample_index.txt after argv parse (see _setup_device)
+
+
+def _as_bool_cfg(value) -> bool:
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _setup_device(index_data: dict) -> torch.device:
+    """
+    Sample_index.txt keys (optional):
+      use_cpu=1          force CPU
+      gpu_id=1           same as cuda_device (physical GPU index)
+      cuda_device=1
+      cuda_visible_devices=0,1
+    """
+    if _as_bool_cfg(index_data.get("use_cpu", "0")):
+        print("Device: cpu (use_cpu=1 in index file)")
+        return cpu
+
+    gpu = (
+        index_data.get("cuda_visible_devices")
+        or index_data.get("gpu_id")
+        or index_data.get("cuda_device")
+    )
+    if gpu is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu).strip()
+    elif "CUDA_VISIBLE_DEVICES" not in os.environ:
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+
+    if torch.cuda.is_available():
+        dev = torch.device("cuda")
+        print("Device:", dev, "| CUDA_VISIBLE_DEVICES=", os.environ.get("CUDA_VISIBLE_DEVICES"))
+        if torch.cuda.device_count() > 0:
+            print("  GPU name:", torch.cuda.get_device_name(0))
+        return dev
+
+    print("Device: cpu (CUDA not available)")
+    return cpu
+
+
+def _read_index_keys(index_path: str) -> dict:
+    """Lightweight key=value parse for boot (full parse in _load_index)."""
+    config: dict = {}
+    lower = index_path.lower()
+    if lower.endswith(".pkl") or lower.endswith(".pickle"):
+        with open(index_path, "rb") as handle:
+            data = pickle.load(handle)
+        return data if isinstance(data, dict) else {}
+    with open(index_path, "r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            config[key.strip()] = value.strip()
+    return config
 
 
 #Command-line arguments - File names
