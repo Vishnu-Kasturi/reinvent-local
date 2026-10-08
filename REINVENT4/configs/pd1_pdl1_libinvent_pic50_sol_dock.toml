@@ -8,14 +8,14 @@
 
 run_type = "staged_learning"
 device   = "cuda:1"
-tb_logdir       = "/home/genai/Vishnu/psearch-master/reinvent-local-main/tb_libinvent_pic50_sol_dock"
-json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_libinvent_pic50_sol_dock.json"
+tb_logdir       = "/home/genai/Vishnu/psearch-master/reinvent-local-main/lib_mol2mol_mol1"
+json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_lib_mol2mol_mol1.json"
 
 [parameters]
 prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/libinvent.prior"
 agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/libinvent.prior"
-smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/iict_lib4.smi"
-summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/libinvent_pic50_sol_dock"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/iict_lib_mol1.smi"
+summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/lib_mol2mol_mol1"
 batch_size         = 16
 unique_sequences   = true
 randomize_smiles   = true
@@ -27,12 +27,12 @@ sigma = 96
 rate  = 0.00005
 
 [diversity_filter]
-type        = "IdenticalMurckoScaffold"
+type        = "IdenticalTopologicalScaffold"
 bucket_size = 25
 minscore    = 0.35
 
 [[stage]]
-chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/libinvent_pic50_sol_dock.chkpt"
+chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/lib_mol2mol_mol1.chkpt"
 termination = "simple"
 max_score   = 0.85
 min_steps   = 150
