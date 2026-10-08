@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import pytest
 
 import numpy as np
@@ -5,6 +8,7 @@ import numpy as np
 from reinvent_plugins.components.RDKit.comp_similarity import (
     Parameters,
     TanimotoDistance,
+    TanimotoSimilarity,
 )
 
 
@@ -43,11 +47,30 @@ from reinvent_plugins.components.RDKit.comp_similarity import (
 )
 def test_comp_similarity(smiles, radius, use_counts, use_features, expected_results):
     params = Parameters(
-        [smiles],
-        [radius],
-        [use_counts],
-        [use_features],
+        radius=[radius],
+        use_counts=[use_counts],
+        use_features=[use_features],
+        smiles=[smiles],
     )
     td = TanimotoDistance(params)
     results = np.concatenate(td(smiles).scores)
     assert np.allclose(results, expected_results)
+
+
+def test_comp_similarity_smiles_file_only():
+    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".smi") as handle:
+        handle.write("c1ccccc1\nCc1ccccc1\n")
+        smiles_file = handle.name
+
+    try:
+        params = Parameters(
+            radius=[2],
+            use_counts=[False],
+            use_features=[False],
+            smiles_file=[smiles_file],
+        )
+        component = TanimotoSimilarity(params)
+        results = component(["c1ccccc1"]).scores[0]
+        assert np.isclose(results[0], 1.0)
+    finally:
+        os.unlink(smiles_file)
