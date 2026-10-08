@@ -52,30 +52,30 @@ transform.high     = 2.0
 transform.coef_div = 100.0
 transform.coef_si  = 10.0
 transform.coef_se  = 10.0
-params.model_path  = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"]
-params.scaler_path = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"]
+params.model_path  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
+params.scaler_path = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
 
 [[stage.scoring.component]]
 [stage.scoring.component.DockingScore]
 [[stage.scoring.component.DockingScore.endpoint]]
 name                    = "DockingReward"
 weight                  = 3.0
-params.receptor_path    = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
-params.autobox_ligand   = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
-params.gnina_executable = ["/home/genai/Documents/gnina/gnina"]
-params.output_root      = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"]
-params.cnn_scoring      = ["none"]
-params.keep_outputs     = ["true"]
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
 
 [[stage.scoring.component.DockingScore.endpoint]]
 name                    = "DockingAffinity_raw"
 weight                  = 0.0
-params.receptor_path    = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"]
-params.autobox_ligand   = ["/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"]
-params.gnina_executable = ["/home/genai/Documents/gnina/gnina"]
-params.output_root      = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"]
-params.cnn_scoring      = ["none"]
-params.keep_outputs     = ["true"]
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
 
 [[stage.scoring.component]]
 [stage.scoring.component.PD1PDL1pIC50]
@@ -86,5 +86,5 @@ transform.type     = "sigmoid"
 transform.low      = 5.0
 transform.high     = 12.0
 transform.k        = 0.4
-params.model_path  = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"]
-params.scaler_path = ["/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"]
+params.model_path  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
+params.scaler_path = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
