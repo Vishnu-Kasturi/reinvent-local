@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Score a SMILES CSV (pIC50, Solubility, GNINA dock, Tyr pi-stacking) → top-N + Butina + PNGs.
+Score a SMILES table (CSV or Excel) → pIC50, Solubility, GNINA dock, Tyr → top-N + Butina + PNGs.
 
-Input: CSV with column smiles / SMILES / canonical_smiles / input_smiles
+Input: .csv / .tsv / .txt or .xlsx / .xlsm / .xls with column
+smiles / SMILES / canonical_smiles / input_smiles
 Output directory:
   scored_all.csv
   top{N}_molecules.csv
@@ -12,7 +13,10 @@ Output directory:
 
 Usage:
   python Preprocess/scripts/score_cluster_smiles_csv.py --input my.csv --out-dir results/run1
+  python Preprocess/scripts/score_cluster_smiles_csv.py --input Selected_mols_filtered.xlsx
   python Preprocess/scripts/score_cluster_smiles_csv.py   # uses CONFIG below
+
+Excel (.xlsx) requires: pip install openpyxl
 """
 
 from __future__ import annotations
@@ -80,6 +84,37 @@ PIC50_MODEL = _REPO_ROOT / "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.
 PIC50_SCALER = _REPO_ROOT / "Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"
 SOL_MODEL = _REPO_ROOT / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
 SOL_SCALER = _REPO_ROOT / "Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
+
+_EXCEL_SUFFIXES = frozenset({".xlsx", ".xlsm", ".xls"})
+_CSV_SUFFIXES = frozenset({".csv", ".tsv", ".txt"})
+
+
+def _load_input_table(path: Path) -> pd.DataFrame:
+    """Load molecules from CSV (with encoding fallback) or Excel."""
+    suffix = path.suffix.lower()
+    if suffix in _EXCEL_SUFFIXES:
+        engine = "openpyxl" if suffix in (".xlsx", ".xlsm") else None
+        try:
+            return pd.read_excel(path, engine=engine)
+        except ImportError as exc:
+            raise SystemExit(
+                "Reading Excel requires openpyxl: pip install openpyxl"
+            ) from exc
+    if suffix and suffix not in _CSV_SUFFIXES:
+        raise ValueError(
+            f"Unsupported input extension {suffix!r} (use .csv, .tsv, .txt, .xlsx, .xlsm, .xls)"
+        )
+    for encoding in ("utf-8", "utf-8-sig", "latin1", "cp1252"):
+        try:
+            return pd.read_csv(
+                path,
+                on_bad_lines="skip",
+                engine="python",
+                encoding=encoding,
+            )
+        except UnicodeDecodeError:
+            continue
+    return pd.read_csv(path, on_bad_lines="skip", engine="python", encoding="latin1")
 
 
 def _find_smiles_col(df: pd.DataFrame) -> str:
@@ -229,7 +264,7 @@ def score_and_cluster(
     if not input_csv.is_file():
         raise FileNotFoundError(input_csv)
 
-    df_in = pd.read_csv(input_csv, on_bad_lines="skip", engine="python")
+    df_in = _load_input_table(input_csv)
     smi_col = _find_smiles_col(df_in)
     print(f"Loaded {len(df_in)} rows from {input_csv} (column {smi_col})")
 
@@ -355,8 +390,8 @@ def score_and_cluster(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Score SMILES CSV + top-N Butina + PNGs")
-    p.add_argument("--input", type=Path, default=None, help="Input CSV")
+    p = argparse.ArgumentParser(description="Score SMILES CSV/Excel + top-N Butina + PNGs")
+    p.add_argument("--input", type=Path, default=None, help="Input .csv or .xlsx (etc.)")
     p.add_argument("--out-dir", type=Path, default=None, help="Output directory")
     p.add_argument("--top-n", type=int, default=TOP_N)
     p.add_argument("--top-clusters", type=int, default=TOP_CLUSTERS)
