@@ -64,6 +64,8 @@ class Parameters:
     cnn_scoring: List[str] = None
     timeout_sec: List[str] = None
     keep_outputs: List[str] = None
+    # "true" → endpoint 0 returns raw GNINA affinity (kcal/mol, negative) for reverse_sigmoid transforms
+    continuous_docking: List[str] = None
 
 
 @add_tag("__component")
@@ -81,7 +83,10 @@ class DockingScore:
         self.number_of_endpoints = 2
         self.config = build_config_from_params(params)
         self.config.validate()
-        logger.info(f"[DockingScore] receptor={self.config.receptor_path}")
+        raw = getattr(params, "continuous_docking", None) or ["false"]
+        self._continuous = str(raw[0]).lower() in ("true", "1", "yes")
+        mode = "continuous (affinity kcal/mol)" if self._continuous else "tiered"
+        logger.info(f"[DockingScore] receptor={self.config.receptor_path} reward_mode={mode}")
 
     @normalize_smiles
     def __call__(self, smilies: List[str]) -> ComponentResults:
@@ -91,9 +96,14 @@ class DockingScore:
         try:
             results = BatchCache.get_or_run(smilies, self.config)
             for i, res in enumerate(results):
-                rewards[i] = res.docking_reward
                 if res.docking_ok:
                     raw_affinity[i] = res.affinity
+                    if self._continuous:
+                        rewards[i] = float(res.affinity)
+                    else:
+                        rewards[i] = res.docking_reward
+                else:
+                    rewards[i] = 0.0
             logger.info(
                 f"[DockingScore] n={n} mean_reward={rewards.mean():.3f} "
                 f"best={np.nanmin(raw_affinity):.2f} kcal/mol"
