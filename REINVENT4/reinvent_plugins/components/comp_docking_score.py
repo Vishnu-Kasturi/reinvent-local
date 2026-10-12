@@ -64,7 +64,7 @@ class Parameters:
     cnn_scoring: List[str] = None
     timeout_sec: List[str] = None
     keep_outputs: List[str] = None
-    # "true" → endpoint 0 returns -affinity (kcal/mol) for sigmoid transforms (e.g. low=11, high=14)
+    # "true" → endpoint 0 returns raw GNINA affinity (kcal/mol, negative) for reverse_sigmoid transforms
     continuous_docking: List[str] = None
 
 
@@ -85,7 +85,7 @@ class DockingScore:
         self.config.validate()
         raw = getattr(params, "continuous_docking", None) or ["false"]
         self._continuous = str(raw[0]).lower() in ("true", "1", "yes")
-        mode = "continuous (-affinity)" if self._continuous else "tiered"
+        mode = "continuous (affinity kcal/mol)" if self._continuous else "tiered"
         logger.info(f"[DockingScore] receptor={self.config.receptor_path} reward_mode={mode}")
 
     @normalize_smiles
@@ -99,7 +99,7 @@ class DockingScore:
                 if res.docking_ok:
                     raw_affinity[i] = res.affinity
                     if self._continuous:
-                        rewards[i] = -float(res.affinity)
+                        rewards[i] = float(res.affinity)
                     else:
                         rewards[i] = res.docking_reward
                 else:

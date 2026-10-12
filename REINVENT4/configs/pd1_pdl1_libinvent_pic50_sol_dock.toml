@@ -2,7 +2,7 @@
 # pd1_pdl1_libinvent_pic50_sol_dock.toml
 # LibInvent RL — only 3 rewards (geometric mean):
 #   PD1PDL1Sol     weight 5.0
-#   DockingReward  weight 3.0  (sigmoid on -affinity, low=11 high=14)
+#   DockingReward  weight 3.0  (reverse_sigmoid on GNINA affinity, low=-14 high=-11 kcal/mol)
 #   PD1PDL1pIC50   weight 2.0
 ##############################################################################
 
@@ -60,9 +60,9 @@ params.scaler_path = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Prep
 [[stage.scoring.component.DockingScore.endpoint]]
 name                    = "DockingReward"
 weight                  = 3.0
-transform.type          = "sigmoid"
-transform.low           = 11.0
-transform.high          = 14.0
+transform.type          = "reverse_sigmoid"
+transform.low           = -14.0
+transform.high          = -11.0
 transform.k             = 0.4
 params.continuous_docking = "true"
 params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
