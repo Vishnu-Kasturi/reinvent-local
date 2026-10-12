@@ -4,6 +4,10 @@ Score a SMILES table (CSV or Excel) → pIC50, Solubility, GNINA dock, Tyr → t
 
 Input: .csv / .tsv / .txt or .xlsx / .xlsm / .xls with column
 smiles / SMILES / canonical_smiles / input_smiles
+
+If both a docking-score column and a tyrosine column are already present (see
+DOCKING_ALIASES / TYR_ALIASES in this file), GNINA + ProLIF are skipped for those
+rows; pIC50 and Solubility are still predicted from SMILES.
 Output directory:
   scored_all.csv
   top{N}_molecules.csv
@@ -52,6 +56,23 @@ from reinvent_gnina_backend import BatchCache, GninaProlifConfig  # noqa: E402
 
 _FP_GEN = GetMorganGenerator(radius=2, fpSize=2048)
 SMILES_ALIASES = ("SMILES", "smiles", "canonical_smiles", "input_smiles")
+DOCKING_ALIASES = (
+    "Docking_Score",
+    "docking_score",
+    "DockingAffinity_raw",
+    "dock_gnina",
+    "gnina_affinity",
+    "affinity",
+    "Docking Affinity",
+)
+TYR_ALIASES = (
+    "Tyrosine_PiStacking",
+    "tyrosine_pistacking",
+    "tyr_pi_stacking",
+    "Tyrosine_PiStacking_count",
+    "TyrInteractionCount_raw",
+    "TyrInteractionReward",
+)
 
 # ── CONFIG (defaults when CLI flags omitted) ─────────────────────────────────
 INPUT_CSV = _REPO_ROOT / "iict_libinvent/input.smi.csv"
@@ -117,14 +138,29 @@ def _load_input_table(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, on_bad_lines="skip", engine="python", encoding="latin1")
 
 
-def _find_smiles_col(df: pd.DataFrame) -> str:
+def _find_col(df: pd.DataFrame, names: tuple[str, ...]) -> str | None:
     lower = {str(c).lower(): c for c in df.columns}
-    for name in SMILES_ALIASES:
+    for name in names:
         if name in df.columns:
             return name
         if name.lower() in lower:
             return lower[name.lower()]
+    return None
+
+
+def _find_smiles_col(df: pd.DataFrame) -> str:
+    col = _find_col(df, SMILES_ALIASES)
+    if col:
+        return col
     raise ValueError(f"No SMILES column. Columns: {list(df.columns)}")
+
+
+def _has_dock_and_tyr_columns(df: pd.DataFrame) -> tuple[str, str] | None:
+    dock = _find_col(df, DOCKING_ALIASES)
+    tyr = _find_col(df, TYR_ALIASES)
+    if dock and tyr:
+        return dock, tyr
+    return None
 
 
 def _load_booster(path: Path, device: str) -> xgb.Booster:
@@ -292,27 +328,41 @@ def score_and_cluster(
     work["pIC50"] = _predict_qsar(smiles_list, pic50_model, PIC50_SCALER, compute_pic50_features)
     work["Solubility"] = _predict_qsar(smiles_list, sol_model, SOL_SCALER, compute_sol_features)
 
-    dock_cfg = GninaProlifConfig(
-        receptor_path=RECEPTOR,
-        autobox_ligand=AUTOBOX,
-        gnina_executable=GNINA,
-        output_root=str(DOCKING_ROOT),
-        cnn_scoring="none",
-        keep_outputs=True,
-        tyr_residue=56,
-    )
-    dock_cfg.validate()
+    existing = _has_dock_and_tyr_columns(work)
+    if existing:
+        dock_col, tyr_col = existing
+        print(
+            f"Using input columns {dock_col!r} and {tyr_col!r}; "
+            "skipping GNINA + ProLIF"
+        )
+        work["Docking_Score"] = pd.to_numeric(work[dock_col], errors="coerce")
+        work["Tyrosine_PiStacking"] = pd.to_numeric(work[tyr_col], errors="coerce")
+        work["docking_ok"] = (
+            work["Docking_Score"].notna() & work["Tyrosine_PiStacking"].notna()
+        )
+    else:
+        dock_cfg = GninaProlifConfig(
+            receptor_path=RECEPTOR,
+            autobox_ligand=AUTOBOX,
+            gnina_executable=GNINA,
+            output_root=str(DOCKING_ROOT),
+            cnn_scoring="none",
+            keep_outputs=True,
+            tyr_residue=56,
+        )
+        dock_cfg.validate()
 
-    print("Docking + Tyr (GNINA + ProLIF)...")
-    dock_results = BatchCache.get_or_run(smiles_list, dock_cfg)
-    work["Docking_Score"] = [
-        float(r.affinity) if r.docking_ok and np.isfinite(r.affinity) else np.nan
-        for r in dock_results
-    ]
-    work["Tyrosine_PiStacking"] = [
-        float(r.tyr_pi_stacking_count) if r.docking_ok else np.nan for r in dock_results
-    ]
-    work["docking_ok"] = [bool(r.docking_ok) for r in dock_results]
+        print("Docking + Tyr (GNINA + ProLIF)...")
+        dock_results = BatchCache.get_or_run(smiles_list, dock_cfg)
+        work["Docking_Score"] = [
+            float(r.affinity) if r.docking_ok and np.isfinite(r.affinity) else np.nan
+            for r in dock_results
+        ]
+        work["Tyrosine_PiStacking"] = [
+            float(r.tyr_pi_stacking_count) if r.docking_ok else np.nan
+            for r in dock_results
+        ]
+        work["docking_ok"] = [bool(r.docking_ok) for r in dock_results]
 
     scored = work.drop(columns=["mol"])
     metric_cols = ["pIC50", "Solubility", "Docking_Score", "Tyrosine_PiStacking"]
