@@ -1,0 +1,95 @@
+##############################################################################
+# pd1_pdl1_linkinvent_pic50_sol_dock.toml
+# LinkInvent RL — only 3 rewards (geometric mean):
+#   PD1PDL1Sol     weight 5.0  (highest)
+#   DockingReward  weight 5.0  (high)
+#   PD1PDL1pIC50   weight 2.0
+#
+# Edit smiles_file / warheads and paths for your run.
+##############################################################################
+
+run_type = "staged_learning"
+device   = "cuda:1"
+tb_logdir       = "/home/genai/Vishnu/psearch-master/reinvent-local-main/tb_linkinvent_pic50_sol_dock"
+json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_linkinvent_pic50_sol_dock.json"
+
+[parameters]
+prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/linkinvent.prior"
+agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/linkinvent.prior"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/warheads_1.smi"
+summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/linkinvent_pic50_sol_dock"
+batch_size         = 16
+unique_sequences   = true
+randomize_smiles   = true
+use_checkpoint     = false
+
+[learning_strategy]
+type  = "dap"
+sigma = 96
+rate  = 0.00005
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 25
+minscore    = 0.35
+
+[[stage]]
+chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/linkinvent_pic50_sol_dock.chkpt"
+termination = "simple"
+max_score   = 0.85
+min_steps   = 100
+max_steps   = 300
+
+[stage.scoring]
+type = "geometric_mean"
+
+# ── 1. Solubility (highest weight) ───────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1Sol]
+[[stage.scoring.component.PD1PDL1Sol.endpoint]]
+name               = "PD1PDL1Sol"
+weight             = 5.0
+transform.type     = "double_sigmoid"
+transform.low      = -4.0
+transform.high     = 2.0
+transform.coef_div = 100.0
+transform.coef_si  = 10.0
+transform.coef_se  = 10.0
+params.model_path  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_model.ubj"
+params.scaler_path = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_sol_final_acc_scaler.pkl"
+
+# ── 2. GNINA docking (high weight) ───────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.DockingScore]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingReward"
+weight                  = 5.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingAffinity_raw"
+weight                  = 0.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
+# ── 3. pIC50 (lower weight) ──────────────────────────────────────────────────
+[[stage.scoring.component]]
+[stage.scoring.component.PD1PDL1pIC50]
+[[stage.scoring.component.PD1PDL1pIC50.endpoint]]
+name               = "PD1PDL1pIC50"
+weight             = 2.0
+transform.type     = "sigmoid"
+transform.low      = 5.0
+transform.high     = 12.0
+transform.k        = 0.4
+params.model_path  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_model.ubj"
+params.scaler_path = "/home/genai/Vishnu/psearch-master/reinvent-local-main/Preprocess/final_acc/pd1_pdl1_pic50_final_acc_scaler.pkl"

@@ -1,0 +1,129 @@
+##############################################################################
+# pd1_pdl1_mol2mol_ring_decor_dock_tyr.toml
+# Mol2Mol RL — 5 weighted rewards only:
+#   NearLead | Dock | Tyr | AromaticRings | RingHetero (N/O/NH in rings)
+#
+# Prior: mol2mol_medium_similarity.prior
+##############################################################################
+
+run_type        = "staged_learning"
+device          = "cuda:1"
+tb_logdir       = "/home/genai/Vishnu/psearch-master/reinvent-local-main/tb_mol2mol_ring_decor"
+json_out_config = "/home/genai/Vishnu/psearch-master/reinvent-local-main/json_mol2mol_ring_decor.json"
+
+[parameters]
+prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_medium_similarity.prior"
+agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/mol2mol_medium_similarity.prior"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
+sample_strategy    = "multinomial"
+distance_threshold = 100
+summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/mol2mol_ring_decor"
+batch_size         = 8
+unique_sequences   = true
+randomize_smiles   = true
+use_checkpoint     = false
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 10
+minscore    = 0.42
+
+[[stage]]
+chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/mol2mol_ring_decor.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 40
+max_steps   = 120
+
+[stage.scoring]
+type = "geometric_mean"
+
+# 1 — stay near lead (not scaffold hop)
+[[stage.scoring.component]]
+[stage.scoring.component.TanimotoSimilarity]
+[[stage.scoring.component.TanimotoSimilarity.endpoint]]
+name                = "NearLead"
+weight              = 2.5
+transform.type      = "sigmoid"
+transform.low       = 0.58
+transform.high      = 0.88
+transform.k         = 0.42
+params.smiles_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/scafolds_5.smi"
+params.radius       = 2
+params.use_counts   = false
+params.use_features = false
+
+# 2 — docking
+[[stage.scoring.component]]
+[stage.scoring.component.DockingScore]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingReward"
+weight                  = 3.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingAffinity_raw"
+weight                  = 0.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
+# 3 — Tyr-56
+[[stage.scoring.component]]
+[stage.scoring.component.TyrosineInteraction]
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                    = "TyrInteractionReward"
+weight                  = 2.5
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+params.tyr_residue      = "56"
+
+[[stage.scoring.component.TyrosineInteraction.endpoint]]
+name                    = "TyrInteractionCount_raw"
+weight                  = 0.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+params.tyr_residue      = "56"
+
+# 4 — aromatic / fused ring count
+[[stage.scoring.component]]
+[stage.scoring.component.NumAromaticRings]
+[[stage.scoring.component.NumAromaticRings.endpoint]]
+name           = "AromaticRings"
+weight         = 1.5
+transform.type = "step"
+transform.low  = 2
+transform.high = 5
+
+# 5 — N, O, NH in rings (single SMARTS bucket)
+[[stage.scoring.component]]
+[stage.scoring.component.GroupCount]
+[[stage.scoring.component.GroupCount.endpoint]]
+name           = "RingHetero"
+weight         = 1.5
+transform.type = "sigmoid"
+transform.low  = 0
+transform.high = 5
+transform.k    = 0.35
+params.smarts  = "[#7,#8;R]"

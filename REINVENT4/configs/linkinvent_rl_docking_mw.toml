@@ -1,0 +1,149 @@
+##############################################################################
+# linkinvent_rl_docking_mw.toml
+# LinkInvent RL: GNINA docking + MW gate + linker shape/aromatic constraints
+#
+# Run:
+#   reinvent /path/to/linkinvent_rl_docking_mw.toml
+##############################################################################
+
+run_type        = "staged_learning"
+device          = "cuda:0"
+tb_logdir       = "tb_linkinvent_2"
+json_out_config = "json_linkinvent_2.json"
+
+[parameters]
+prior_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/linkinvent.prior"
+agent_file         = "/home/genai/Vishnu/psearch-master/reinvent-local-main/REINVENT4/priors/linkinvent.prior"
+smiles_file        = "/home/genai/Vishnu/psearch-master/reinvent-local-main/data/warheads_1.smi"
+summary_csv_prefix = "/home/genai/Vishnu/psearch-master/reinvent-local-main/results/linkinvent_2"
+batch_size         = 8
+unique_sequences   = true
+randomize_smiles   = true
+
+[learning_strategy]
+type  = "dap"
+sigma = 128
+rate  = 0.0001
+
+[diversity_filter]
+type        = "IdenticalMurckoScaffold"
+bucket_size = 25
+minscore    = 0.2
+
+[[stage]]
+chkpt_file  = "/home/genai/Vishnu/psearch-master/reinvent-local-main/models/linkinvent_2.chkpt"
+termination = "simple"
+max_score   = 1.0
+min_steps   = 50
+max_steps   = 200
+
+[stage.scoring]
+type = "geometric_mean"
+
+# GNINA docking (tiered: <=-12 -> 1.0, (-12,-10] -> 0.5, >-10 -> 0.0)
+[[stage.scoring.component]]
+[stage.scoring.component.DockingScore]
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingReward"
+weight                  = 3.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
+[[stage.scoring.component.DockingScore.endpoint]]
+name                    = "DockingAffinity_raw"
+weight                  = 0.0
+params.receptor_path    = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/receptor.pdb"
+params.autobox_ligand   = "/home/genai/navneet/iict/pdl1/docking_TL_dataset/ref_ligand.pdb"
+params.gnina_executable = "/home/genai/Documents/gnina/gnina"
+params.output_root      = "/home/genai/Vishnu/psearch-master/reinvent-local-main/docking_runs"
+params.cnn_scoring      = "none"
+params.keep_outputs     = "true"
+
+# Full-molecule MW gate: 1 if MW <= 700, else 0
+[[stage.scoring.component]]
+[stage.scoring.component.MolecularWeight]
+[[stage.scoring.component.MolecularWeight.endpoint]]
+name           = "MW_gate"
+weight         = 1.0
+transform.type = "step"
+transform.low  = 0
+transform.high = 700
+
+# Short linker (effective span 2-6 atoms)
+[[stage.scoring.component]]
+[stage.scoring.component.FragmentEffectiveLength]
+[[stage.scoring.component.FragmentEffectiveLength.endpoint]]
+name           = "ShortLinker"
+weight         = 2.0
+transform.type = "step"
+transform.low  = 2
+transform.high = 6
+
+# Linear linker (high length ratio = straighter linker)
+[[stage.scoring.component]]
+[stage.scoring.component.FragmentLengthRatio]
+[[stage.scoring.component.FragmentLengthRatio.endpoint]]
+name           = "LinearLinker"
+weight         = 1.5
+transform.type = "sigmoid"
+transform.low  = 60
+transform.high = 95
+transform.k    = 0.3
+
+# Max 2 rotatable bonds in linker
+[[stage.scoring.component]]
+[stage.scoring.component.FragmentNumRotBond]
+[[stage.scoring.component.FragmentNumRotBond.endpoint]]
+name           = "LinkerRotBonds"
+weight         = 2.0
+transform.type = "step"
+transform.low  = 0
+transform.high = 2
+
+# Aromatic rings in linker
+[[stage.scoring.component]]
+[stage.scoring.component.FragmentNumAromaticRings]
+[[stage.scoring.component.FragmentNumAromaticRings.endpoint]]
+name           = "LinkerAromaticRings"
+weight         = 2.5
+transform.type = "sigmoid"
+transform.low  = 0
+transform.high = 2
+transform.k    = 0.5
+
+# Penalize aliphatic rings in linker
+[[stage.scoring.component]]
+[stage.scoring.component.FragmentNumAliphaticRings]
+[[stage.scoring.component.FragmentNumAliphaticRings.endpoint]]
+name           = "NoAliphaticLinkerRings"
+weight         = 1.5
+transform.type = "reverse_sigmoid"
+transform.low  = 0
+transform.high = 1
+transform.k    = 0.5
+
+# Low sp3 in linker
+[[stage.scoring.component]]
+[stage.scoring.component.FragmentCsp3]
+[[stage.scoring.component.FragmentCsp3.endpoint]]
+name           = "LowLinkerCsp3"
+weight         = 1.5
+transform.type = "reverse_sigmoid"
+transform.low  = 0.1
+transform.high = 0.5
+transform.k    = 0.5
+
+# More aromatic rings in full molecule
+[[stage.scoring.component]]
+[stage.scoring.component.NumAromaticRings]
+[[stage.scoring.component.NumAromaticRings.endpoint]]
+name           = "TotalAromaticRings"
+weight         = 2.0
+transform.type = "sigmoid"
+transform.low  = 3
+transform.high = 6
+transform.k    = 0.4
